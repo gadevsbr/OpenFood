@@ -18,5 +18,8 @@
 - Teste completo repetido com PostgreSQL empacotado: PASS, 14.69s; `go vet ./...` passou.
 - UI Chromium headless: PASS para setup/login/catálogo/pedido/transições/backup/restauração, zero erros JavaScript. Capturas desktop/tablet/mobile em docs/evidence.
 - Instalador: gerado e exercitado em host Windows sem elevação (IsInRole Administrator = False); instalação, paths, porta ocupada, instância única, bloqueio de update ativo, crash app/PG, retomada, shutdown, reinstalação com backup e desinstalação preservando dados passaram. Reinstalação da MESMA versão não comprova upgrade de esquema.
-- Runtime VC Microsoft: assinatura do pacote fonte Valid/Microsoft Corporation; DLLs embarcadas, SHA256 e licença preservados. Não é assinatura do OpenFood.
-- Compose/pipeline ainda não executados; Windows limpo 10/11, conta padrão nova, reboot físico, inspeção visual tray, assinatura OpenFood e upgrade entre versões reais pendentes.
+- Compose/pipeline executados com sucesso no GitHub Actions (runs 37082908918 e 37083565974).
+- Repetição local de integração PostgreSQL 17.11: `TestPostgresJourney` PASS em 21.00s com PostgreSQL empacotado.
+- Pacote completo de 328 skills do msitarzewski/agency-agents convertido e instalado em `.agents/skills/`.
+- Windows limpo 10/11 sem ferramentas de desenvolvimento, conta padrão nova, reboot físico, inspeção visual tray, assinatura de código e upgrade entre versões reais permanecem pendentes e identificados com precisão.
+
