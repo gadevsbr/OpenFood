@@ -10,6 +10,7 @@
 - govulncheck inicial identificou 6 vulnerabilidades alcançáveis em Go 1.26.5/pgx/x/text. Versões iniciais superseded pelas corrigidas; nova varredura e artefatos finais em andamento.
 - Nova varredura govulncheck com Go 1.26.8: zero vulnerabilidades alcançáveis; uma em módulo requerido sem chamadas identificadas. Não equivale a auditoria completa de segurança.
 - Repetição final após alias 8.3, com caminho acentuado correto e Go 1.26.8: instalador/lifecycle PASS; UI PASS; testes PG PASS 17.46s. Scripts PS têm BOM para PowerShell 5; gitattributes fixa LF no SQL para checksum idêntico Windows/Linux.
+- GitHub Actions 37082908918: job Linux Ubuntu 24.04 PASS; Docker Compose build/readiness, setup, catálogo, pedido, estoque, idempotência, transições, pg_dump/pg_restore e restart executados de verdade. Pendência anterior "Compose não executado" superseded por essa evidência.
 - Teste completo repetido com PostgreSQL empacotado: PASS, 14.69s; `go vet ./...` passou.
 - UI Chromium headless: PASS para setup/login/catálogo/pedido/transições/backup/restauração, zero erros JavaScript. Capturas desktop/tablet/mobile em docs/evidence.
 - Instalador: gerado e exercitado em host Windows sem elevação (IsInRole Administrator = False); instalação, paths, porta ocupada, instância única, bloqueio de update ativo, crash app/PG, retomada, shutdown, reinstalação com backup e desinstalação preservando dados passaram. Reinstalação da MESMA versão não comprova upgrade de esquema.
