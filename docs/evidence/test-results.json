@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-02",
+  "environment": "Windows com ferramentas de desenvolvimento; Chrome headless; não ambiente limpo",
+  "passed": [
+    "setup",
+    "login",
+    "catalog",
+    "manual order",
+    "backend amount 3998 cents",
+    "order transitions",
+    "responsive widths",
+    "diagnostics without credentials",
+    "backup download",
+    "UI restore",
+    "session revocation",
+    "preserved completed order"
+  ],
+  "javascript_errors": [],
+  "status": "PASS"
+}

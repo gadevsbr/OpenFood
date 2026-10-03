@@ -1,0 +1,17 @@
+# Evidência
+- Inicial: pasta vazia; sem repositório Git, sem Docker, sem PostgreSQL instalado.
+- Windows disponível com ferramentas de desenvolvimento; não é ambiente limpo.
+- Registro anterior "agency-sagents não encontrado": superseded em 2026-10-02 pela correção do usuário para msitarzewski/agency-agents.
+- Referências consultadas: Backend Architect, Desktop App Engineer e Reality Checker, commit d3f71c4bb8922d3eea7576237a870dd59b3cdd52. Cópia local em tools/agency-agents, ignorada pelo Git.
+- GitHub autenticado; repositório remoto ainda não definido.
+- Testes e artefatos serão registrados após execução, sem equiparar build a validação limpa.
+- Etapa núcleo: `go test -v ./internal/app -run TestPostgresJourney -count=1` com PostgreSQL 17.11 real: PASS, 23.20s. Cobertura: caminho acentuado, setup repetido, CSRF, autenticação, isolamento, estoque concorrente, idempotência, snapshot, transições, lease expirada, dump/restore, formato inválido, revogação de sessões e reabertura.
+- Primeira tentativa de initdb falhou; repetições reais posteriores passaram. Instalação com path acentuado real revelou bug upstream 16926, corrigido por alias 8.3 para binários; repetição instalada final em andamento.
+- govulncheck inicial identificou 6 vulnerabilidades alcançáveis em Go 1.26.5/pgx/x/text. Versões iniciais superseded pelas corrigidas; nova varredura e artefatos finais em andamento.
+- Nova varredura govulncheck com Go 1.26.8: zero vulnerabilidades alcançáveis; uma em módulo requerido sem chamadas identificadas. Não equivale a auditoria completa de segurança.
+- Repetição final após alias 8.3, com caminho acentuado correto e Go 1.26.8: instalador/lifecycle PASS; UI PASS; testes PG PASS 17.46s. Scripts PS têm BOM para PowerShell 5; gitattributes fixa LF no SQL para checksum idêntico Windows/Linux.
+- Teste completo repetido com PostgreSQL empacotado: PASS, 14.69s; `go vet ./...` passou.
+- UI Chromium headless: PASS para setup/login/catálogo/pedido/transições/backup/restauração, zero erros JavaScript. Capturas desktop/tablet/mobile em docs/evidence.
+- Instalador: gerado e exercitado em host Windows sem elevação (IsInRole Administrator = False); instalação, paths, porta ocupada, instância única, bloqueio de update ativo, crash app/PG, retomada, shutdown, reinstalação com backup e desinstalação preservando dados passaram. Reinstalação da MESMA versão não comprova upgrade de esquema.
+- Runtime VC Microsoft: assinatura do pacote fonte Valid/Microsoft Corporation; DLLs embarcadas, SHA256 e licença preservados. Não é assinatura do OpenFood.
+- Compose/pipeline ainda não executados; Windows limpo 10/11, conta padrão nova, reboot físico, inspeção visual tray, assinatura OpenFood e upgrade entre versões reais pendentes.

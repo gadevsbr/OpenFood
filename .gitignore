@@ -1,0 +1,11 @@
+/dist/
+/tools/
+/runtime/
+/.env
+*.log
+*.dump
+*.zip
+*.exe
+*.key
+*.pem
+node_modules/

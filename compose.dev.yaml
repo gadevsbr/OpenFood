@@ -1,0 +1,11 @@
+services:
+  app:
+    build:
+      context: .
+      target: build
+    entrypoint: ["go", "run", "./cmd/openfood"]
+    read_only: false
+    working_dir: /src
+    volumes:
+      - ./cmd:/src/cmd:ro
+      - ./internal:/src/internal:ro

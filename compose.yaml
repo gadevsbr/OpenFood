@@ -1,0 +1,38 @@
+name: openfood
+services:
+  db:
+    image: postgres:17.11-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openfood
+      POSTGRES_USER: openfood
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure a senha do banco}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U openfood -d openfood"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://openfood:${POSTGRES_PASSWORD:?Configure a senha do banco}@db:5432/openfood?sslmode=disable
+      SETUP_TOKEN: ${SETUP_TOKEN:?Configure um token de setup}
+    ports:
+      - "127.0.0.1:18880:8080"
+    stop_grace_period: 40s
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, /usr/local/bin/openfood, --healthcheck]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+volumes:
+  database:

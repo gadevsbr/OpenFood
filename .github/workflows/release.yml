@@ -1,0 +1,74 @@
+name: Build and release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+      - name: Build installer and checksum
+        shell: pwsh
+        run: ./scripts/build-windows.ps1
+      - name: Real PostgreSQL integration
+        shell: pwsh
+        run: |
+          $env:OPENFOOD_TEST_PG_BIN = "$PWD/tools/pg/pgsql/bin"
+          go test -v ./...
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+      - name: Installed lifecycle tests (not clean VM certification)
+        shell: pwsh
+        run: ./scripts/test-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/*.exe
+            dist/*.zip
+            dist/SHA256SUMS
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+      - run: go test ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - run: |
+          printf 'POSTGRES_PASSWORD=%s\nSETUP_TOKEN=%s\n' "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" > .env
+          docker compose up --build -d --wait
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:18880/readyz && break; sleep 2; done
+          curl -fsS http://127.0.0.1:18880/readyz
+          python3 scripts/test-linux.py
+          docker compose down
+      - run: |
+          mkdir -p dist
+          CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -buildid=' -o dist/openfood ./cmd/openfood
+          tar -czf dist/OpenFood-0.1.0-alpha.1-linux-x64.tar.gz -C dist openfood
+          cd dist && sha256sum *.tar.gz > SHA256SUMS-linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/*.tar.gz
+            dist/SHA256SUMS-linux
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, linux]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish experimental release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create '${{ github.ref_name }}' dist/* --repo '${{ github.repository }}' --prerelease --title 'OpenFood ${{ github.ref_name }}' --notes 'Experimental. Consulte project-memory/validation.md. Build não substitui validação em Windows limpo. Integrações externas ainda desabilitadas.'

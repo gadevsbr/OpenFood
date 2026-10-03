@@ -1,0 +1,7 @@
+.git
+tools
+dist
+runtime
+.env
+node_modules
+*.dump

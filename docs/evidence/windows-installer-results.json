@@ -1,0 +1,27 @@
+﻿{
+    "date":  "2026-10-02",
+    "status":  "PASS",
+    "pending":  [
+                    "Windows 10/11 clean VM",
+                    "standard non-admin account",
+                    "physical reboot",
+                    "upgrade across different schemas",
+                    "tray visual inspection",
+                    "Authenticode signing"
+                ],
+    "environment":  "Windows com ferramentas; não VM limpa",
+    "passed":  [
+                   "installer",
+                   "accented paths",
+                   "occupied HTTP port",
+                   "second instance",
+                   "update blocked while running",
+                   "manual order",
+                   "process crash",
+                   "PostgreSQL immediate stop and WAL recovery",
+                   "graceful shutdown",
+                   "same-version reinstall with backup",
+                   "data preserved",
+                   "uninstall preserves data"
+               ]
+}
