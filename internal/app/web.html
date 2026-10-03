@@ -1,5 +1,58 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OpenFood</title><style>
-:root{font:16px system-ui;color:#182a25;background:#f2f5f3}*{box-sizing:border-box}body{margin:0}header{background:#143d30;color:white;padding:20px 5%;display:flex;justify-content:space-between;align-items:center}header strong{font-size:24px}main{max-width:1100px;margin:28px auto;padding:0 20px}section{background:white;border:1px solid #d8e2dc;border-radius:12px;padding:24px;margin-bottom:20px}h1{font-size:28px;margin:0 0 8px}h2{font-size:20px}p{line-height:1.6}label{display:block;margin:12px 0}input,select,button{font:inherit;padding:10px;border-radius:6px;border:1px solid #899d91}input,select{width:100%;max-width:450px}button{background:#1c664a;color:white;cursor:pointer;margin:6px 6px 6px 0}button:disabled{opacity:.5}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #d19425;outline-offset:2px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}table{border-collapse:collapse;width:100%}td,th{text-align:left;border-bottom:1px solid #d8e2dc;padding:12px 8px}small{display:block;color:#52685b}#message{padding:14px;background:#fff2d4;white-space:pre-wrap;margin-bottom:16px}.hidden{display:none!important}.notice{border-left:4px solid #d19425;padding-left:16px}.scroll{overflow-x:auto}@media(max-width:720px){.grid{grid-template-columns:1fr}header{padding:16px}section{padding:16px}}
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  --bg-app: #f4f6f5;
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #f8faf9;
+  --border-subtle: #e2e8e5;
+  --border-strong: #8fa397;
+  --text-main: #13221c;
+  --text-muted: #4e6357;
+  --primary: #124b37;
+  --primary-hover: #0c3627;
+  --primary-contrast: #ffffff;
+  --accent: #c48011;
+  --accent-light: #fef8ee;
+  --danger: #b91c1c;
+  --danger-light: #fef2f2;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-sans); font-size: 15px; color: var(--text-main); background: var(--bg-app); -webkit-font-smoothing: antialiased; }
+header { background: var(--primary); color: var(--primary-contrast); padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-sm); }
+header strong { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+#health { font-size: 13px; font-weight: 500; background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 999px; }
+main { max-width: 1140px; margin: 32px auto; padding: 0 20px; }
+section { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px; box-shadow: var(--shadow-sm); }
+h1 { font-size: 24px; font-weight: 700; margin: 0 0 8px; color: var(--text-main); letter-spacing: -0.02em; }
+h2 { font-size: 18px; font-weight: 600; margin: 0 0 16px; color: var(--text-main); border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
+p { line-height: 1.6; margin: 0 0 12px; }
+label { display: block; margin: 14px 0 6px; font-weight: 500; font-size: 14px; color: var(--text-main); }
+input, select, button { font: inherit; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); }
+input, select { width: 100%; max-width: 460px; background: var(--bg-surface); color: var(--text-main); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button { background: var(--primary); color: var(--primary-contrast); border: none; font-weight: 600; cursor: pointer; margin: 6px 6px 6px 0; transition: background 0.15s ease-in-out; }
+button:hover:not(:disabled) { background: var(--primary-hover); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; border-bottom: 2px solid var(--border-subtle); padding: 12px 10px; font-weight: 600; color: var(--text-muted); background: var(--bg-surface-subtle); }
+td { text-align: left; border-bottom: 1px solid var(--border-subtle); padding: 12px 10px; vertical-align: middle; }
+small { display: block; color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+#message { padding: 14px 18px; background: var(--accent-light); border: 1px solid var(--accent); border-radius: var(--radius-sm); white-space: pre-wrap; margin-bottom: 20px; font-weight: 500; }
+.hidden { display: none !important; }
+.notice { border-left: 4px solid var(--accent); background: var(--accent-light); padding: 14px 18px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 768px) {
+  main { margin: 18px auto; padding: 0 12px; }
+  .grid { grid-template-columns: 1fr; gap: 16px; }
+  header { padding: 14px 16px; flex-direction: column; align-items: flex-start; gap: 8px; }
+  section { padding: 18px 14px; }
+  input, select { max-width: 100%; }
+}
 </style></head><body><header><strong>OpenFood</strong><span id="health">Verificando serviços…</span></header><main><div id="message" role="status" class="hidden"></div>
 <section id="setup" class="hidden"><h1>Vamos configurar sua loja</h1><p>Crie o administrador. Nenhuma senha padrão é utilizada.</p><form id="setupForm"><label>Nome da loja<input name="store" required maxlength="120"></label><label>E-mail<input type="email" name="email" required></label><label>Senha (12 a 72 caracteres)<input type="password" name="password" minlength="12" maxlength="72" required autocomplete="new-password"></label><label id="tokenLabel">Token temporário de configuração<input name="token" required autocomplete="off"></label><button>Configurar instalação</button></form></section>
 <section id="login" class="hidden"><h1>Acesse sua operação</h1><form id="loginForm"><label>E-mail<input type="email" name="email" required autocomplete="username"></label><label>Senha<input type="password" name="password" required autocomplete="current-password"></label><button>Entrar</button></form></section>

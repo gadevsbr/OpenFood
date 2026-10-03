@@ -21,5 +21,7 @@
 - Compose/pipeline executados com sucesso no GitHub Actions (runs 37082908918 e 37083565974).
 - Repetição local de integração PostgreSQL 17.11: `TestPostgresJourney` PASS em 21.00s com PostgreSQL empacotado.
 - Pacote completo de 328 skills do msitarzewski/agency-agents convertido e instalado em `.agents/skills/`.
+- UI aprimorada com Design Tokens CSS, WCAG AA focus e tipografia de sistema; `TestPostgresJourney` revalidado: PASS em 15.64s.
 - Windows limpo 10/11 sem ferramentas de desenvolvimento, conta padrão nova, reboot físico, inspeção visual tray, assinatura de código e upgrade entre versões reais permanecem pendentes e identificados com precisão.
+
 
