@@ -28,13 +28,35 @@ var schema string
 //go:embed web.html
 var web []byte
 
-const Version = "0.1.0-alpha.1"
+const Version = "0.2.0-alpha.1"
+
+// Roles supported by OpenFood RBAC
+const (
+	RoleInstanceAdmin = "instance_admin"
+	RoleOrgAdmin      = "org_admin"
+	RoleStoreManager  = "store_manager"
+	RoleAttendant     = "attendant"
+	RoleKitchen       = "kitchen"
+	RoleDispatch      = "dispatch"
+	RoleFinanceViewer = "finance_viewer"
+)
+
+var validRoles = map[string]bool{
+	RoleInstanceAdmin: true,
+	RoleOrgAdmin:      true,
+	RoleStoreManager:  true,
+	RoleAttendant:     true,
+	RoleKitchen:       true,
+	RoleDispatch:      true,
+	RoleFinanceViewer: true,
+}
 
 type Maintenance interface {
 	Backup(context.Context) (string, error)
 	Restore(context.Context, []byte) error
 	Diagnostics() any
 }
+
 type App struct {
 	DB           *pgxpool.Pool
 	SetupToken   string
@@ -44,9 +66,20 @@ type App struct {
 	authMu       sync.Mutex
 	authAttempts map[string]attempt
 }
+
 type attempt struct {
 	count int
 	until time.Time
+}
+
+type SessionUser struct {
+	ID           int64
+	OrgID        int64
+	StoreID      *int64
+	Email        string
+	Role         string
+	Active       bool
+	TokenVersion int
 }
 
 func Token() string {
@@ -56,7 +89,12 @@ func Token() string {
 	}
 	return hex.EncodeToString(b)
 }
-func Hash(s string) string { sum := sha256.Sum256([]byte(s)); return hex.EncodeToString(sum[:]) }
+
+func Hash(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
 func Open(ctx context.Context, dsn string, setup string, ops Maintenance) (*App, error) {
 	cfg, e := pgxpool.ParseConfig(dsn)
 	if e != nil {
@@ -78,6 +116,7 @@ func Open(ctx context.Context, dsn string, setup string, ops Maintenance) (*App,
 	}
 	return a, nil
 }
+
 func (a *App) Migrate(ctx context.Context) error {
 	tx, e := a.DB.Begin(ctx)
 	if e != nil {
@@ -97,29 +136,91 @@ func (a *App) Migrate(ctx context.Context) error {
 		if _, e = tx.Exec(ctx, schema); e != nil {
 			return e
 		}
-		_, e = tx.Exec(ctx, "INSERT INTO schema_migrations(version,checksum) VALUES(1,$1)", Hash(schema))
-	} else if e == nil && (n != 1 || checksum != Hash(schema)) {
-		return errors.New("migration_incompatible")
+		_, e = tx.Exec(ctx, "INSERT INTO schema_migrations(version,checksum) VALUES(2,$1)", Hash(schema))
+	} else if e == nil {
+		if n == 1 {
+			// Migration from v1 to v2 (Organizations, RBAC, Store scoping)
+			migrationSQL := `
+				CREATE TABLE IF NOT EXISTS organizations(id bigserial PRIMARY KEY, name text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+				INSERT INTO organizations(name) SELECT name FROM stores ORDER BY id LIMIT 1 ON CONFLICT DO NOTHING;
+				DO $$
+				DECLARE
+					default_org bigint;
+				BEGIN
+					SELECT id INTO default_org FROM organizations ORDER BY id LIMIT 1;
+					IF default_org IS NULL THEN
+						INSERT INTO organizations(name) VALUES('Organização Principal') RETURNING id INTO default_org;
+					END IF;
+
+					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stores' AND column_name='org_id') THEN
+						ALTER TABLE stores ADD COLUMN org_id bigint REFERENCES organizations(id) ON DELETE CASCADE;
+						UPDATE stores SET org_id = default_org WHERE org_id IS NULL;
+						ALTER TABLE stores ALTER COLUMN org_id SET NOT NULL;
+						ALTER TABLE stores ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+					END IF;
+
+					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='org_id') THEN
+						ALTER TABLE users ADD COLUMN org_id bigint REFERENCES organizations(id) ON DELETE CASCADE;
+						UPDATE users SET org_id = default_org WHERE org_id IS NULL;
+						ALTER TABLE users ALTER COLUMN org_id SET NOT NULL;
+					END IF;
+
+					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='role') THEN
+						ALTER TABLE users ADD COLUMN role text NOT NULL DEFAULT 'instance_admin';
+						ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('instance_admin','org_admin','store_manager','attendant','kitchen','dispatch','finance_viewer'));
+					END IF;
+
+					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='active') THEN
+						ALTER TABLE users ADD COLUMN active boolean NOT NULL DEFAULT true;
+					END IF;
+
+					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='token_version') THEN
+						ALTER TABLE users ADD COLUMN token_version integer NOT NULL DEFAULT 1;
+					END IF;
+
+					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='created_at') THEN
+						ALTER TABLE users ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+					END IF;
+
+					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='token_version') THEN
+						ALTER TABLE sessions ADD COLUMN token_version integer NOT NULL DEFAULT 1;
+					END IF;
+				END $$;
+			`
+			if _, e = tx.Exec(ctx, migrationSQL); e != nil {
+				return fmt.Errorf("migration_v1_to_v2_failed: %w", e)
+			}
+			_, e = tx.Exec(ctx, "INSERT INTO schema_migrations(version,checksum) VALUES(2,$1)", Hash(schema))
+			if e != nil {
+				return e
+			}
+		} else if n != 2 || checksum != Hash(schema) {
+			return errors.New("migration_incompatible")
+		}
 	}
 	if e != nil {
 		return e
 	}
 	return tx.Commit(ctx)
 }
+
 func ValidateSchema(version int, checksum string) error {
-	if version != 1 || checksum != Hash(schema) {
+	if version != 2 || checksum != Hash(schema) {
 		return errors.New("migration_incompatible")
 	}
 	return nil
 }
+
 func jsonResponse(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
 }
+
 func failure(w http.ResponseWriter, status int, code string) {
 	jsonResponse(w, status, map[string]string{"error": code})
 }
+
 func decode(w http.ResponseWriter, r *http.Request, v any) error {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	d := json.NewDecoder(r.Body)
@@ -133,6 +234,68 @@ func decode(w http.ResponseWriter, r *http.Request, v any) error {
 	}
 	return errors.New("extra_json")
 }
+
+func (a *App) authenticateSession(ctx context.Context, cookieValue string) (*SessionUser, error) {
+	var u SessionUser
+	query := `
+		SELECT u.id, u.org_id, u.store_id, u.email, u.role, u.active, u.token_version
+		FROM sessions s
+		JOIN users u ON u.id = s.user_id
+		WHERE s.token_hash = $1
+		  AND s.expires_at > now()
+		  AND s.token_version = u.token_version
+		  AND u.active = true
+	`
+	e := a.DB.QueryRow(ctx, query, Hash(cookieValue)).Scan(
+		&u.ID, &u.OrgID, &u.StoreID, &u.Email, &u.Role, &u.Active, &u.TokenVersion,
+	)
+	if e != nil {
+		return nil, e
+	}
+	return &u, nil
+}
+
+func (u *SessionUser) CanAccessStore(targetStore int64) bool {
+	if !u.Active {
+		return false
+	}
+	if u.Role == RoleInstanceAdmin || u.Role == RoleOrgAdmin {
+		return true
+	}
+	return u.StoreID != nil && *u.StoreID == targetStore
+}
+
+func (u *SessionUser) CanManageCatalog() bool {
+	return u.Role == RoleInstanceAdmin || u.Role == RoleOrgAdmin || u.Role == RoleStoreManager
+}
+
+func (u *SessionUser) CanCreateOrders() bool {
+	return u.Role == RoleInstanceAdmin || u.Role == RoleOrgAdmin || u.Role == RoleStoreManager || u.Role == RoleAttendant
+}
+
+func (u *SessionUser) CanManageUsers() bool {
+	return u.Role == RoleInstanceAdmin || u.Role == RoleOrgAdmin || u.Role == RoleStoreManager
+}
+
+func (u *SessionUser) CanTransitionState(targetState string) bool {
+	switch u.Role {
+	case RoleInstanceAdmin, RoleOrgAdmin, RoleStoreManager:
+		return true
+	case RoleAttendant:
+		return targetState == "preparing" || targetState == "cancelled"
+	case RoleKitchen:
+		return targetState == "preparing" || targetState == "ready"
+	case RoleDispatch:
+		return targetState == "completed"
+	default:
+		return false
+	}
+}
+
+func (u *SessionUser) CanViewFinancials() bool {
+	return u.Role == RoleInstanceAdmin || u.Role == RoleOrgAdmin || u.Role == RoleStoreManager || u.Role == RoleFinanceViewer
+}
+
 func (a *App) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
@@ -140,6 +303,7 @@ func (a *App) Handler() http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'")
 		w.Header().Set("X-Request-ID", Token()[:16])
+
 		host := strings.Split(r.Host, ":")[0]
 		if host != "127.0.0.1" && host != "localhost" {
 			failure(w, 403, "host_not_allowed")
@@ -164,9 +328,11 @@ func (a *App) Handler() http.Handler {
 			a.gate.RLock()
 			defer a.gate.RUnlock()
 		}
+
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
 		r = r.WithContext(ctx)
+
 		switch r.URL.Path {
 		case "/":
 			if r.Method != "GET" {
@@ -193,20 +359,50 @@ func (a *App) Handler() http.Handler {
 			a.login(w, r)
 			return
 		}
+
 		cookie, e := r.Cookie("openfood_session")
 		if e != nil {
 			failure(w, 401, "login_required")
 			return
 		}
-		var user, store int64
-		if e = a.DB.QueryRow(ctx, "SELECT u.id,u.store_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()", Hash(cookie.Value)).Scan(&user, &store); e != nil {
+
+		user, e := a.authenticateSession(ctx, cookie.Value)
+		if e != nil {
 			failure(w, 401, "session_invalid")
 			return
 		}
+
+		// Determine target store context (header or user default store)
+		targetStore := int64(0)
+		if storeHeader := r.Header.Get("X-Store-ID"); storeHeader != "" {
+			targetStore = ParseInt(storeHeader)
+		} else if user.StoreID != nil {
+			targetStore = *user.StoreID
+		} else {
+			// Find first accessible store for org
+			a.DB.QueryRow(ctx, "SELECT id FROM stores WHERE org_id=$1 ORDER BY id LIMIT 1", user.OrgID).Scan(&targetStore)
+		}
+
 		switch r.URL.Path {
+		case "/api/me":
+			if r.Method != "GET" {
+				failure(w, 405, "method_not_allowed")
+				return
+			}
+			jsonResponse(w, 200, map[string]any{
+				"id":       user.ID,
+				"email":    user.Email,
+				"role":     user.Role,
+				"org_id":   user.OrgID,
+				"store_id": user.StoreID,
+			})
 		case "/api/shutdown":
 			if r.Method != "POST" {
 				failure(w, 405, "method_not_allowed")
+				return
+			}
+			if user.Role != RoleInstanceAdmin {
+				failure(w, 403, "forbidden_instance_admin_required")
 				return
 			}
 			if a.OnShutdown == nil {
@@ -223,21 +419,55 @@ func (a *App) Handler() http.Handler {
 			a.DB.Exec(ctx, "DELETE FROM sessions WHERE token_hash=$1", Hash(cookie.Value))
 			http.SetCookie(w, &http.Cookie{Name: "openfood_session", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode})
 			jsonResponse(w, 200, map[string]bool{"ok": true})
+		case "/api/stores":
+			a.storesHandler(w, r, user)
+		case "/api/users":
+			a.usersHandler(w, r, user)
 		case "/api/status":
+			if targetStore > 0 && !user.CanAccessStore(targetStore) {
+				failure(w, 403, "forbidden_cross_store_access")
+				return
+			}
 			var name string
 			var pending, failed int
-			a.DB.QueryRow(ctx, "SELECT name FROM stores WHERE id=$1", store).Scan(&name)
-			a.DB.QueryRow(ctx, "SELECT count(*) FILTER(WHERE state IN ('pending','running')),count(*) FILTER(WHERE state='failed') FROM jobs WHERE store_id=$1", store).Scan(&pending, &failed)
-			jsonResponse(w, 200, map[string]any{"store": name, "version": Version, "pending_jobs": pending, "failed_jobs": failed, "integrations": "disabled", "public_webhooks": "not_configured", "local_only": true})
+			a.DB.QueryRow(ctx, "SELECT name FROM stores WHERE id=$1", targetStore).Scan(&name)
+			a.DB.QueryRow(ctx, "SELECT count(*) FILTER(WHERE state IN ('pending','running')),count(*) FILTER(WHERE state='failed') FROM jobs WHERE store_id=$1", targetStore).Scan(&pending, &failed)
+			jsonResponse(w, 200, map[string]any{
+				"store":           name,
+				"store_id":        targetStore,
+				"version":         Version,
+				"user_role":       user.Role,
+				"pending_jobs":    pending,
+				"failed_jobs":     failed,
+				"integrations":    "disabled",
+				"public_webhooks": "not_configured",
+				"local_only":      true,
+			})
 		case "/api/products":
-			a.products(w, r, store, user)
+			if !user.CanAccessStore(targetStore) {
+				failure(w, 403, "forbidden_cross_store_access")
+				return
+			}
+			a.products(w, r, targetStore, user)
 		case "/api/orders":
-			a.orders(w, r, store, user)
+			if !user.CanAccessStore(targetStore) {
+				failure(w, 403, "forbidden_cross_store_access")
+				return
+			}
+			a.orders(w, r, targetStore, user)
 		case "/api/order-state":
-			a.orderState(w, r, store, user)
+			if !user.CanAccessStore(targetStore) {
+				failure(w, 403, "forbidden_cross_store_access")
+				return
+			}
+			a.orderState(w, r, targetStore, user)
 		case "/api/backup":
 			if r.Method != "POST" {
 				failure(w, 405, "method_not_allowed")
+				return
+			}
+			if user.Role != RoleInstanceAdmin && user.Role != RoleOrgAdmin {
+				failure(w, 403, "forbidden_admin_required")
 				return
 			}
 			if a.Ops == nil {
@@ -253,8 +483,16 @@ func (a *App) Handler() http.Handler {
 			w.Header().Set("Content-Disposition", "attachment; filename=openfood.dump")
 			http.ServeFile(w, r, path)
 		case "/api/restore":
+			if user.Role != RoleInstanceAdmin {
+				failure(w, 403, "forbidden_instance_admin_required")
+				return
+			}
 			a.restore(w, r)
 		case "/api/diagnostics":
+			if user.Role != RoleInstanceAdmin && user.Role != RoleOrgAdmin {
+				failure(w, 403, "forbidden_admin_required")
+				return
+			}
 			if a.Ops == nil {
 				failure(w, 501, "diagnostics_not_configured")
 				return
@@ -266,6 +504,7 @@ func (a *App) Handler() http.Handler {
 		}
 	})
 }
+
 func (a *App) setup(w http.ResponseWriter, r *http.Request) {
 	var count int
 	if e := a.DB.QueryRow(r.Context(), "SELECT count(*) FROM users").Scan(&count); e != nil {
@@ -280,7 +519,13 @@ func (a *App) setup(w http.ResponseWriter, r *http.Request) {
 		failure(w, 405, "method_not_allowed")
 		return
 	}
-	var input struct{ Token, Email, Password, Store string }
+	var input struct {
+		Token        string `json:"token"`
+		Email        string `json:"email"`
+		Password     string `json:"password"`
+		Store        string `json:"store"`
+		Organization string `json:"organization"`
+	}
 	if decode(w, r, &input) != nil || len(input.Password) < 12 || len(input.Password) > 72 || len(input.Store) < 1 || len(input.Store) > 120 || !strings.Contains(input.Email, "@") {
 		failure(w, 400, "setup_input_invalid")
 		return
@@ -288,6 +533,10 @@ func (a *App) setup(w http.ResponseWriter, r *http.Request) {
 	if a.SetupToken == "" || Hash(input.Token) != Hash(a.SetupToken) {
 		failure(w, 403, "setup_token_invalid")
 		return
+	}
+	orgName := input.Organization
+	if orgName == "" {
+		orgName = input.Store + " Org"
 	}
 	hash, e := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
 	if e != nil {
@@ -305,10 +554,14 @@ func (a *App) setup(w http.ResponseWriter, r *http.Request) {
 		failure(w, 409, "setup_closed")
 		return
 	}
-	var store int64
-	e = tx.QueryRow(r.Context(), "INSERT INTO stores(name) VALUES($1) RETURNING id", input.Store).Scan(&store)
+	var orgID, storeID int64
+	e = tx.QueryRow(r.Context(), "INSERT INTO organizations(name) VALUES($1) RETURNING id", orgName).Scan(&orgID)
 	if e == nil {
-		_, e = tx.Exec(r.Context(), "INSERT INTO users(store_id,email,password_hash) VALUES($1,$2,$3)", store, strings.ToLower(input.Email), string(hash))
+		e = tx.QueryRow(r.Context(), "INSERT INTO stores(org_id,name) VALUES($1,$2) RETURNING id", orgID, input.Store).Scan(&storeID)
+	}
+	if e == nil {
+		_, e = tx.Exec(r.Context(), "INSERT INTO users(org_id,store_id,email,password_hash,role,active) VALUES($1,$2,$3,$4,$5,true)",
+			orgID, storeID, strings.ToLower(input.Email), string(hash), RoleInstanceAdmin)
 	}
 	if e == nil {
 		e = tx.Commit(r.Context())
@@ -319,6 +572,7 @@ func (a *App) setup(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResponse(w, 201, map[string]bool{"ok": true})
 }
+
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		failure(w, 405, "method_not_allowed")
@@ -347,13 +601,15 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	}
 	var id int64
 	var hash string
-	e := a.DB.QueryRow(r.Context(), "SELECT id,password_hash FROM users WHERE email=$1", key).Scan(&id, &hash)
-	if e != nil || bcrypt.CompareHashAndPassword([]byte(hash), []byte(input.Password)) != nil {
+	var active bool
+	var tokenVersion int
+	e := a.DB.QueryRow(r.Context(), "SELECT id,password_hash,active,token_version FROM users WHERE email=$1", key).Scan(&id, &hash, &active, &tokenVersion)
+	if e != nil || !active || bcrypt.CompareHashAndPassword([]byte(hash), []byte(input.Password)) != nil {
 		failure(w, 401, "credentials_invalid")
 		return
 	}
 	token := Token()
-	_, e = a.DB.Exec(r.Context(), "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval '12 hours')", Hash(token), id)
+	_, e = a.DB.Exec(r.Context(), "INSERT INTO sessions(token_hash,user_id,token_version,expires_at) VALUES($1,$2,$3,now()+interval '12 hours')", Hash(token), id, tokenVersion)
 	if e != nil {
 		failure(w, 500, "session_failed")
 		return
@@ -361,7 +617,237 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: "openfood_session", Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 43200})
 	jsonResponse(w, 200, map[string]bool{"ok": true})
 }
-func (a *App) products(w http.ResponseWriter, r *http.Request, store, user int64) {
+
+func (a *App) storesHandler(w http.ResponseWriter, r *http.Request, u *SessionUser) {
+	if r.Method == "GET" {
+		var rows pgx.Rows
+		var e error
+		if u.Role == RoleInstanceAdmin {
+			rows, e = a.DB.Query(r.Context(), "SELECT id, org_id, name, created_at FROM stores ORDER BY id")
+		} else if u.Role == RoleOrgAdmin {
+			rows, e = a.DB.Query(r.Context(), "SELECT id, org_id, name, created_at FROM stores WHERE org_id=$1 ORDER BY id", u.OrgID)
+		} else if u.StoreID != nil {
+			rows, e = a.DB.Query(r.Context(), "SELECT id, org_id, name, created_at FROM stores WHERE id=$1", *u.StoreID)
+		} else {
+			failure(w, 403, "no_store_assigned")
+			return
+		}
+		if e != nil {
+			failure(w, 500, "stores_query_failed")
+			return
+		}
+		defer rows.Close()
+		stores := []map[string]any{}
+		for rows.Next() {
+			var id, orgID int64
+			var name string
+			var createdAt time.Time
+			if rows.Scan(&id, &orgID, &name, &createdAt) != nil {
+				failure(w, 500, "stores_scan_failed")
+				return
+			}
+			stores = append(stores, map[string]any{
+				"id":         id,
+				"org_id":     orgID,
+				"name":       name,
+				"created_at": createdAt,
+			})
+		}
+		jsonResponse(w, 200, stores)
+		return
+	}
+	if r.Method == "POST" {
+		if u.Role != RoleInstanceAdmin && u.Role != RoleOrgAdmin {
+			failure(w, 403, "forbidden_admin_required")
+			return
+		}
+		var input struct {
+			Name  string `json:"name"`
+			OrgID *int64 `json:"org_id"`
+		}
+		if decode(w, r, &input) != nil || len(input.Name) < 1 || len(input.Name) > 120 {
+			failure(w, 400, "store_name_invalid")
+			return
+		}
+		targetOrg := u.OrgID
+		if u.Role == RoleInstanceAdmin && input.OrgID != nil {
+			targetOrg = *input.OrgID
+		}
+		var storeID int64
+		e := a.DB.QueryRow(r.Context(), "INSERT INTO stores(org_id, name) VALUES($1, $2) RETURNING id", targetOrg, input.Name).Scan(&storeID)
+		if e != nil {
+			failure(w, 500, "store_creation_failed")
+			return
+		}
+		jsonResponse(w, 201, map[string]int64{"id": storeID})
+		return
+	}
+	failure(w, 405, "method_not_allowed")
+}
+
+func (a *App) usersHandler(w http.ResponseWriter, r *http.Request, u *SessionUser) {
+	if !u.CanManageUsers() {
+		failure(w, 403, "forbidden_insufficient_role")
+		return
+	}
+	if r.Method == "GET" {
+		var rows pgx.Rows
+		var e error
+		if u.Role == RoleInstanceAdmin {
+			rows, e = a.DB.Query(r.Context(), "SELECT id, org_id, store_id, email, role, active, created_at FROM users ORDER BY id")
+		} else if u.Role == RoleOrgAdmin {
+			rows, e = a.DB.Query(r.Context(), "SELECT id, org_id, store_id, email, role, active, created_at FROM users WHERE org_id=$1 ORDER BY id", u.OrgID)
+		} else if u.Role == RoleStoreManager && u.StoreID != nil {
+			rows, e = a.DB.Query(r.Context(), "SELECT id, org_id, store_id, email, role, active, created_at FROM users WHERE store_id=$1 ORDER BY id", *u.StoreID)
+		} else {
+			failure(w, 403, "forbidden")
+			return
+		}
+		if e != nil {
+			failure(w, 500, "users_query_failed")
+			return
+		}
+		defer rows.Close()
+		users := []map[string]any{}
+		for rows.Next() {
+			var id, orgID int64
+			var storeID *int64
+			var email, role string
+			var active bool
+			var createdAt time.Time
+			if rows.Scan(&id, &orgID, &storeID, &email, &role, &active, &createdAt) != nil {
+				failure(w, 500, "users_scan_failed")
+				return
+			}
+			users = append(users, map[string]any{
+				"id":         id,
+				"org_id":     orgID,
+				"store_id":   storeID,
+				"email":      email,
+				"role":       role,
+				"active":     active,
+				"created_at": createdAt,
+			})
+		}
+		jsonResponse(w, 200, users)
+		return
+	}
+	if r.Method == "POST" {
+		var input struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+			Role     string `json:"role"`
+			StoreID  *int64 `json:"store_id"`
+			OrgID    *int64 `json:"org_id"`
+		}
+		if decode(w, r, &input) != nil || len(input.Password) < 12 || len(input.Password) > 72 || !strings.Contains(input.Email, "@") || !validRoles[input.Role] {
+			failure(w, 400, "user_input_invalid")
+			return
+		}
+		// Authorization checks for creating roles
+		if u.Role == RoleStoreManager {
+			if input.Role == RoleInstanceAdmin || input.Role == RoleOrgAdmin || input.Role == RoleStoreManager {
+				failure(w, 403, "store_manager_cannot_create_admins")
+				return
+			}
+			input.StoreID = u.StoreID
+			input.OrgID = &u.OrgID
+		} else if u.Role == RoleOrgAdmin {
+			if input.Role == RoleInstanceAdmin {
+				failure(w, 403, "org_admin_cannot_create_instance_admin")
+				return
+			}
+			input.OrgID = &u.OrgID
+		}
+		targetOrg := u.OrgID
+		if u.Role == RoleInstanceAdmin && input.OrgID != nil {
+			targetOrg = *input.OrgID
+		}
+
+		hash, e := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
+		if e != nil {
+			failure(w, 500, "password_hash_failed")
+			return
+		}
+		var newID int64
+		e = a.DB.QueryRow(r.Context(), `
+			INSERT INTO users(org_id, store_id, email, password_hash, role, active)
+			VALUES($1, $2, $3, $4, $5, true)
+			RETURNING id
+		`, targetOrg, input.StoreID, strings.ToLower(input.Email), string(hash), input.Role).Scan(&newID)
+		if e != nil {
+			if strings.Contains(e.Error(), "unique") {
+				failure(w, 409, "email_already_registered")
+				return
+			}
+			failure(w, 500, "user_creation_failed")
+			return
+		}
+		jsonResponse(w, 201, map[string]int64{"id": newID})
+		return
+	}
+	if r.Method == "PATCH" {
+		var input struct {
+			ID     int64   `json:"id"`
+			Active *bool   `json:"active"`
+			Role   *string `json:"role"`
+		}
+		if decode(w, r, &input) != nil || input.ID <= 0 {
+			failure(w, 400, "user_patch_invalid")
+			return
+		}
+		if input.Role != nil && !validRoles[*input.Role] {
+			failure(w, 400, "role_invalid")
+			return
+		}
+		// Check target user's org/store
+		var targetOrg int64
+		var targetStore *int64
+		var targetRole string
+		e := a.DB.QueryRow(r.Context(), "SELECT org_id, store_id, role FROM users WHERE id=$1", input.ID).Scan(&targetOrg, &targetStore, &targetRole)
+		if e != nil {
+			failure(w, 404, "user_not_found")
+			return
+		}
+		if u.Role == RoleOrgAdmin && targetOrg != u.OrgID {
+			failure(w, 403, "forbidden_cross_org")
+			return
+		}
+		if u.Role == RoleStoreManager && (targetStore == nil || *targetStore != *u.StoreID) {
+			failure(w, 403, "forbidden_cross_store")
+			return
+		}
+
+		tx, e := a.DB.Begin(r.Context())
+		if e != nil {
+			failure(w, 500, "database_unavailable")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		// Increment token_version to immediately revoke existing active sessions for this user
+		if input.Active != nil && input.Role != nil {
+			_, e = tx.Exec(r.Context(), "UPDATE users SET active=$1, role=$2, token_version=token_version+1 WHERE id=$3", *input.Active, *input.Role, input.ID)
+		} else if input.Active != nil {
+			_, e = tx.Exec(r.Context(), "UPDATE users SET active=$1, token_version=token_version+1 WHERE id=$2", *input.Active, input.ID)
+		} else if input.Role != nil {
+			_, e = tx.Exec(r.Context(), "UPDATE users SET role=$1, token_version=token_version+1 WHERE id=$2", *input.Role, input.ID)
+		}
+
+		if e == nil {
+			e = tx.Commit(r.Context())
+		}
+		if e != nil {
+			failure(w, 500, "user_update_failed")
+			return
+		}
+		jsonResponse(w, 200, map[string]bool{"ok": true})
+		return
+	}
+	failure(w, 405, "method_not_allowed")
+}
+
+func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
 	if r.Method == "GET" {
 		rows, e := a.DB.Query(r.Context(), "SELECT id,name,price_cents,stock FROM products WHERE store_id=$1 ORDER BY id", store)
 		if e != nil {
@@ -384,6 +870,10 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store, user int64
 	}
 	if r.Method != "POST" {
 		failure(w, 405, "method_not_allowed")
+		return
+	}
+	if !user.CanManageCatalog() {
+		failure(w, 403, "forbidden_catalog_management_required")
 		return
 	}
 	var p struct {
@@ -488,14 +978,19 @@ func (a *App) CreateOrder(ctx context.Context, store, user int64, key string, in
 	}
 	return id, tx.Commit(ctx)
 }
-func (a *App) orders(w http.ResponseWriter, r *http.Request, store, user int64) {
+
+func (a *App) orders(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
 	if r.Method == "POST" {
+		if !user.CanCreateOrders() {
+			failure(w, 403, "forbidden_order_creation_required")
+			return
+		}
 		var input OrderRequest
 		if decode(w, r, &input) != nil {
 			failure(w, 400, "order_invalid")
 			return
 		}
-		id, e := a.CreateOrder(r.Context(), store, user, r.Header.Get("Idempotency-Key"), input)
+		id, e := a.CreateOrder(r.Context(), store, user.ID, r.Header.Get("Idempotency-Key"), input)
 		if e != nil {
 			failure(w, 409, e.Error())
 			return
@@ -522,14 +1017,20 @@ func (a *App) orders(w http.ResponseWriter, r *http.Request, store, user int64) 
 			failure(w, 500, "orders_failed")
 			return
 		}
-		result = append(result, map[string]any{"id": id, "total_cents": total, "state": state, "financial_state": financial, "created_at": at})
+		item := map[string]any{"id": id, "total_cents": total, "state": state, "financial_state": financial, "created_at": at}
+		if !user.CanViewFinancials() {
+			delete(item, "financial_state")
+		}
+		result = append(result, item)
 	}
 	jsonResponse(w, 200, result)
 }
+
 func Allowed(from, to string) bool {
 	return (from == "confirmed" && (to == "preparing" || to == "cancelled")) || (from == "preparing" && to == "ready") || (from == "ready" && to == "completed")
 }
-func (a *App) orderState(w http.ResponseWriter, r *http.Request, store, user int64) {
+
+func (a *App) orderState(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
 	if r.Method != "POST" {
 		failure(w, 405, "method_not_allowed")
 		return
@@ -540,6 +1041,10 @@ func (a *App) orderState(w http.ResponseWriter, r *http.Request, store, user int
 	}
 	if decode(w, r, &input) != nil {
 		failure(w, 400, "input_invalid")
+		return
+	}
+	if !user.CanTransitionState(input.State) {
+		failure(w, 403, "forbidden_role_transition")
 		return
 	}
 	tx, e := a.DB.Begin(r.Context())
@@ -566,7 +1071,7 @@ func (a *App) orderState(w http.ResponseWriter, r *http.Request, store, user int
 	}
 	_, e = tx.Exec(r.Context(), "UPDATE orders SET state=$3 WHERE store_id=$1 AND id=$2", store, input.ID, input.State)
 	if e == nil {
-		_, e = tx.Exec(r.Context(), "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,$3,$4)", store, user, "order_"+input.State, input.ID)
+		_, e = tx.Exec(r.Context(), "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,$3,$4)", store, user.ID, "order_"+input.State, input.ID)
 	}
 	if e == nil {
 		e = tx.Commit(r.Context())
@@ -610,6 +1115,7 @@ func (a *App) WorkOnce(ctx context.Context) error {
 	}
 	return tx.Commit(ctx)
 }
+
 func (a *App) Worker(ctx context.Context) {
 	timer := time.NewTicker(time.Second)
 	defer timer.Stop()
@@ -624,6 +1130,7 @@ func (a *App) Worker(ctx context.Context) {
 		}
 	}
 }
+
 func (a *App) restore(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" || r.Header.Get("X-Confirm-Restore") != "RESTAURAR" {
 		failure(w, 400, "restore_confirmation_required")
@@ -654,4 +1161,7 @@ func (a *App) restore(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, 200, map[string]bool{"ok": true, "login_required": true})
 }
 
-func ParseInt(s string) int64 { n, _ := strconv.ParseInt(s, 10, 64); return n }
+func ParseInt(s string) int64 {
+	n, _ := strconv.ParseInt(s, 10, 64)
+	return n
+}

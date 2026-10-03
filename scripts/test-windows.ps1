@@ -1,4 +1,4 @@
-﻿param([string]$Installer='dist/OpenFood-0.1.0-alpha.1-windows-x64-setup.exe')
+param([string]$Installer='dist/OpenFood-0.2.0-alpha.1-windows-x64-setup.exe')
 $ErrorActionPreference='Stop'
 $repoDir=Split-Path $PSScriptRoot -Parent
 Set-Location -LiteralPath $repoDir

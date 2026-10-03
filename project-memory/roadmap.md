@@ -17,11 +17,11 @@ Este roadmap consolida todos os requisitos estabelecidos na especificação orig
 
 ---
 
-## Fase 2: Organizações, Lojas e Controle de Acesso Granular (RBAC Multi-tenant)
-- [ ] **Múltiplas Organizações e Lojas**:
+## Fase 2: Organizações, Lojas e Controle de Acesso Granular (RBAC Multi-tenant) — **Concluída — v0.2.0-alpha.1**
+- [x] **Múltiplas Organizações e Lojas**:
   - Suporte explícito a várias lojas operando na mesma instalação com isolamento estrito de dados.
   - Escopo de loja validado em nível de banco de dados (`WHERE store_id = $1`) em todas as queries e rotinas.
-- [ ] **Papéis Granulares e Permissões**:
+- [x] **Papéis Granulares e Permissões**:
   - Administrador da Instalação (`instance_admin`).
   - Administrador da Organização (`org_admin`).
   - Gerente de Loja (`store_manager`).
@@ -29,9 +29,9 @@ Este roadmap consolida todos os requisitos estabelecidos na especificação orig
   - Cozinha / Separação (`kitchen`).
   - Expedição (`dispatch`).
   - Consulta Financeira (`finance_viewer`).
-- [ ] **Critérios de Aceite**:
+- [x] **Critérios de Aceite**:
   - Testes automatizados tentando acesso cruzado entre lojas com rejeição `403 Forbidden`.
-  - Sessões vinculadas a permissões ativas e revogação imediata em caso de desativação do usuário.
+  - Sessões vinculadas a permissões ativas e revogação imediata via `token_version` em caso de desativação do usuário.
 
 ---
 

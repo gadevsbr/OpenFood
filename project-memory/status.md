@@ -5,8 +5,16 @@
 - Etapa UI/UX: Design Tokens, tipografia do sistema, estados de foco WCAG AA, badges semânticos de status de pedido e financeiro, além de estilo de botão destrutivo acessível implementados em `internal/app/web.html`; `TestPostgresJourney` revalidado: PASS em 18.13s.
 - Etapa distribuição: instalador/ZIP Windows e tar.gz Linux produzidos no pipeline corretivo 37083565974, com ambos os jobs PASS. Release experimental publicada: https://github.com/gadevsbr/OpenFood/releases/tag/v0.1.0-alpha.1, com SHA256SUMS e artefatos desse run verificados pelo digest GitHub.
 - Etapa roadmap: planejado e documentado em `project-memory/roadmap.md` estruturando Fases 2 a 9 (multi-tenant RBAC, catálogo avançado, consentimentos/LGPD, pagamentos Pix, WhatsApp/Chatbot, entrega/retirada, iFood e observabilidade).
-- Produto completo: em desenvolvimento conforme fases do roadmap. Conectores externos, papéis granulares, catálogo avançado, LAN/túnel guiado, assinatura de código e validação limpa física continuam pendentes.
-
-
-
-
+- **Fase 2 (RBAC Multi-tenant): implementada em 2026-10-02.** Alterações:
+  - Schema v2: tabela `organizations`, `stores` com `org_id`, `users` com `role`, `active`, `token_version`, `created_at`; `sessions` com `token_version`.
+  - Migração incremental v1→v2 via DDL `ALTER TABLE` transacional com advisory lock.
+  - Papéis: `instance_admin`, `org_admin`, `store_manager`, `attendant`, `kitchen`, `dispatch`, `finance_viewer`.
+  - Revogação imediata de sessões via `token_version` ao desativar ou alterar papel.
+  - Isolamento estrito de dados por `store_id`/`org_id` em todas as queries.
+  - Endpoints novos: `GET/POST /api/stores`, `GET/POST/PATCH /api/users`, `GET /api/me`.
+  - Permissões granulares por papel em produtos, pedidos, transições, backup, diagnóstico e shutdown.
+  - UI atualizada: abas Operação / Usuários / Lojas / Manutenção; badge de papel; seletor de loja para admins.
+  - Suíte de testes expandida: cross-org, cross-store, revogação, roles, deduplicação, backup/restore.
+  - Versão bumped para `0.2.0-alpha.1`.
+  - Build verificado com `go vet ./...` (PASS). Build final e release pendentes de evidência CI.
+- Produto completo: em desenvolvimento conforme fases do roadmap. Conectores externos, catálogo avançado, LAN/túnel guiado, assinatura de código e validação limpa física continuam pendentes.
