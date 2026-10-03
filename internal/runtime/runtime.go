@@ -157,6 +157,7 @@ func (r *Runtime) Stop(ctx context.Context) error {
 	e := r.run(ctx, "pg_ctl", "stop", "-D", filepath.Join(r.Data, "database"), "-m", "fast", "-w", "-t", "30")
 	if e == nil {
 		r.Code("database_stopped")
+		ReleaseToolPath(r.Bin)
 	}
 	return e
 }

@@ -6,6 +6,7 @@ $fixtureId=[Guid]::NewGuid().ToString('N')
 $installDir=Join-Path $repoDir ('runtime\Instalação QA com espaços '+$fixtureId)
 $dataDir=Join-Path $repoDir ('runtime\Dados instalados ação '+$fixtureId)
 $env:OPENFOOD_DATA_DIR=$dataDir
+$env:OPENFOOD_TEST_HEADLESS='1'
 New-Item -ItemType Directory -Force runtime | Out-Null
 function Install-Package {
     $p=Start-Process -FilePath (Resolve-Path -LiteralPath $Installer).Path -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="'+$installDir+'"') -WindowStyle Hidden -PassThru
@@ -19,7 +20,7 @@ function Start-App {
             $state=Get-Content -LiteralPath (Join-Path $dataDir 'runtime.json') -Raw -Encoding UTF8 | ConvertFrom-Json
             try { $ready=Invoke-RestMethod -Uri ($state.URL+'/readyz') -TimeoutSec 2; if ($ready.status -eq 'ready') {return @{Process=$p;URL=$state.URL}} } catch {}
         }
-        if ($p.HasExited) {throw 'Application exited before readiness'}
+        if ($p.HasExited) {Get-Content -LiteralPath (Join-Path $dataDir 'operations.log') -Tail 5 -ErrorAction SilentlyContinue; throw 'Application exited before readiness'}
         Start-Sleep -Milliseconds 1000
     }
     throw 'Application readiness timeout'

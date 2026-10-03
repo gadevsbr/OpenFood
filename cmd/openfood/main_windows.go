@@ -27,6 +27,9 @@ func openURL(url string) {
 }
 func fatal(code string) {
 	exitCode = 1
+	if os.Getenv("OPENFOOD_TEST_HEADLESS") == "1" {
+		return
+	}
 	p, _ := windows.UTF16PtrFromString("OpenFood não iniciou: " + code + ". Consulte operations.log na pasta de dados do OpenFood.")
 	title, _ := windows.UTF16PtrFromString("OpenFood")
 	windows.NewLazySystemDLL("user32.dll").NewProc("MessageBoxW").Call(0, uintptrPointer(p), uintptrPointer(title), 0x10)
@@ -76,6 +79,7 @@ func main() {
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	defer local.ReleaseToolPath(r.Bin)
 	defer cancel()
 	boot, stopBoot := context.WithTimeout(ctx, 90*time.Second)
 	e = r.Start(boot)

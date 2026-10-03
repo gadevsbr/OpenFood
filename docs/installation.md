@@ -4,7 +4,7 @@ Execute OpenFood-0.1.0-alpha.1-windows-x64-setup.exe. Instalação por usuário,
 
 Programa: `%LOCALAPPDATA%\Programs\OpenFood`. Dados: `%LOCALAPPDATA%\OpenFood`, com ACL para usuário atual e SYSTEM. Não compartilhe config.json: contém senha gerada do banco e token temporário de setup, inutilizável após criar o administrador. Banco aceita apenas loopback com SCRAM.
 
-Binários PostgreSQL em caminho acentuado usam alias 8.3 existente, contornando o [bug upstream de bootstrap](https://www.postgresql.org/message-id/16926-e4ef345545d185ab%40postgresql.org). Volumes sem nomes curtos e perfis Unicode fora da página de códigos ainda não foram validados; não há cobertura geral desses ambientes.
+Binários PostgreSQL em caminho acentuado usam alias 8.3 existente ou caminho DOS temporário por sessão, contornando o [bug upstream de bootstrap](https://www.postgresql.org/message-id/16926-e4ef345545d185ab%40postgresql.org). Não move arquivos nem exige administrador. Letras livres são verificadas antes do mapeamento e ele é removido no shutdown. Perfis Unicode fora da página de códigos ainda não foram validados; não há cobertura geral desses ambientes.
 
 O painel prefere 18880 e escolhe outra porta se ocupada. A bandeja abre o endereço real. Segunda instância abre o painel existente. Iniciar com Windows é opt-in na bandeja, por conta de usuário; não roda antes do login. Fechar o navegador mantém o processamento. A opção de encerrar automaticamente ao fechar o navegador ainda não está implementada.
 
