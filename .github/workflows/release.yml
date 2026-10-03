@@ -71,4 +71,9 @@ jobs:
       - name: Publish experimental release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create '${{ github.ref_name }}' dist/* --repo '${{ github.repository }}' --prerelease --title 'OpenFood ${{ github.ref_name }}' --notes 'Experimental. Consulte project-memory/validation.md. Build não substitui validação em Windows limpo. Integrações externas ainda desabilitadas.'
+        run: |
+          if gh release view '${{ github.ref_name }}' --repo '${{ github.repository }}' >/dev/null 2>&1; then
+            gh release upload '${{ github.ref_name }}' dist/* --repo '${{ github.repository }}' --clobber
+          else
+            gh release create '${{ github.ref_name }}' dist/* --repo '${{ github.repository }}' --prerelease --title 'OpenFood ${{ github.ref_name }}' --notes 'Experimental. Consulte project-memory/validation.md. Build não substitui validação em Windows limpo. Integrações externas ainda desabilitadas.'
+          fi
