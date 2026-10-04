@@ -265,7 +265,7 @@ select[multiple] { min-height: 120px; }
 
 </div>
 </main><script>
-const $=id=>document.getElementById(id);
+const $=id=>document.getElementById(id.startsWith('#')?id.slice(1):id);
 let setupToken=new URLSearchParams(location.hash.slice(1)).get('setup')||'';
 history.replaceState(null,'',location.pathname);
 let orderKey=crypto.randomUUID();
