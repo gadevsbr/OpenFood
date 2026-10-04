@@ -33,6 +33,7 @@ p { line-height: 1.6; margin: 0 0 12px; }
 label { display: block; margin: 14px 0 6px; font-weight: 500; font-size: 14px; color: var(--text-main); }
 input, select, button { font: inherit; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); }
 input, select { width: 100%; max-width: 460px; background: var(--bg-surface); color: var(--text-main); }
+input[type="checkbox"] { width: auto; max-width: none; }
 input:focus-visible, select:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 button { background: var(--primary); color: var(--primary-contrast); border: none; font-weight: 600; cursor: pointer; margin: 6px 6px 6px 0; transition: background 0.15s ease-in-out; }
 button:hover:not(:disabled) { background: var(--primary-hover); }
@@ -58,6 +59,9 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .badge-active { background: #dcfce7; color: #166534; }
 .badge-inactive { background: #fee2e2; color: #991b1b; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .grid-3, .grid { grid-template-columns: 1fr; } }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th { text-align: left; border-bottom: 2px solid var(--border-subtle); padding: 12px 10px; font-weight: 600; color: var(--text-muted); background: var(--bg-surface-subtle); }
 td { text-align: left; border-bottom: 1px solid var(--border-subtle); padding: 12px 10px; vertical-align: middle; }
@@ -66,12 +70,23 @@ small { display: block; color: var(--text-muted); font-size: 13px; margin-top: 4
 .hidden { display: none !important; }
 .notice { border-left: 4px solid var(--accent); background: var(--accent-light); padding: 14px 18px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid var(--border-subtle); }
+.tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid var(--border-subtle); flex-wrap: wrap; }
 .tab { background: none; border: none; border-radius: var(--radius-sm) var(--radius-sm) 0 0; padding: 10px 18px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; margin: 0; }
 .tab:hover { background: var(--bg-surface-subtle); color: var(--text-main); }
 .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
+.sub-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid var(--border-subtle); flex-wrap: wrap; }
+.sub-tab { background: none; border: none; border-radius: var(--radius-sm) var(--radius-sm) 0 0; padding: 8px 14px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; margin: 0; font-size: 14px; }
+.sub-tab:hover { background: var(--bg-surface-subtle); color: var(--text-main); }
+.sub-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.sub-tab-panel { display: none; }
+.sub-tab-panel.active { display: block; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+.form-group { margin-bottom: 16px; }
+.form-group > label { margin-bottom: 6px; }
+select[multiple] { min-height: 120px; }
 @media (max-width: 768px) {
   main { margin: 18px auto; padding: 0 12px; }
   .grid { grid-template-columns: 1fr; gap: 16px; }
@@ -89,7 +104,7 @@ small { display: block; color: var(--text-muted); font-size: 13px; margin-top: 4
     <span id="roleIndicator" class="badge"></span>
     <select id="storeSelector" style="max-width:260px;padding:8px 12px;margin:0;"></select>
   </div>
-  <p>Catálogo e pedidos manuais funcionam sem internet.</p>
+  <p>Catálogo avançado, pedidos manuais e estoque transacional funcionam sem internet.</p>
   <small>Fechar este navegador mantém o aplicativo funcionando. Use a bandeja para encerrar.</small>
   <button id="refresh">Atualizar painel</button>
   <button id="logout">Sair da conta</button>
@@ -97,6 +112,9 @@ small { display: block; color: var(--text-muted); font-size: 13px; margin-top: 4
 
 <div class="tabs">
   <button class="tab active" data-tab="operacao" id="tabOperacao">Operação</button>
+  <button class="tab" data-tab="catalogo" id="tabCatalogo">Catálogo</button>
+  <button class="tab" data-tab="clientes" id="tabClientes">Clientes & LGPD</button>
+  <button class="tab" data-tab="pagamentos" id="tabPagamentos">Pagamentos</button>
   <button class="tab" data-tab="usuarios" id="tabUsuarios">Usuários</button>
   <button class="tab" data-tab="lojas" id="tabLojas">Lojas</button>
   <button class="tab" data-tab="manutencao" id="tabManutencao">Manutenção</button>
@@ -104,11 +122,100 @@ small { display: block; color: var(--text-muted); font-size: 13px; margin-top: 4
 
 <div id="panelOperacao" class="tab-panel active">
   <div class="grid">
-    <section id="catalogPanel"><h2>Cadastrar produto</h2><form id="productForm"><label>Nome<input name="name" required maxlength="200"></label><label>Preço em reais<input name="price" required inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" placeholder="19,90"></label><label>Estoque em unidades<input type="number" name="stock" min="0" max="1000000" step="1" required></label><button>Cadastrar</button></form></section>
-    <section><h2>Pedido manual</h2><form id="orderForm"><label>Produto<select id="productSelect" name="product" required></select></label><label>Quantidade<input type="number" name="quantity" min="1" max="100000" value="1" required></label><p>O servidor calcula o preço e consome o estoque. Pagamento permanece pendente e não é confirmado por gateway.</p><label><input style="width:auto" type="checkbox" required> Confirmo este pedido</label><button>Criar pedido</button></form></section>
+    <section id="catalogPanel"><h2>Cadastrar produto</h2><form id="productForm"><label>Nome<input name="name" required maxlength="200"></label><label>Descrição<textarea name="description" maxlength="1000" rows="2"></textarea></label><div class="form-row"><label>Preço (R$)<input name="price" required inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" placeholder="19,90"></label><label>Estoque<input type="number" name="stock" min="0" step="0.001" max="1000000" required></label></div><div class="form-row"><label>Unidade<select name="unit"><option value="unidade">Unidade</option><option value="kg">Kg</option><option value="g">g</option><option value="l">L</option><option value="ml">ml</option><option value="porcao">Porção</option></select></label><label>Categoria<select name="category_id"><option value="">— Sem categoria —</option></select></label></div><div class="form-row"><label>SKU<input name="sku" maxlength="64" placeholder="Código interno"></label><label>Código de barras<input name="barcode" maxlength="64" placeholder="EAN/GTIN"></label></div><div class="form-row"><label>Qtd. mínima<input type="number" name="min_qty" min="1" step="0.001" value="1"></label><label>Qtd. máxima<input type="number" name="max_qty" min="1" step="0.001" placeholder="Opcional"></label></div><div class="form-row"><label>Tempo de preparo (min)<input type="number" name="prep_time" min="0" max="480" value="0"></label><label>Ordem de exibição<input type="number" name="display_order" min="0" value="0"></label></div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="active" checked> Ativo</label><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="weight_based"> Por peso</label><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="substitution_allowed" checked> Permite substituição</label></div><label>Disponível das<input type="time" name="available_from"></label><label>Disponível até<input type="time" name="available_until"></label><button>Cadastrar</button></form></section>
+    <section><h2>Pedido manual</h2><form id="orderForm"><label>Produto<select id="productSelect" name="product" required></select></label><label>Quantidade<input type="number" name="quantity" min="0.001" step="0.001" max="100000" value="1" required></label><p>O servidor calcula o preço e consome o estoque. Pagamento permanece pendente e não é confirmado por gateway.</p><label><input style="width:auto" type="checkbox" required> Confirmo este pedido</label><button>Criar pedido</button></form></section>
   </div>
-  <section><h2>Catálogo</h2><div class="scroll"><table><thead><tr><th>Produto</th><th>Preço</th><th>Estoque</th></tr></thead><tbody id="products"></tbody></table></div></section>
+  <section><h2>Catálogo</h2><div class="scroll"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Un.</th><th>SKU</th><th>Status</th></tr></thead><tbody id="products"></tbody></table></div></section>
   <section><h2>Pedidos</h2><div class="scroll"><table><thead><tr><th>Número</th><th>Total</th><th>Operação</th><th id="finCol">Financeiro</th><th>Próxima ação</th></tr></thead><tbody id="orders"></tbody></table></div><p id="emptyOrders"></p></section>
+</div>
+
+<div id="panelCatalogo" class="tab-panel">
+  <div class="sub-tabs">
+    <button class="sub-tab active" data-subtab="produtos" id="subtabProdutos">Produtos</button>
+    <button class="sub-tab" data-subtab="categorias" id="subtabCategorias">Categorias</button>
+    <button class="sub-tab" data-subtab="variantes" id="subtabVariantes">Variantes</button>
+    <button class="sub-tab" data-subtab="adicionais" id="subtabAdicionais">Adicionais</button>
+    <button class="sub-tab" data-subtab="combos" id="subtabCombos">Combos</button>
+  </div>
+
+  <div id="subpanelProdutos" class="sub-tab-panel active">
+    <section id="advancedProductForm"><h2>Produto avançado</h2><form id="advProductForm"><input type="hidden" name="id" id="advProductId"><div class="form-row"><label>Nome<input name="name" required maxlength="200"></label><label>Categoria<select name="category_id"><option value="">— Sem categoria —</option></select></label></div><label>Descrição<textarea name="description" maxlength="1000" rows="2"></textarea></label><div class="form-row"><label>Preço (R$)<input name="price" required inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" placeholder="19,90"></label><label>Estoque<input type="number" name="stock" min="0" step="0.001" max="1000000" required></label></div><div class="form-row"><label>Unidade<select name="unit"><option value="unidade">Unidade</option><option value="kg">Kg</option><option value="g">g</option><option value="l">L</option><option value="ml">ml</option><option value="porcao">Porção</option></select></label><label>SKU<input name="sku" maxlength="64" placeholder="Código interno"></label></div><div class="form-row"><label>Código de barras<input name="barcode" maxlength="64" placeholder="EAN/GTIN"></label><label>Qtd. mínima<input type="number" name="min_qty" min="1" step="0.001" value="1"></label></div><div class="form-row"><label>Qtd. máxima<input type="number" name="max_qty" min="1" step="0.001" placeholder="Opcional"></label><label>Tempo preparo (min)<input type="number" name="prep_time" min="0" max="480" value="0"></label></div><div class="form-row"><label>Ordem exibição<input type="number" name="display_order" min="0" value="0"></label></div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="active" checked> Ativo</label><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="weight_based"> Por peso</label><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="substitution_allowed" checked> Permite substituição</label></div><label>Disponível das<input type="time" name="available_from"></label><label>Disponível até<input type="time" name="available_until"></label><button type="submit" id="advProductSubmit">Salvar produto</button><button type="button" class="btn-secondary hidden" id="advProductCancel">Cancelar edição</button></form></section>
+    <section><h2>Produtos</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Produto</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Un.</th><th>SKU</th><th>Cód. barras</th><th>Peso</th><th>Subst.</th><th>Status</th><th>Ações</th></tr></thead><tbody id="advProducts"></tbody></table></div></section>
+  </div>
+
+  <div id="subpanelCategorias" class="sub-tab-panel">
+    <section><h2>Nova categoria</h2><form id="categoryForm"><input type="hidden" name="id" id="categoryId"><div class="form-row"><label>Nome<input name="name" required maxlength="120"></label><label>Categoria pai<select name="parent_id" id="categoryParent"><option value="">— Nenhuma (raiz) —</option></select></label></div><label>Descrição<textarea name="description" maxlength="500" rows="2"></textarea></label><div class="form-row"><label>Ordem de exibição<input type="number" name="display_order" min="0" value="0"></label></div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="active" checked> Ativa</label></div><button type="submit" id="categorySubmit">Salvar categoria</button><button type="button" class="btn-secondary hidden" id="categoryCancel">Cancelar edição</button></form></section>
+    <section><h2>Categorias</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Nome</th><th>Pai</th><th>Ordem</th><th>Status</th><th>Ações</th></tr></thead><tbody id="categoriesTable"></tbody></table></div></section>
+  </div>
+
+  <div id="subpanelVariantes" class="sub-tab-panel">
+    <section><h2>Variantes do produto</h2><div style="margin-bottom:16px;"><label>Produto<select id="variantProductSelect" required></select></label></div><form id="variantForm"><input type="hidden" name="product_id" id="variantProductId"><input type="hidden" name="id" id="variantId"><div class="form-row"><label>Nome da variante<input name="name" required maxlength="120"></label><label>Ajuste de preço (R$)<input name="price_adjustment" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" placeholder="0,00" value="0,00"></label></div><div class="form-row"><label>Estoque<input type="number" name="stock" min="0" step="0.001" max="1000000" value="0"></label><label>SKU<input name="sku" maxlength="64" placeholder="Código da variante"></label></div><div class="form-row"><label>Ordem de exibição<input type="number" name="display_order" min="0" value="0"></label></div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="active" checked> Ativa</label></div><button type="submit" id="variantSubmit">Salvar variante</button><button type="button" class="btn-secondary hidden" id="variantCancel">Cancelar edição</button></form></section>
+    <section><h2>Variantes</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Produto</th><th>Variante</th><th>Ajuste</th><th>Estoque</th><th>SKU</th><th>Status</th><th>Ações</th></tr></thead><tbody id="variantsTable"></tbody></table></div></section>
+  </div>
+
+  <div id="subpanelAdicionais" class="sub-tab-panel">
+    <div class="grid">
+      <section><h2>Grupo de adicionais</h2><form id="addonGroupForm"><input type="hidden" name="id" id="addonGroupId"><label>Nome<input name="name" required maxlength="120"></label><label>Descrição<textarea name="description" maxlength="500" rows="2"></textarea></label><div class="form-row"><label>Mín. seleções<input type="number" name="min_sel" min="0" value="0"></label><label>Máx. seleções<input type="number" name="max_sel" min="1" value="1"></label></div><div class="form-row"><label>Ordem de exibição<input type="number" name="display_order" min="0" value="0"></label></div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="required"> Obrigatório</label><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="active" checked> Ativo</label></div><button type="submit" id="addonGroupSubmit">Salvar grupo</button><button type="button" class="btn-secondary hidden" id="addonGroupCancel">Cancelar edição</button></form></section>
+      <section><h2>Opção de adicional</h2><div style="margin-bottom:16px;"><label>Grupo<select id="addonOptionGroupSelect" required></select></label></div><form id="addonOptionForm"><input type="hidden" name="group_id" id="addonOptionGroupId"><input type="hidden" name="id" id="addonOptionId"><div class="form-row"><label>Nome<input name="name" required maxlength="120"></label><label>Preço (R$)<input name="price" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" placeholder="0,00" value="0,00"></label></div><label>Descrição<textarea name="description" maxlength="500" rows="2"></textarea></label><div class="form-row"><label>Estoque<input type="number" name="stock" min="0" step="0.001" max="1000000" value="0"></label><label>Ordem exibição<input type="number" name="display_order" min="0" value="0"></label></div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="is_default"> Padrão</label><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="active" checked> Ativo</label></div><button type="submit" id="addonOptionSubmit">Salvar opção</button><button type="button" class="btn-secondary hidden" id="addonOptionCancel">Cancelar edição</button></form></section>
+    </div>
+    <section><h2>Grupos de adicionais</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Nome</th><th>Mín</th><th>Máx</th><th>Obrig.</th><th>Ordem</th><th>Status</th><th>Ações</th></tr></thead><tbody id="addonGroupsTable"></tbody></table></div></section>
+    <section><h2>Opções de adicionais</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Grupo</th><th>Opção</th><th>Preço</th><th>Estoque</th><th>Padrão</th><th>Status</th><th>Ações</th></tr></thead><tbody id="addonOptionsTable"></tbody></table></div></section>
+    <section><h2>Vincular produto a grupos</h2><div style="margin-bottom:16px;"><label>Produto<select id="productAddonProductSelect" required></select></label></div><div id="productAddonGroupsList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div></section>
+  </div>
+
+  <div id="subpanelCombos" class="sub-tab-panel">
+    <section><h2>Combo</h2><form id="comboForm"><input type="hidden" name="id" id="comboId"><label>Nome<input name="name" required maxlength="120"></label><label>Descrição<textarea name="description" maxlength="500" rows="2"></textarea></label><div class="form-row"><label>Preço fixo (R$)<input name="price" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" placeholder="0,00" value="0,00"></label><label>Política de preço<select name="pricing_policy"><option value="fixed">Preço fixo</option><option value="highest">Maior item</option><option value="sum">Soma dos itens</option></select></label></div><div class="form-row"><label>Ordem de exibição<input type="number" name="display_order" min="0" value="0"></label></div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="active" checked> Ativo</label></div><button type="submit" id="comboSubmit">Salvar combo</button><button type="button" class="btn-secondary hidden" id="comboCancel">Cancelar edição</button></form></section>
+    <section><h2>Combos</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Nome</th><th>Preço</th><th>Política</th><th>Status</th><th>Ações</th></tr></thead><tbody id="combosTable"></tbody></table></div></section>
+    <section><h2>Itens do combo</h2><div style="margin-bottom:16px;"><label>Combo<select id="comboItemComboSelect" required></select></label></div><form id="comboItemForm"><input type="hidden" name="combo_id" id="comboItemComboId"><input type="hidden" name="product_id" id="comboItemProductId"><div class="form-row"><label>Produto<select name="product_id" id="comboItemProductSelect" required></select></label><label>Quantidade<input type="number" name="quantity" min="0.001" step="0.001" value="1" required></label></div><div class="form-row"><label>Nome do grupo (opcional)<input name="group_name" maxlength="60" placeholder="Ex: Bebida, Acompanhamento"></label><label>Ordem<input type="number" name="display_order" min="0" value="0"></label></div><div class="form-row"><label>Mín. seleções<input type="number" name="min_sel" min="0" value="0"></label><label>Máx. seleções<input type="number" name="max_sel" min="1" value="1"></label></div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="is_optional"> Opcional</label></div><button type="submit" id="comboItemSubmit">Adicionar item</button><button type="button" class="btn-secondary hidden" id="comboItemCancel">Cancelar edição</button></form></section>
+    <section><h2>Itens</h2><div class="scroll"><table><thead><tr><th>Combo</th><th>Produto</th><th>Qtd.</th><th>Grupo</th><th>Opcional</th><th>Mín</th><th>Máx</th><th>Ordem</th><th>Ações</th></tr></thead><tbody id="comboItemsTable"></tbody></table></div></section>
+  </div>
+</div>
+
+<div id="panelClientes" class="tab-panel">
+  <div class="sub-tabs">
+    <button class="sub-tab active" data-subtab="clientes" id="subtabClientes">Clientes</button>
+    <button class="sub-tab" data-subtab="consentimentos" id="subtabConsentimentos">Consentimentos</button>
+    <button class="sub-tab" data-subtab="lgpd" id="subtabLGPD">Ferramentas LGPD</button>
+  </div>
+
+  <div id="subpanelClientes" class="sub-tab-panel active">
+    <section><h2>Novo cliente</h2><form id="customerForm"><input type="hidden" name="id" id="customerId"><div class="form-row"><label>Nome<input name="name" required maxlength="200"></label><label>Telefone<input name="phone" maxlength="32" placeholder="(11) 99999-9999"></label></div><div class="form-row"><label>E-mail<input type="email" name="email" maxlength="254" placeholder="cliente@email.com"></label><label>Documento<input name="document" maxlength="32" placeholder="CPF/CNPJ"></label></div><label>Observações<textarea name="notes" maxlength="1000" rows="2"></textarea></label><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="marketing_consent"> Autoriza marketing</label></div><button type="submit" id="customerSubmit">Salvar cliente</button><button type="button" class="btn-secondary hidden" id="customerCancel">Cancelar edição</button></form></section>
+    <section><h2>Clientes</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Nome</th><th>Telefone</th><th>E-mail</th><th>Documento</th><th>Marketing</th><th>Criado em</th><th>Ações</th></tr></thead><tbody id="customersTable"></tbody></table></div></section>
+  </div>
+
+  <div id="subpanelConsentimentos" class="sub-tab-panel">
+    <section><h2>Registrar consentimento</h2><form id="consentForm"><div class="form-row"><label>Cliente<select id="consentCustomerSelect" required></select></label><label>Finalidade<input name="purpose" required maxlength="100" placeholder="Ex: marketing_email, whatsapp_notifications, data_processing"></label></div><div class="form-row"><label>Versão<input name="version" required maxlength="20" placeholder="Ex: 1.0, 2024-01"></label><label>Origem<select name="source" required><option value="website">Website</option><option value="whatsapp">WhatsApp</option><option value="in_store">Na loja</option><option value="phone">Telefone</option><option value="other">Outro</option></select></label></div><label>Evidência (JSON opcional)<textarea name="evidence" maxlength="2000" rows="3" placeholder='{"ip":"192.168.1.1","user_agent":"...","form_id":"newsletter_signup"}'></textarea></label><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" name="granted" checked> Concedido</label></div><button type="submit">Registrar consentimento</button></form></section>
+    <section><h2>Consentimentos</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Cliente</th><th>Finalidade</th><th>Versão</th><th>Status</th><th>Concedido em</th><th>Revogado em</th><th>Origem</th><th>Ações</th></tr></thead><tbody id="consentsTable"></tbody></table></div></section>
+  </div>
+
+  <div id="subpanelLGPD" class="sub-tab-panel">
+    <section><h2>Exportação de dados do titular (Art. 18 LGPD)</h2><p>Gera um arquivo JSON com todos os dados pessoais do cliente, incluindo pedidos, consentimentos e pagamentos.</p><div style="margin-bottom:16px;"><label>Cliente<select id="lgpdExportCustomerSelect" required></select></label></div><button id="lgpdExportBtn">Exportar dados (JSON)</button></section>
+    <section style="margin-top:24px;"><h2>Exclusão/Anonimização de dados (Art. 18 LGPD)</h2><p class="notice"><strong>Atenção:</strong> Se o cliente tiver pedidos não cancelados, os dados serão anonimizados (mantidos para conformidade fiscal) em vez de excluídos. A anonimização remove dados pessoais (nome, telefone, e-mail, documento) mas preserva os registros de pedidos para fins contábeis.</p><div style="margin-bottom:16px;"><label>Cliente<select id="lgpdDeleteCustomerSelect" required></select></label></div><label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><input type="checkbox" id="lgpdDeleteConfirm" required> Confirmo que compreendi as consequências</label><button id="lgpdDeleteBtn" class="btn-cancel">Anonimizar/Excluir cliente</button></section>
+    <section style="margin-top:24px;"><h2>Políticas de retenção</h2><ul><li><strong>Dados de pedidos:</strong> Mantidos por 5 anos após o último pedido (conformidade fiscal)</li><li><strong>Consentimentos:</strong> Mantidos enquanto válidos + 5 anos após revogação</li><li><strong>Logs de auditoria:</strong> Mantidos por 2 anos</li><li><strong>Backups:</strong> Seguem a mesma política dos dados originais</li></ul></section>
+  </div>
+</div>
+
+<div id="panelPagamentos" class="tab-panel">
+  <div class="sub-tabs">
+    <button class="sub-tab active" data-subtab="configuracoes" id="subtabPagConfig">Configurações</button>
+    <button class="sub-tab" data-subtab="cobrancas" id="subtabCobrancas">Cobranças</button>
+    <button class="sub-tab" data-subtab="reembolsos" id="subtabReembolsos">Reembolsos</button>
+  </div>
+
+  <div id="subpanelConfiguracoes" class="sub-tab-panel active">
+    <section><h2>Configurar gateway de pagamento</h2><p>Configure as credenciais para cada provedor. Apenas um provedor ativo por vez é recomendado.</p><form id="paymentConfigForm"><input type="hidden" name="id" id="paymentConfigId"><div class="form-row"><label>Provedor<select name="provider" id="paymentConfigProvider" required><option value="">— Selecione —</option><option value="mercadopago">Mercado Pago</option><option value="asaas">Asaas</option><option value="efi">Efí (Gerencianet)</option></select></label><label>Ativo<input type="checkbox" name="enabled" checked></label></div><div id="mpFields" class="hidden"><h4>Mercado Pago</h4><div class="form-row"><label>Access Token<input name="cred_access_token" type="password" placeholder="APP_USR-..."></label><label>Public Key<input name="cred_public_key" placeholder="APP_USR-..."></label></div><div class="form-row"><label>Client ID<input name="cred_client_id" placeholder="..."></label><label>Client Secret<input name="cred_client_secret" type="password" placeholder="..."></label></div><label>Webhook URL<input name="cred_webhook_url" placeholder="https://seu-dominio.com/api/payment-webhook?provider=mercadopago"></label><label>Webhook Secret<input name="webhook_secret" type="password" placeholder="Chave secreta do webhook"></label><label>Base URL (opcional)<input name="cred_base_url" placeholder="https://api.mercadopago.com"></label></div><div id="asaasFields" class="hidden"><h4>Asaas</h4><div class="form-row"><label>Access Token<input name="cred_access_token" type="password" placeholder="$aact_..."></label></div><label>Webhook Secret<input name="webhook_secret" type="password" placeholder="Chave secreta do webhook"></label><label>Base URL (opcional)<input name="cred_base_url" placeholder="https://api.asaas.com/v3"></label></div><div id="efiFields" class="hidden"><h4>Efí (Gerencianet)</h4><div class="form-row"><label>Client ID<input name="cred_client_id" placeholder="Client_Id_..."></label><label>Client Secret<input name="cred_client_secret" type="password" placeholder="Client_Secret_..."></label></div><div class="form-row"><label>Pix Key (Chave Pix)<input name="cred_pix_key" placeholder="chave-pix@dominio.com"></label></div><label>Webhook Secret<input name="webhook_secret" type="password" placeholder="Chave secreta do webhook"></label><label>Base URL (opcional)<input name="cred_base_url" placeholder="https://api.efipay.com.br"></label></div><button type="submit" id="paymentConfigSubmit">Salvar configuração</button><button type="button" class="btn-secondary hidden" id="paymentConfigCancel">Cancelar edição</button></form></section>
+    <section><h2>Configurações salvas</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Provedor</th><th>Status</th><th>Criado em</th><th>Ações</th></tr></thead><tbody id="paymentConfigsTable"></tbody></table></div></section>
+  </div>
+
+  <div id="subpanelCobrancas" class="sub-tab-panel">
+    <section><h2>Nova cobrança Pix</h2><form id="paymentCreateForm"><div class="form-row"><label>Pedido<select name="order_id" id="paymentOrderSelect" required></select></label><label>Provedor<select name="provider" id="paymentProviderSelect" required></select></label></div><div class="form-row"><label>Valor (R$)<input name="amount" required inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" placeholder="19,90"></label><label>Descrição<input name="description" maxlength="200" placeholder="Pedido #123"></label></div><div class="form-row"><label>Nome do pagador<input name="payer_name" required maxlength="200"></label><label>E-mail do pagador<input type="email" name="payer_email" required maxlength="254"></label></div><div class="form-row"><label>Telefone do pagador<input name="payer_phone" maxlength="32" placeholder="(11) 99999-9999"></label><label>Documento do pagador<input name="payer_document" maxlength="32" placeholder="CPF/CNPJ"></label></div><label>Expiração (minutos)<input type="number" name="expiration_minutes" min="5" max="43200" value="60"></label><button type="submit">Gerar cobrança</button></form></section>
+    <section><h2>Cobranças</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Pedido</th><th>Provedor</th><th>Valor</th><th>Status</th><th>Expira em</th><th>Criado em</th><th>Ações</th></tr></thead><tbody id="paymentsTable"></tbody></table></div></section>
+  </div>
+
+  <div id="subpanelReembolsos" class="sub-tab-panel">
+    <section><h2>Solicitar reembolso</h2><p>Selecione uma cobrança confirmada para solicitar reembolso total ou parcial.</p><form id="refundForm"><div class="form-row"><label>Cobrança<select name="payment_id" id="refundPaymentSelect" required></select></label><label>Valor do reembolso (R$)<input name="amount" required inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" placeholder="0,00"></label></div><label>Motivo<textarea name="reason" required maxlength="500" rows="2" placeholder="Motivo do reembolso..."></textarea></label><button type="submit" class="btn-cancel">Solicitar reembolso</button></form></section>
+    <section><h2>Reembolsos recentes</h2><p class="notice">Os reembolsos são registrados na cobrança original. Consulte a aba "Cobranças" para ver o status.</p></section>
+  </div>
 </div>
 
 <div id="panelUsuarios" class="tab-panel">
@@ -164,6 +271,10 @@ history.replaceState(null,'',location.pathname);
 let orderKey=crypto.randomUUID();
 let currentUser=null;
 let currentStoreId=null;
+let allCategories=[];
+let allProducts=[];
+let allAddonGroups=[];
+let allCombos=[];
 
 function msg(text){$('message').textContent=text;$('message').classList.remove('hidden')}
 function clearMsg(){$('message').classList.add('hidden')}
@@ -186,6 +297,15 @@ async function apiPatch(path,data){
   return result
 }
 
+async function apiDelete(path){
+  let headers={'Content-Type':'application/json','X-OpenFood':'1'};
+  if(currentStoreId)headers['X-Store-ID']=String(currentStoreId);
+  let res=await fetch('/api/'+path,{method:'DELETE',headers});
+  let result=await res.json();
+  if(!res.ok){if(res.status===401)show('login');throw Error(result.error||'Falha na operação')}
+  return result
+}
+
 function show(id){for(let x of ['setup','login','workspace'])$(x).classList.toggle('hidden',x!==id)}
 function money(cents){return(cents/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
 function td(row,text){let cell=document.createElement('td');cell.textContent=text;row.append(cell);return cell}
@@ -202,6 +322,19 @@ document.querySelectorAll('.tab').forEach(tab=>{
     $('panel'+tab.dataset.tab.charAt(0).toUpperCase()+tab.dataset.tab.slice(1)).classList.add('active');
     if(tab.dataset.tab==='usuarios')loadUsers();
     if(tab.dataset.tab==='lojas')loadStores();
+    if(tab.dataset.tab==='catalogo')loadCatalog();
+    if(tab.dataset.tab==='clientes')loadCustomers();
+    if(tab.dataset.tab==='pagamentos')loadPayments();
+  }
+});
+
+// Sub-tab switching
+document.querySelectorAll('.sub-tab').forEach(tab=>{
+  tab.onclick=()=>{
+    document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.sub-tab-panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    $('subpanel'+tab.dataset.subtab.charAt(0).toUpperCase()+tab.dataset.subtab.slice(1)).classList.add('active');
   }
 });
 
@@ -210,6 +343,8 @@ function canManageUsers(){return currentUser&&['instance_admin','org_admin','sto
 function canManageStores(){return currentUser&&['instance_admin','org_admin'].includes(currentUser.role)}
 function canViewFinancials(){return currentUser&&['instance_admin','org_admin','store_manager','finance_viewer'].includes(currentUser.role)}
 function canCreateOrders(){return currentUser&&['instance_admin','org_admin','store_manager','attendant'].includes(currentUser.role)}
+function canAccessCustomers(){return currentUser&&['instance_admin','org_admin','store_manager','finance_viewer','attendant'].includes(currentUser.role)}
+function canAccessPayments(){return currentUser&&['instance_admin','org_admin','store_manager','finance_viewer'].includes(currentUser.role)}
 
 async function refresh(){
   clearMsg();
@@ -251,46 +386,494 @@ async function refresh(){
   // Users tab visibility
   $('tabUsuarios').classList.toggle('hidden',!canManageUsers());
   $('tabLojas').classList.toggle('hidden',!canManageStores());
+  $('tabCatalogo').classList.toggle('hidden',!canManageCatalog());
+  $('tabClientes').classList.toggle('hidden',!canAccessCustomers());
+  $('tabPagamentos').classList.toggle('hidden',!canAccessPayments());
 
   // Financial column
   $('finCol').classList.toggle('hidden',!canViewFinancials());
 
-  // Products
+  // Products (simple view for operation tab)
   $('products').replaceChildren();
   $('productSelect').replaceChildren();
   $('newUserStore').innerHTML='<option value="">— Sem loja específica —</option>';
   for(let p of products){
     let r=document.createElement('tr');
-    td(r,p.name);td(r,money(p.price_cents));td(r,p.stock);
+    td(r,p.name);td(r,p.category_id?'#'+p.category_id:'—');td(r,money(p.price_cents));td(r,p.stock_quantity);td(r,p.unit);td(r,p.sku||'—');td(r,p.active?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-inactive">Inativo</span>');
     $('products').append(r);
-    let o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} — ${money(p.price_cents)} (${p.stock} disponíveis)`;
+    let o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} — ${money(p.price_cents)} (${p.stock_quantity} ${p.unit||'unidade'})`;
     $('productSelect').append(o);
   }
 
   // Orders
   $('orders').replaceChildren();
   $('emptyOrders').textContent=orders.length?'':'Nenhum pedido registrado.';
-  let labels={confirmed:'Confirmado',preparing:'Em preparo',ready:'Pronto',completed:'Concluído',cancelled:'Cancelado'};
+  let labels={confirmed:'Confirmado',preparing:'Em preparo',ready:'Pronto',completed:'Concluído',cancelled:'Cancelado',awaiting_confirmation:'Aguardando confirmação',awaiting_payment:'Aguardando pagamento',draft:'Rascunho'};
   for(let o of orders){
     let r=document.createElement('tr');
     td(r,'#'+o.id);td(r,money(o.total_cents));
     let statusCell=document.createElement('td');
-    let badge=document.createElement('span');badge.className='badge badge-'+o.state;badge.textContent=labels[o.state];
+    let badge=document.createElement('span');badge.className='badge badge-'+o.state;badge.textContent=labels[o.state]||o.state;
     statusCell.append(badge);r.append(statusCell);
     if(canViewFinancials()){
       let finCell=document.createElement('td');
-      let finBadge=document.createElement('span');finBadge.className='badge badge-financial';finBadge.textContent='Pagamento manual pendente';
+      let finBadge=document.createElement('span');finBadge.className='badge badge-financial';finBadge.textContent=o.financial_state||'Pagamento manual pendente';
       finCell.append(finBadge);r.append(finCell);
     }
     let actions=document.createElement('td');
-    let next={confirmed:'preparing',preparing:'ready',ready:'completed'}[o.state];
+    let next={confirmed:'preparing',preparing:'ready',ready:'completed',awaiting_confirmation:'confirmed',awaiting_payment:'confirmed'}[o.state];
     if(next){let b=document.createElement('button');b.textContent=labels[next];b.onclick=()=>run(async()=>{await api('order-state',{id:o.id,state:next});await refresh()});actions.append(b)}
-    if(o.state==='confirmed'){let b=document.createElement('button');b.className='btn-cancel';b.textContent='Cancelar';b.onclick=()=>run(async()=>{await api('order-state',{id:o.id,state:'cancelled'});await refresh()});actions.append(b)}
+    if(o.state==='confirmed'||o.state==='awaiting_confirmation'||o.state==='awaiting_payment'){let b=document.createElement('button');b.className='btn-cancel';b.textContent='Cancelar';b.onclick=()=>run(async()=>{await api('order-state',{id:o.id,state:'cancelled'});await refresh()});actions.append(b)}
     r.append(actions);$('orders').append(r);
   }
   show('workspace');
 }
 
+async function loadCatalog(){
+  try{
+    [allCategories, allProducts, allAddonGroups, allCombos] = await Promise.all([
+      api('categories'),
+      api('products'),
+      api('addon-groups'),
+      api('combos')
+    ]);
+    
+    // Populate category selects
+    const catOptions = allCategories.map(c => `<option value="${c.id}">${c.name}${c.parent_id ? ' (sub)' : ''}</option>`).join('');
+    $$('select[name="category_id"]').forEach(sel => { sel.innerHTML = '<option value="">— Sem categoria —</option>' + catOptions; });
+    $('#categoryParent').innerHTML = '<option value="">— Nenhuma (raiz) —</option>' + catOptions;
+    
+    // Populate product selects
+    const prodOptions = allProducts.map(p => `<option value="${p.id}">${p.name} — ${money(p.price_cents)}</option>`).join('');
+    $('#variantProductSelect').innerHTML = '<option value="">— Selecione —</option>' + prodOptions;
+    $('#productAddonProductSelect').innerHTML = '<option value="">— Selecione —</option>' + prodOptions;
+    $('#comboItemProductSelect').innerHTML = '<option value="">— Selecione —</option>' + prodOptions;
+    $('#comboItemComboSelect').innerHTML = '<option value="">— Selecione —</option>';
+    
+    // Populate addon group selects
+    const addonGroupOptions = allAddonGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+    $('#addonOptionGroupSelect').innerHTML = '<option value="">— Selecione —</option>' + addonGroupOptions;
+    
+    // Populate combo selects
+    const comboOptions = allCombos.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    $('#comboItemComboSelect').innerHTML = '<option value="">— Selecione —</option>' + comboOptions;
+    
+    // Render all tables
+    renderAdvancedProducts();
+    renderCategories();
+    renderVariants();
+    renderAddonGroups();
+    renderAddonOptions();
+    renderProductAddonGroups();
+    renderCombos();
+    renderComboItems();
+    
+  }catch(e){msg('Erro ao carregar catálogo: '+e.message)}
+}
+
+function $$(sel){return [...document.querySelectorAll(sel)]}
+
+function parsePrice(str){
+  let parts=str.replace(',','.').split('.');
+  return Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0'));
+}
+
+function formatQty(qty, unit){
+  if(unit==='kg' || unit==='g' || unit==='l' || unit==='ml'){
+    return Number(qty).toFixed(3).replace(/\.?0+$/,'') + ' ' + unit;
+  }
+  return Number(qty).toLocaleString('pt-BR') + ' ' + (unit||'unidade');
+}
+
+// --- Advanced Products ---
+async function renderAdvancedProducts(){
+  try{
+    let products = await api('products');
+    allProducts = products;
+    let tbody=$('advProducts'); tbody.replaceChildren();
+    for(let p of products){
+      let r=document.createElement('tr');
+      let cat = allCategories.find(c=>c.id===p.category_id);
+      td(r,'#'+p.id);
+      td(r,p.name);
+      td(r,cat?cat.name:'—');
+      td(r,money(p.price_cents));
+      td(r,formatQty(p.stock_quantity, p.unit));
+      td(r,p.unit);
+      td(r,p.sku||'—');
+      td(r,p.barcode||'—');
+      td(r,p.is_weight_based?'<span class="badge badge-active">Sim</span>':'Não');
+      td(r,p.substitution_allowed?'<span class="badge badge-active">Sim</span>':'Não');
+      td(r,p.active?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-inactive">Inativo</span>');
+      let actCell=document.createElement('td');
+      let editBtn=document.createElement('button');editBtn.textContent='Editar';editBtn.style.fontSize='12px';editBtn.style.padding='6px 10px';editBtn.onclick=()=>editAdvancedProduct(p);actCell.append(editBtn);
+      let delBtn=document.createElement('button');delBtn.className='btn-cancel';delBtn.textContent='Excluir';delBtn.style.fontSize='12px';delBtn.style.padding='6px 10px';delBtn.onclick=()=>run(async()=>{if(confirm('Excluir produto "'+p.name+'"?')){await apiDelete('products?id='+p.id);await loadCatalog()}});actCell.append(delBtn);
+      r.append(actCell);tbody.append(r);
+    }
+  }catch(e){msg('Erro ao carregar produtos: '+e.message)}
+}
+
+function editAdvancedProduct(p){
+  $('#advProductId').value=p.id;
+  $('#advProductForm [name="name"]').value=p.name;
+  $('#advProductForm [name="description"]').value=p.description||'';
+  $('#advProductForm [name="category_id"]').value=p.category_id||'';
+  $('#advProductForm [name="price"]').value=(p.price_cents/100).toFixed(2).replace('.',',');
+  $('#advProductForm [name="stock"]').value=p.stock_quantity;
+  $('#advProductForm [name="unit"]').value=p.unit||'unidade';
+  $('#advProductForm [name="sku"]').value=p.sku||'';
+  $('#advProductForm [name="barcode"]').value=p.barcode||'';
+  $('#advProductForm [name="min_qty"]').value=p.min_order_quantity||1;
+  $('#advProductForm [name="max_qty"]').value=p.max_order_quantity||'';
+  $('#advProductForm [name="prep_time"]').value=p.preparation_time_minutes||0;
+  $('#advProductForm [name="display_order"]').value=p.display_order||0;
+  $('#advProductForm [name="active"]').checked=p.active;
+  $('#advProductForm [name="weight_based"]').checked=p.is_weight_based;
+  $('#advProductForm [name="substitution_allowed"]').checked=p.substitution_allowed;
+  $('#advProductForm [name="available_from"]').value=p.available_from||'';
+  $('#advProductForm [name="available_until"]').value=p.available_until||'';
+  $('#advProductSubmit').textContent='Atualizar produto';
+  $('#advProductCancel').classList.remove('hidden');
+  $('advProductForm').scrollIntoView({behavior:'smooth'});
+}
+
+$('#advProductForm').onsubmit=e=>{e.preventDefault();if(!canManageCatalog()){msg('Sem permissão.');return;}let id=$('#advProductId').value;let d=new FormData(e.target);let payload={name:d.get('name'),description:d.get('description'),price_cents:parsePrice(d.get('price')),stock_quantity:Number(d.get('stock')),unit:d.get('unit'),sku:d.get('sku')||null,barcode:d.get('barcode')||null,min_order_quantity:Number(d.get('min_qty'))||1,max_order_quantity:d.get('max_qty')?Number(d.get('max_qty')):null,preparation_time_minutes:Number(d.get('prep_time'))||0,display_order:Number(d.get('display_order'))||0,active:d.get('active')==='on',is_weight_based:d.get('weight_based')==='on',substitution_allowed:d.get('substitution_allowed')==='on',available_from:d.get('available_from')||null,available_until:d.get('available_until')||null,category_id:d.get('category_id')?Number(d.get('category_id')):null};let url=id?'products?id='+id:'products';run(async()=>{if(id){await apiPatch(url,payload)}else{await api(url,payload)}resetAdvProductForm();await loadCatalog();msg(id?'Produto atualizado.':'Produto criado.')})};
+
+function resetAdvProductForm(){
+  $('#advProductForm').reset();
+  $('#advProductId').value='';
+  $('#advProductSubmit').textContent='Salvar produto';
+  $('#advProductCancel').classList.add('hidden');
+}
+
+$('#advProductCancel').onclick=resetAdvProductForm;
+
+// --- Categories ---
+async function renderCategories(){
+  try{
+    let cats = await api('categories');
+    allCategories = cats;
+    let tbody=$('categoriesTable'); tbody.replaceChildren();
+    for(let c of cats){
+      let r=document.createElement('tr');
+      let parent = cats.find(x=>x.id===c.parent_id);
+      td(r,'#'+c.id);
+      td(r,c.name);
+      td(r,parent?parent.name:'—');
+      td(r,c.display_order);
+      td(r,c.active?'<span class="badge badge-active">Ativa</span>':'<span class="badge badge-inactive">Inativa</span>');
+      let actCell=document.createElement('td');
+      let editBtn=document.createElement('button');editBtn.textContent='Editar';editBtn.style.fontSize='12px';editBtn.style.padding='6px 10px';editBtn.onclick=()=>editCategory(c);actCell.append(editBtn);
+      let delBtn=document.createElement('button');delBtn.className='btn-cancel';delBtn.textContent='Excluir';delBtn.style.fontSize='12px';delBtn.style.padding='6px 10px';delBtn.onclick=()=>run(async()=>{if(confirm('Excluir categoria "'+c.name+'"?')){await apiDelete('categories?id='+c.id);await loadCatalog()}});actCell.append(delBtn);
+      r.append(actCell);tbody.append(r);
+    }
+  }catch(e){msg('Erro ao carregar categorias: '+e.message)}
+}
+
+function editCategory(c){
+  $('#categoryId').value=c.id;
+  $('#categoryForm [name="name"]').value=c.name;
+  $('#categoryForm [name="description"]').value=c.description||'';
+  $('#categoryForm [name="parent_id"]').value=c.parent_id||'';
+  $('#categoryForm [name="display_order"]').value=c.display_order||0;
+  $('#categoryForm [name="active"]').checked=c.active;
+  $('#categorySubmit').textContent='Atualizar categoria';
+  $('#categoryCancel').classList.remove('hidden');
+  $('categoryForm').scrollIntoView({behavior:'smooth'});
+}
+
+$('#categoryForm').onsubmit=e=>{e.preventDefault();if(!canManageCatalog()){msg('Sem permissão.');return;}let id=$('#categoryId').value;let d=new FormData(e.target);let payload={name:d.get('name'),description:d.get('description'),parent_id:d.get('parent_id')?Number(d.get('parent_id')):null,display_order:Number(d.get('display_order'))||0,active:d.get('active')==='on'};let url=id?'categories?id='+id:'categories';run(async()=>{if(id){await apiPatch(url,payload)}else{await api(url,payload)}resetCategoryForm();await loadCatalog();msg(id?'Categoria atualizada.':'Categoria criada.')})};
+
+function resetCategoryForm(){
+  $('#categoryForm').reset();
+  $('#categoryId').value='';
+  $('#categorySubmit').textContent='Salvar categoria';
+  $('#categoryCancel').classList.add('hidden');
+}
+
+$('#categoryCancel').onclick=resetCategoryForm;
+
+// --- Variants ---
+async function renderVariants(){
+  try{
+    if(!$('#variantProductSelect').value) return;
+    let variants = await api('product-variants?product_id='+$('#variantProductSelect').value);
+    let tbody=$('variantsTable'); tbody.replaceChildren();
+    for(let v of variants){
+      let r=document.createElement('tr');
+      let prod = allProducts.find(p=>p.id===v.product_id);
+      td(r,'#'+v.id);
+      td(r,prod?prod.name:'#'+v.product_id);
+      td(r,v.name);
+      td(r,money(v.price_adjustment_cents));
+      td(r,formatQty(v.stock_quantity, 'unidade'));
+      td(r,v.sku||'—');
+      td(r,v.active?'<span class="badge badge-active">Ativa</span>':'<span class="badge badge-inactive">Inativa</span>');
+      let actCell=document.createElement('td');
+      let editBtn=document.createElement('button');editBtn.textContent='Editar';editBtn.style.fontSize='12px';editBtn.style.padding='6px 10px';editBtn.onclick=()=>editVariant(v);actCell.append(editBtn);
+      let delBtn=document.createElement('button');delBtn.className='btn-cancel';delBtn.textContent='Excluir';delBtn.style.fontSize='12px';delBtn.style.padding='6px 10px';delBtn.onclick=()=>run(async()=>{if(confirm('Excluir variante?')){await apiDelete('product-variants?id='+v.id);await renderVariants()}});actCell.append(delBtn);
+      r.append(actCell);tbody.append(r);
+    }
+  }catch(e){msg('Erro ao carregar variantes: '+e.message)}
+}
+
+$('#variantProductSelect').onchange=renderVariants;
+
+function editVariant(v){
+  $('#variantId').value=v.id;
+  $('#variantProductId').value=v.product_id;
+  $('#variantProductSelect').value=v.product_id;
+  $('#variantForm [name="name"]').value=v.name;
+  $('#variantForm [name="price_adjustment"]').value=(v.price_adjustment_cents/100).toFixed(2).replace('.',',');
+  $('#variantForm [name="stock"]').value=v.stock_quantity;
+  $('#variantForm [name="sku"]').value=v.sku||'';
+  $('#variantForm [name="display_order"]').value=v.display_order||0;
+  $('#variantForm [name="active"]').checked=v.active;
+  $('#variantSubmit').textContent='Atualizar variante';
+  $('#variantCancel').classList.remove('hidden');
+  $('variantForm').scrollIntoView({behavior:'smooth'});
+}
+
+$('#variantForm').onsubmit=e=>{e.preventDefault();if(!canManageCatalog()){msg('Sem permissão.');return;}let id=$('#variantId').value;let productId=$('#variantProductId').value||$('#variantProductSelect').value;let d=new FormData(e.target);let payload={name:d.get('name'),price_adjustment_cents:parsePrice(d.get('price_adjustment')),stock_quantity:Number(d.get('stock')),sku:d.get('sku')||null,display_order:Number(d.get('display_order'))||0,active:d.get('active')==='on'};let url=id?'product-variants?id='+id:'product-variants?product_id='+productId;run(async()=>{if(id){await apiPatch(url,payload)}else{await api(url,payload)}resetVariantForm();await renderVariants();msg(id?'Variante atualizada.':'Variante criada.')})};
+
+function resetVariantForm(){
+  $('#variantForm').reset();
+  $('#variantId').value='';
+  $('#variantProductId').value='';
+  $('#variantSubmit').textContent='Salvar variante';
+  $('#variantCancel').classList.add('hidden');
+}
+
+$('#variantCancel').onclick=resetVariantForm;
+
+// --- Addon Groups ---
+async function renderAddonGroups(){
+  try{
+    let groups = await api('addon-groups');
+    allAddonGroups = groups;
+    let tbody=$('addonGroupsTable'); tbody.replaceChildren();
+    for(let g of groups){
+      let r=document.createElement('tr');
+      td(r,'#'+g.id);
+      td(r,g.name);
+      td(r,g.min_selections);
+      td(r,g.max_selections);
+      td(r,g.required?'<span class="badge badge-active">Sim</span>':'Não');
+      td(r,g.display_order);
+      td(r,g.active?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-inactive">Inativo</span>');
+      let actCell=document.createElement('td');
+      let editBtn=document.createElement('button');editBtn.textContent='Editar';editBtn.style.fontSize='12px';editBtn.style.padding='6px 10px';editBtn.onclick=()=>editAddonGroup(g);actCell.append(editBtn);
+      let delBtn=document.createElement('button');delBtn.className='btn-cancel';delBtn.textContent='Excluir';delBtn.style.fontSize='12px';delBtn.style.padding='6px 10px';delBtn.onclick=()=>run(async()=>{if(confirm('Excluir grupo?')){await apiDelete('addon-groups?id='+g.id);await loadCatalog()}});actCell.append(delBtn);
+      r.append(actCell);tbody.append(r);
+    }
+  }catch(e){msg('Erro ao carregar grupos de adicionais: '+e.message)}
+}
+
+function editAddonGroup(g){
+  $('#addonGroupId').value=g.id;
+  $('#addonGroupForm [name="name"]').value=g.name;
+  $('#addonGroupForm [name="description"]').value=g.description||'';
+  $('#addonGroupForm [name="min_sel"]').value=g.min_selections;
+  $('#addonGroupForm [name="max_sel"]').value=g.max_selections;
+  $('#addonGroupForm [name="display_order"]').value=g.display_order||0;
+  $('#addonGroupForm [name="required"]').checked=g.required;
+  $('#addonGroupForm [name="active"]').checked=g.active;
+  $('#addonGroupSubmit').textContent='Atualizar grupo';
+  $('#addonGroupCancel').classList.remove('hidden');
+  $('addonGroupForm').scrollIntoView({behavior:'smooth'});
+}
+
+$('#addonGroupForm').onsubmit=e=>{e.preventDefault();if(!canManageCatalog()){msg('Sem permissão.');return;}let id=$('#addonGroupId').value;let d=new FormData(e.target);let payload={name:d.get('name'),description:d.get('description'),min_selections:Number(d.get('min_sel')),max_selections:Number(d.get('max_sel')),required:d.get('required')==='on',display_order:Number(d.get('display_order'))||0,active:d.get('active')==='on'};let url=id?'addon-groups?id='+id:'addon-groups';run(async()=>{if(id){await apiPatch(url,payload)}else{await api(url,payload)}resetAddonGroupForm();await loadCatalog();msg(id?'Grupo atualizado.':'Grupo criado.')})};
+
+function resetAddonGroupForm(){
+  $('#addonGroupForm').reset();
+  $('#addonGroupId').value='';
+  $('#addonGroupSubmit').textContent='Salvar grupo';
+  $('#addonGroupCancel').classList.add('hidden');
+}
+
+$('#addonGroupCancel').onclick=resetAddonGroupForm;
+
+// --- Addon Options ---
+async function renderAddonOptions(){
+  try{
+    if(!$('#addonOptionGroupSelect').value) return;
+    let options = await api('addon-options?group_id='+$('#addonOptionGroupSelect').value);
+    let tbody=$('addonOptionsTable'); tbody.replaceChildren();
+    for(let o of options){
+      let r=document.createElement('tr');
+      let group = allAddonGroups.find(g=>g.id===o.group_id);
+      td(r,'#'+o.id);
+      td(r,group?group.name:'#'+o.group_id);
+      td(r,o.name);
+      td(r,money(o.price_cents));
+      td(r,formatQty(o.stock_quantity, 'unidade'));
+      td(r,o.is_default?'<span class="badge badge-active">Sim</span>':'Não');
+      td(r,o.active?'<span class="badge badge-active">Ativa</span>':'<span class="badge badge-inactive">Inativa</span>');
+      let actCell=document.createElement('td');
+      let editBtn=document.createElement('button');editBtn.textContent='Editar';editBtn.style.fontSize='12px';editBtn.style.padding='6px 10px';editBtn.onclick=()=>editAddonOption(o);actCell.append(editBtn);
+      let delBtn=document.createElement('button');delBtn.className='btn-cancel';delBtn.textContent='Excluir';delBtn.style.fontSize='12px';delBtn.style.padding='6px 10px';delBtn.onclick=()=>run(async()=>{if(confirm('Excluir opção?')){await apiDelete('addon-options?id='+o.id);await renderAddonOptions()}});actCell.append(delBtn);
+      r.append(actCell);tbody.append(r);
+    }
+  }catch(e){msg('Erro ao carregar opções: '+e.message)}
+}
+
+$('#addonOptionGroupSelect').onchange=renderAddonOptions;
+
+function editAddonOption(o){
+  $('#addonOptionId').value=o.id;
+  $('#addonOptionGroupId').value=o.group_id;
+  $('#addonOptionGroupSelect').value=o.group_id;
+  $('#addonOptionForm [name="name"]').value=o.name;
+  $('#addonOptionForm [name="description"]').value=o.description||'';
+  $('#addonOptionForm [name="price"]').value=(o.price_cents/100).toFixed(2).replace('.',',');
+  $('#addonOptionForm [name="stock"]').value=o.stock_quantity;
+  $('#addonOptionForm [name="display_order"]').value=o.display_order||0;
+  $('#addonOptionForm [name="is_default"]').checked=o.is_default;
+  $('#addonOptionForm [name="active"]').checked=o.active;
+  $('#addonOptionSubmit').textContent='Atualizar opção';
+  $('#addonOptionCancel').classList.remove('hidden');
+  $('addonOptionForm').scrollIntoView({behavior:'smooth'});
+}
+
+$('#addonOptionForm').onsubmit=e=>{e.preventDefault();if(!canManageCatalog()){msg('Sem permissão.');return;}let id=$('#addonOptionId').value;let groupId=$('#addonOptionGroupId').value||$('#addonOptionGroupSelect').value;let d=new FormData(e.target);let payload={name:d.get('name'),description:d.get('description'),price_cents:parsePrice(d.get('price')),stock_quantity:Number(d.get('stock')),is_default:d.get('is_default')==='on',display_order:Number(d.get('display_order'))||0,active:d.get('active')==='on'};let url=id?'addon-options?id='+id:'addon-options?group_id='+groupId;run(async()=>{if(id){await apiPatch(url,payload)}else{await api(url,payload)}resetAddonOptionForm();await renderAddonOptions();msg(id?'Opção atualizada.':'Opção criada.')})};
+
+function resetAddonOptionForm(){
+  $('#addonOptionForm').reset();
+  $('#addonOptionId').value='';
+  $('#addonOptionGroupId').value='';
+  $('#addonOptionSubmit').textContent='Salvar opção';
+  $('#addonOptionCancel').classList.add('hidden');
+}
+
+$('#addonOptionCancel').onclick=resetAddonOptionForm;
+
+// --- Product Addon Groups ---
+async function renderProductAddonGroups(){
+  try{
+    let pid = $('#productAddonProductSelect').value;
+    if(!pid) { $('#productAddonGroupsList').innerHTML = '<p class="notice">Selecione um produto para gerenciar seus grupos de adicionais.</p>'; return; }
+    let linked = await api('product-addon-groups?product_id='+pid);
+    let linkedIds = new Set(linked.map(l=>l.group_id));
+    let html = allAddonGroups.map(g => `
+      <label style="display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--bg-surface);cursor:pointer;">
+        <input type="checkbox" ${linkedIds.has(g.id)?'checked':''} onchange="toggleProductAddonGroup(${pid},${g.id},this.checked)">
+        <span>${g.name}</span>
+        <small style="color:var(--text-muted);margin-left:auto;">${g.min_selections}–${g.max_selections} seleções</small>
+      </label>
+    `).join('');
+    $('#productAddonGroupsList').innerHTML = html || '<p class="notice">Nenhum grupo de adicionais cadastrado.</p>';
+  }catch(e){msg('Erro ao carregar vínculos: '+e.message)}
+}
+
+$('#productAddonProductSelect').onchange=renderProductAddonGroups;
+
+async function toggleProductAddonGroup(productId, groupId, checked){
+  try{
+    if(checked){
+      await api('product-addon-groups',{product_id:productId,group_id:groupId});
+    }else{
+      await apiDelete('product-addon-groups?product_id='+productId+'&group_id='+groupId);
+    }
+    await renderProductAddonGroups();
+  }catch(e){msg('Erro ao atualizar vínculo: '+e.message); renderProductAddonGroups();}
+}
+
+// --- Combos ---
+async function renderCombos(){
+  try{
+    let combos = await api('combos');
+    allCombos = combos;
+    let tbody=$('combosTable'); tbody.replaceChildren();
+    for(let c of combos){
+      let r=document.createElement('tr');
+      td(r,'#'+c.id);
+      td(r,c.name);
+      td(r,money(c.price_cents));
+      td(r,c.pricing_policy==='fixed'?'Fixo':c.pricing_policy==='highest'?'Maior item':'Soma');
+      td(r,c.active?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-inactive">Inativo</span>');
+      let actCell=document.createElement('td');
+      let editBtn=document.createElement('button');editBtn.textContent='Editar';editBtn.style.fontSize='12px';editBtn.style.padding='6px 10px';editBtn.onclick=()=>editCombo(c);actCell.append(editBtn);
+      let delBtn=document.createElement('button');delBtn.className='btn-cancel';delBtn.textContent='Excluir';delBtn.style.fontSize='12px';delBtn.style.padding='6px 10px';delBtn.onclick=()=>run(async()=>{if(confirm('Excluir combo?')){await apiDelete('combos?id='+c.id);await loadCatalog()}});actCell.append(delBtn);
+      let itemsBtn=document.createElement('button');itemsBtn.className='btn-secondary';itemsBtn.textContent='Itens';itemsBtn.style.fontSize='12px';itemsBtn.style.padding='6px 10px';itemsBtn.onclick=()=>{$('#comboItemComboSelect').value=c.id;$('#subtabCombos').click();$('#subtabCombos').click();renderComboItems();};actCell.append(itemsBtn);
+      r.append(actCell);tbody.append(r);
+    }
+    // Update combo item combo select
+    $('#comboItemComboSelect').innerHTML = '<option value="">— Selecione —</option>' + combos.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  }catch(e){msg('Erro ao carregar combos: '+e.message)}
+}
+
+function editCombo(c){
+  $('#comboId').value=c.id;
+  $('#comboForm [name="name"]').value=c.name;
+  $('#comboForm [name="description"]').value=c.description||'';
+  $('#comboForm [name="price"]').value=(c.price_cents/100).toFixed(2).replace('.',',');
+  $('#comboForm [name="pricing_policy"]').value=c.pricing_policy;
+  $('#comboForm [name="display_order"]').value=c.display_order||0;
+  $('#comboForm [name="active"]').checked=c.active;
+  $('#comboSubmit').textContent='Atualizar combo';
+  $('#comboCancel').classList.remove('hidden');
+  $('comboForm').scrollIntoView({behavior:'smooth'});
+}
+
+$('#comboForm').onsubmit=e=>{e.preventDefault();if(!canManageCatalog()){msg('Sem permissão.');return;}let id=$('#comboId').value;let d=new FormData(e.target);let payload={name:d.get('name'),description:d.get('description'),price_cents:parsePrice(d.get('price')),pricing_policy:d.get('pricing_policy'),display_order:Number(d.get('display_order'))||0,active:d.get('active')==='on'};let url=id?'combos?id='+id:'combos';run(async()=>{if(id){await apiPatch(url,payload)}else{await api(url,payload)}resetComboForm();await loadCatalog();msg(id?'Combo atualizado.':'Combo criado.')})};
+
+function resetComboForm(){
+  $('#comboForm').reset();
+  $('#comboId').value='';
+  $('#comboSubmit').textContent='Salvar combo';
+  $('#comboCancel').classList.add('hidden');
+}
+
+$('#comboCancel').onclick=resetComboForm;
+
+// --- Combo Items ---
+async function renderComboItems(){
+  try{
+    let cid = $('#comboItemComboSelect').value;
+    if(!cid) { $('#comboItemsTable').innerHTML = ''; return; }
+    let items = await api('combo-items?combo_id='+cid);
+    let tbody=$('comboItemsTable'); tbody.replaceChildren();
+    for(let i of items){
+      let r=document.createElement('tr');
+      let combo = allCombos.find(c=>c.id===i.combo_id);
+      let prod = allProducts.find(p=>p.id===i.product_id);
+      td(r,combo?combo.name:'#'+i.combo_id);
+      td(r,prod?prod.name:'#'+i.product_id);
+      td(r,formatQty(i.quantity, prod?prod.unit:'unidade'));
+      td(r,i.group_name||'—');
+      td(r,i.is_optional?'<span class="badge badge-active">Sim</span>':'Não');
+      td(r,i.min_selections);
+      td(r,i.max_selections);
+      td(r,i.display_order);
+      let actCell=document.createElement('td');
+      let delBtn=document.createElement('button');delBtn.className='btn-cancel';delBtn.textContent='Remover';delBtn.style.fontSize='12px';delBtn.style.padding='6px 10px';delBtn.onclick=()=>run(async()=>{if(confirm('Remover item do combo?')){await apiDelete('combo-items?combo_id='+cid+'&product_id='+i.product_id);await renderComboItems()}});actCell.append(delBtn);
+      r.append(actCell);tbody.append(r);
+    }
+  }catch(e){msg('Erro ao carregar itens do combo: '+e.message)}
+}
+
+$('#comboItemComboSelect').onchange=renderComboItems;
+
+$('#comboItemForm').onsubmit=e=>{e.preventDefault();if(!canManageCatalog()){msg('Sem permissão.');return;}let comboId=$('#comboItemComboId').value||$('#comboItemComboSelect').value;let d=new FormData(e.target);let payload={product_id:Number(d.get('product_id')),quantity:Number(d.get('quantity')),is_optional:d.get('is_optional')==='on',group_name:d.get('group_name')||null,min_selections:Number(d.get('min_sel')),max_selections:Number(d.get('max_sel')),display_order:Number(d.get('display_order'))||0};run(async()=>{await api('combo-items?combo_id='+comboId,payload);resetComboItemForm();await renderComboItems();msg('Item adicionado ao combo.')})};
+
+function resetComboItemForm(){
+  $('#comboItemForm').reset();
+  $('#comboItemComboId').value='';
+  $('#comboItemProductId').value='';
+  $('#comboItemSubmit').textContent='Adicionar item';
+  $('#comboItemCancel').classList.add('hidden');
+}
+
+$('#comboItemCancel').onclick=resetComboItemForm;
+
+// --- Original simple product form ---
+$('#productForm').onsubmit=e=>{e.preventDefault();if(!canManageCatalog()){msg('Sem permissão para cadastrar produtos.');return;}let d=new FormData(e.target);let parts=d.get('price').replace(',','.').split('.');let price=Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0'));run(async()=>{await api('products',{Name:d.get('name'),PriceCents:price,Stock:Number(d.get('stock'))});e.target.reset();await refresh()})};
+
+// --- Orders ---
+$('#orderForm').onsubmit=e=>{e.preventDefault();if(!canCreateOrders()){msg('Sem permissão para criar pedidos.');return;}let d=new FormData(e.target);run(async()=>{await api('orders',{items:[{product_id:Number(d.get('product')),quantity:Number(d.get('quantity'))}]},{'Idempotency-Key':orderKey});orderKey=crypto.randomUUID();await refresh()})};
+
+// --- Users ---
 async function loadUsers(){
   try{
     let users=await api('users');
@@ -298,7 +881,6 @@ async function loadUsers(){
     let stores=[];
     try{stores=await api('stores')}catch(e){}
     let storeMap={};for(let s of stores)storeMap[s.id]=s.name;
-    // Populate new user store selector
     $('newUserStore').innerHTML='<option value="">— Sem loja específica —</option>';
     for(let s of stores){let o=document.createElement('option');o.value=s.id;o.textContent=s.name;$('newUserStore').append(o)}
     for(let u of users){
@@ -322,6 +904,9 @@ async function loadUsers(){
   }catch(e){msg('Erro ao carregar usuários: '+e.message)}
 }
 
+$('#addUserForm').onsubmit=e=>{e.preventDefault();let d=Object.fromEntries(new FormData(e.target));let payload={email:d.email,password:d.password,role:d.role};if(d.store_id)payload.store_id=Number(d.store_id);run(async()=>{await api('users',payload);e.target.reset();await loadUsers();msg('Usuário criado com sucesso.')})};
+
+// --- Stores ---
 async function loadStores(){
   try{
     let stores=await api('stores');
@@ -335,31 +920,263 @@ async function loadStores(){
   }catch(e){msg('Erro ao carregar lojas: '+e.message)}
 }
 
+$('#addStoreForm').onsubmit=e=>{e.preventDefault();let d=Object.fromEntries(new FormData(e.target));run(async()=>{await api('stores',{name:d.name});e.target.reset();await loadStores();msg('Loja criada com sucesso.')})};
+
+// --- Customers & LGPD ---
+async function loadCustomers(){
+  try{
+    let [customers, consents] = await Promise.all([
+      api('customers'),
+      api('consents')
+    ]);
+    let tbody=$('customersTable'); tbody.replaceChildren();
+    for(let c of customers){
+      let r=document.createElement('tr');
+      td(r,'#'+c.id);
+      td(r,c.name);
+      td(r,c.phone||'—');
+      td(r,c.email||'—');
+      td(r,c.document||'—');
+      td(r,c.marketing_consent?'<span class="badge badge-active">Sim</span>':'Não');
+      td(r,new Date(c.created_at).toLocaleString('pt-BR'));
+      let actCell=document.createElement('td');
+      let editBtn=document.createElement('button');editBtn.textContent='Editar';editBtn.style.fontSize='12px';editBtn.style.padding='6px 10px';editBtn.onclick=()=>editCustomer(c);actCell.append(editBtn);
+      let delBtn=document.createElement('button');delBtn.className='btn-cancel';delBtn.textContent='Excluir';delBtn.style.fontSize='12px';delBtn.style.padding='6px 10px';delBtn.onclick=()=>run(async()=>{if(confirm('Excluir cliente "'+c.name+'"?')){await apiDelete('customers?id='+c.id);await loadCustomers()}});actCell.append(delBtn);
+      r.append(actCell);tbody.append(r);
+    }
+    
+    // Populate consent customer select
+    $('#consentCustomerSelect').innerHTML = '<option value="">— Selecione —</option>' + customers.map(c=>`<option value="${c.id}">${c.name} (${c.phone||c.email||'sem contato'})</option>`).join('');
+    $('#lgpdExportCustomerSelect').innerHTML = '<option value="">— Selecione —</option>' + customers.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    $('#lgpdDeleteCustomerSelect').innerHTML = '<option value="">— Selecione —</option>' + customers.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    
+    // Render consents
+    renderConsents(consents);
+  }catch(e){msg('Erro ao carregar clientes: '+e.message)}
+}
+
+function editCustomer(c){
+  $('#customerId').value=c.id;
+  $('#customerForm [name="name"]').value=c.name;
+  $('#customerForm [name="phone"]').value=c.phone||'';
+  $('#customerForm [name="email"]').value=c.email||'';
+  $('#customerForm [name="document"]').value=c.document||'';
+  $('#customerForm [name="notes"]').value=c.notes||'';
+  $('#customerForm [name="marketing_consent"]').checked=c.marketing_consent;
+  $('#customerSubmit').textContent='Atualizar cliente';
+  $('#customerCancel').classList.remove('hidden');
+  $('customerForm').scrollIntoView({behavior:'smooth'});
+}
+
+$('#customerForm').onsubmit=e=>{e.preventDefault();if(!canManageUsers()){msg('Sem permissão.');return;}let id=$('#customerId').value;let d=new FormData(e.target);let payload={name:d.get('name'),phone:d.get('phone')||null,email:d.get('email')||null,document:d.get('document')||null,notes:d.get('notes')||null,marketing_consent:d.get('marketing_consent')==='on'};let url=id?'customers?id='+id:'customers';run(async()=>{if(id){await apiPatch(url,payload)}else{await api(url,payload)}resetCustomerForm();await loadCustomers();msg(id?'Cliente atualizado.':'Cliente criado.')})};
+
+function resetCustomerForm(){
+  $('#customerForm').reset();
+  $('#customerId').value='';
+  $('#customerSubmit').textContent='Salvar cliente';
+  $('#customerCancel').classList.add('hidden');
+}
+
+$('#customerCancel').onclick=resetCustomerForm;
+
+async function renderConsents(consents){
+  let tbody=$('consentsTable'); tbody.replaceChildren();
+  let customers = await api('customers');
+  let custMap = {}; customers.forEach(c=>custMap[c.id]=c.name);
+  for(let c of consents){
+    let r=document.createElement('tr');
+    td(r,'#'+c.id);
+    td(r,custMap[c.customer_id]||'#'+c.customer_id);
+    td(r,c.purpose);
+    td(r,c.version);
+    td(r,c.granted?'<span class="badge badge-active">Concedido</span>':'<span class="badge badge-inactive">Revogado</span>');
+    td(r,c.granted_at?new Date(c.granted_at).toLocaleString('pt-BR'):'—');
+    td(r,c.revoked_at?new Date(c.revoked_at).toLocaleString('pt-BR'):'—');
+    td(r,c.source);
+    let actCell=document.createElement('td');
+    if(c.granted && !c.revoked_at){
+      let revokeBtn=document.createElement('button');revokeBtn.className='btn-cancel';revokeBtn.textContent='Revogar';revokeBtn.style.fontSize='12px';revokeBtn.style.padding='6px 10px';revokeBtn.onclick=()=>run(async()=>{if(confirm('Revogar este consentimento?')){await apiPatch('consents',{id:c.id});await loadCustomers()}});actCell.append(revokeBtn);
+    }
+    r.append(actCell);tbody.append(r);
+  }
+}
+
+$('#consentForm').onsubmit=e=>{e.preventDefault();if(!canManageUsers()){msg('Sem permissão.');return;}let d=new FormData(e.target);let evidence=null;try{evidence=JSON.parse(d.get('evidence')||'null')}catch(e){evidence=d.get('evidence')}let payload={customer_id:Number(d.get('customer_id')),purpose:d.get('purpose'),version:d.get('version'),granted:d.get('granted')==='on',source:d.get('source'),evidence:evidence};run(async()=>{await api('consents',payload);e.target.reset();await loadCustomers();msg('Consentimento registrado.')})};
+
+async function lgpdExport(customerId){
+  try{
+    let res = await fetch('/api/customer-export?customer_id='+customerId, {headers:{'X-OpenFood':'1','X-Store-ID':String(currentStoreId)}});
+    if(!res.ok){if(res.status===401)show('login');throw Error((await res.json()).error||'Falha na exportação')}
+    let blob = await res.blob();
+    download(blob, 'customer-export-'+customerId+'-'+new Date().toISOString().split('T')[0]+'.json');
+    msg('Exportação concluída. O arquivo contém todos os dados do titular.');
+  }catch(e){msg('Erro na exportação: '+e.message)}
+}
+
+async function lgpdDelete(customerId){
+  if(!confirm('ATENÇÃO: Esta ação é irreversível. Se o cliente tiver pedidos ativos, os dados serão anonimizados (mantidos para conformidade fiscal). Continuar?')) return;
+  try{
+    let res = await fetch('/api/customer-delete?customer_id='+customerId, {method:'DELETE', headers:{'X-OpenFood':'1','X-Store-ID':String(currentStoreId)}});
+    if(!res.ok){if(res.status===401)show('login');throw Error((await res.json()).error||'Falha na exclusão')}
+    let result = await res.json();
+    if(result.anonymized){
+      msg('Cliente anonimizado. Pedidos mantidos para conformidade fiscal.');
+    }else{
+      msg('Cliente excluído permanentemente.');
+    }
+    await loadCustomers();
+  }catch(e){msg('Erro na exclusão/anonimização: '+e.message)}
+}
+
+$('#lgpdExportBtn').onclick=()=>{let cid=$('#lgpdExportCustomerSelect').value;if(!cid){msg('Selecione um cliente.');return;}lgpdExport(cid)};
+$('#lgpdDeleteBtn').onclick=()=>{let cid=$('#lgpdDeleteCustomerSelect').value;if(!cid){msg('Selecione um cliente.');return;}if(!$('#lgpdDeleteConfirm').checked){msg('Marque a confirmação.');return;}lgpdDelete(cid)};
+
+// --- Payments ---
+async function loadPayments(){
+  try{
+    let [configs, payments, orders] = await Promise.all([
+      api('payment-configs'),
+      api('payments'),
+      api('orders')
+    ]);
+    
+    // Populate provider selects
+    const providerOptions = configs.filter(c=>c.enabled).map(c=>`<option value="${c.provider}">${c.provider}</option>`).join('');
+    $('#paymentProviderSelect').innerHTML = '<option value="">— Selecione —</option>' + providerOptions;
+    $('#refundPaymentSelect').innerHTML = '<option value="">— Selecione —</option>';
+    
+    // Populate order select (only orders with payment_pending or manual_pending)
+    const orderOptions = orders
+      .filter(o => o.financial_state === 'payment_pending' || o.financial_state === 'manual_pending')
+      .map(o => `<option value="${o.id}">#${o.id} — ${money(o.total_cents)} (${o.financial_state})</option>`).join('');
+    $('#paymentOrderSelect').innerHTML = '<option value="">— Selecione —</option>' + orderOptions;
+    
+    // Render payment configs
+    let configTbody = $('paymentConfigsTable'); configTbody.replaceChildren();
+    for(let c of configs){
+      let r = document.createElement('tr');
+      td(r, '#'+c.id);
+      td(r, c.provider);
+      td(r, c.enabled ? '<span class="badge badge-active">Ativo</span>' : '<span class="badge badge-inactive">Inativo</span>');
+      td(r, new Date(c.created_at).toLocaleString('pt-BR'));
+      let actCell = document.createElement('td');
+      let editBtn = document.createElement('button'); editBtn.textContent = 'Editar'; editBtn.style.fontSize='12px'; editBtn.style.padding='6px 10px';
+      editBtn.onclick = () => editPaymentConfig(c); actCell.append(editBtn);
+      let delBtn = document.createElement('button'); delBtn.className = 'btn-cancel'; delBtn.textContent = 'Excluir'; delBtn.style.fontSize='12px'; delBtn.style.padding='6px 10px';
+      delBtn.onclick = () => run(async() => { if(confirm('Excluir configuração?')){ await apiDelete('payment-configs?id='+c.id); await loadPayments() }}); actCell.append(delBtn);
+      r.append(actCell); configTbody.append(r);
+    }
+    
+    // Render payments
+    let payTbody = $('paymentsTable'); payTbody.replaceChildren();
+    // Populate refund select with confirmed payments
+    const confirmedPayments = payments.filter(p => p.status === 'confirmed');
+    $('#refundPaymentSelect').innerHTML = '<option value="">— Selecione —</option>' + confirmedPayments.map(p => `<option value="${p.id}">#${p.id} — ${p.provider} — ${money(p.amount_cents)}</option>`).join('');
+    
+    for(let p of payments){
+      let r = document.createElement('tr');
+      td(r, '#'+p.id);
+      td(r, p.order_id ? '#'+p.order_id : '—');
+      td(r, p.provider);
+      td(r, money(p.amount_cents));
+      let statusBadge = 'badge-'+p.status;
+      if(p.status === 'confirmed') statusBadge = 'badge-confirmed';
+      else if(p.status === 'pending') statusBadge = 'badge-preparing';
+      else if(p.status === 'expired' || p.status === 'cancelled') statusBadge = 'badge-cancelled';
+      else if(p.status === 'refunded' || p.status === 'refund_partial') statusBadge = 'badge-completed';
+      td(r, `<span class="badge ${statusBadge}">${p.status}</span>`);
+      td(r, p.expires_at ? new Date(p.expires_at).toLocaleString('pt-BR') : '—');
+      td(r, new Date(p.created_at).toLocaleString('pt-BR'));
+      let actCell = document.createElement('td');
+      if(p.status === 'pending' && p.qr_code){
+        let copyBtn = document.createElement('button'); copyBtn.textContent = 'Copiar Pix'; copyBtn.style.fontSize='12px'; copyBtn.style.padding='6px 10px';
+        copyBtn.onclick = () => { navigator.clipboard.writeText(p.pix_copy_paste); msg('Código Pix copiado!'); };
+        actCell.append(copyBtn);
+      }
+      if(p.status === 'confirmed' && p.refunded_amount_cents < p.amount_cents){
+        let refundBtn = document.createElement('button'); refundBtn.className = 'btn-cancel'; refundBtn.textContent = 'Reembolsar'; refundBtn.style.fontSize='12px'; refundBtn.style.padding='6px 10px';
+        refundBtn.onclick = () => { $('#subtabReembolsos').click(); $('#refundPaymentSelect').value = p.id; };
+        actCell.append(refundBtn);
+      }
+      r.append(actCell); payTbody.append(r);
+    }
+    
+    // Show/hide provider-specific fields
+    $('#paymentConfigProvider').onchange = function(){
+      const provider = this.value;
+      $$('#mpFields, #asaasFields, #efiFields').forEach(el => el.classList.add('hidden'));
+      if(provider === 'mercadopago') $('#mpFields').classList.remove('hidden');
+      else if(provider === 'asaas') $('#asaasFields').classList.remove('hidden');
+      else if(provider === 'efi') $('#efiFields').classList.remove('hidden');
+    };
+    
+  }catch(e){msg('Erro ao carregar pagamentos: '+e.message)}
+}
+
+function editPaymentConfig(c){
+  $('#paymentConfigId').value = c.id;
+  $('#paymentConfigProvider').value = c.provider;
+  $('#paymentConfigForm [name="enabled"]').checked = c.enabled;
+  
+  // Trigger provider change to show fields
+  $('#paymentConfigProvider').trigger('change');
+  
+  // Fill credentials (masked values will need to be re-entered)
+  if(c.credentials){
+    for(let [key, value] of Object.entries(c.credentials)){
+      const input = $(`#paymentConfigForm [name="cred_${key}"]`);
+      if(input) input.value = value === '***' ? '' : value;
+    }
+  }
+  if(c.settings){
+    for(let [key, value] of Object.entries(c.settings)){
+      const input = $(`#paymentConfigForm [name="${key}"]`);
+      if(input) input.value = value;
+    }
+  }
+  if(c.webhook_secret){
+    $('#paymentConfigForm [name="webhook_secret"]').value = c.webhook_secret === '***' ? '' : c.webhook_secret;
+  }
+  
+  $('#paymentConfigSubmit').textContent = 'Atualizar configuração';
+  $('#paymentConfigCancel').classList.remove('hidden');
+  $('paymentConfigForm').scrollIntoView({behavior:'smooth'});
+}
+
+$('#paymentConfigForm').onsubmit = e => { e.preventDefault(); if(!canViewFinancials()){msg('Sem permissão.');return;} let id=$('#paymentConfigId').value; let d=new FormData(e.target); let provider=d.get('provider'); let credentials={}; let settings={}; for(let [key,value] of d.entries()){ if(key.startsWith('cred_')){ if(value) credentials[key.replace('cred_','')] = value; } else if(!['id','provider','enabled','webhook_secret'].includes(key)){ if(value) settings[key] = isNaN(value)?value:Number(value); } } let payload={provider:provider,enabled:d.get('enabled')==='on',credentials:credentials,settings:settings,webhook_secret:d.get('webhook_secret')||null}; let url=id?'payment-configs?id='+id:'payment-configs'; run(async()=>{ if(id){ await apiPatch(url,payload) }else{ await api(url,payload) } resetPaymentConfigForm(); await loadPayments(); msg(id?'Configuração atualizada.':'Configuração criada.') }) };
+
+function resetPaymentConfigForm(){
+  $('#paymentConfigForm').reset();
+  $('#paymentConfigId').value='';
+  $('#paymentConfigSubmit').textContent='Salvar configuração';
+  $('#paymentConfigCancel').classList.add('hidden');
+  $$('#mpFields, #asaasFields, #efiFields').forEach(el => el.classList.add('hidden'));
+}
+
+$('#paymentConfigCancel').onclick=resetPaymentConfigForm;
+
+$('#paymentCreateForm').onsubmit = e => { e.preventDefault(); if(!canViewFinancials()){msg('Sem permissão.');return;} let d=new FormData(e.target); let parts=d.get('amount').replace(',','.').split('.'); let amount=Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0')); let payload={order_id:Number(d.get('order_id')),provider:d.get('provider'),amount_cents:amount,description:d.get('description'),payer_name:d.get('payer_name'),payer_email:d.get('payer_email'),payer_phone:d.get('payer_phone'),payer_document:d.get('payer_document'),expiration_minutes:Number(d.get('expiration_minutes'))||60}; run(async()=>{ let res=await api('payments',payload); msg('Cobrança gerada! QR Code e código Pix disponíveis na lista.'); $('#paymentCreateForm').reset(); await loadPayments(); }) };
+
+$('#refundForm').onsubmit = e => { e.preventDefault(); if(!canViewFinancials()){msg('Sem permissão.');return;} let d=new FormData(e.target); let parts=d.get('amount').replace(',','.').split('.'); let amount=Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0')); let payload={payment_id:Number(d.get('payment_id')),amount_cents:amount,reason:d.get('reason')}; run(async()=>{ await api('payment-refund',payload); msg('Reembolso solicitado.'); $('#refundForm').reset(); await loadPayments(); }) };
+
+// --- Maintenance ---
+function download(blob,name){let link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000)}
+$('#backup').onclick=()=>run(async()=>{let r=await fetch('/api/backup',{method:'POST',headers:{'X-OpenFood':'1'}});if(!r.ok)throw Error('backup_failed');download(await r.blob(),'openfood-'+new Date().toISOString().replaceAll(':','-')+'.dump');msg('Backup criado. O arquivo contém dados pessoais e deve ser guardado em local protegido.')});
+$('#diagnostics').onclick=()=>run(async()=>download(new Blob([JSON.stringify(await api('diagnostics'),null,2)],{type:'application/json'}),'openfood-diagnostics.json'));
+$('#restore').onclick=()=>run(async()=>{if($('restoreConfirm').value!=='RESTAURAR'||!$('restoreFile').files[0])throw Error('Selecione o backup e confirme RESTAURAR');let r=await fetch('/api/restore',{method:'POST',headers:{'X-OpenFood':'1','X-Confirm-Restore':'RESTAURAR'},body:$('restoreFile').files[0]});if(!r.ok)throw Error((await r.json()).error);show('login');msg('Banco restaurado. Entre novamente.')});
+
 async function run(fn){
   let buttons=[...document.querySelectorAll('button')];
   buttons.forEach(x=>x.disabled=true);
   try{await fn()}catch(e){msg('Não foi possível concluir: '+e.message)}finally{buttons.forEach(x=>x.disabled=false)}
 }
 
-$('setupForm').onsubmit=e=>{e.preventDefault();let d=Object.fromEntries(new FormData(e.target));run(async()=>{await api('setup',d);setupToken='';e.target.reset();show('login');msg('Instalação configurada. Entre com sua conta.')})};
+$('#refresh').onclick=()=>run(refresh);
+$('#logout').onclick=()=>run(async()=>{await api('logout',{});currentUser=null;currentStoreId=null;show('login')});
 
-$('loginForm').onsubmit=e=>{e.preventDefault();run(async()=>{await api('login',Object.fromEntries(new FormData(e.target)));e.target.reset();await refresh()})};
+$('#setupForm').onsubmit=e=>{e.preventDefault();let d=Object.fromEntries(new FormData(e.target));run(async()=>{await api('setup',d);setupToken='';e.target.reset();show('login');msg('Instalação configurada. Entre com sua conta.')})};
 
-$('productForm').onsubmit=e=>{e.preventDefault();if(!canManageCatalog()){msg('Sem permissão para cadastrar produtos.');return;}let d=new FormData(e.target);let parts=d.get('price').replace(',','.').split('.');let price=Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0'));run(async()=>{await api('products',{Name:d.get('name'),PriceCents:price,Stock:Number(d.get('stock'))});e.target.reset();await refresh()})};
-
-$('orderForm').onsubmit=e=>{e.preventDefault();if(!canCreateOrders()){msg('Sem permissão para criar pedidos.');return;}let d=new FormData(e.target);run(async()=>{await api('orders',{items:[{product_id:Number(d.get('product')),quantity:Number(d.get('quantity'))}]},{'Idempotency-Key':orderKey});orderKey=crypto.randomUUID();await refresh()})};
-
-$('addUserForm').onsubmit=e=>{e.preventDefault();let d=Object.fromEntries(new FormData(e.target));let payload={email:d.email,password:d.password,role:d.role};if(d.store_id)payload.store_id=Number(d.store_id);run(async()=>{await api('users',payload);e.target.reset();await loadUsers();msg('Usuário criado com sucesso.')})};
-
-$('addStoreForm').onsubmit=e=>{e.preventDefault();let d=Object.fromEntries(new FormData(e.target));run(async()=>{await api('stores',{name:d.name});e.target.reset();await loadStores();msg('Loja criada com sucesso.')})};
-
-$('refresh').onclick=()=>run(refresh);
-$('logout').onclick=()=>run(async()=>{await api('logout',{});currentUser=null;currentStoreId=null;show('login')});
-
-function download(blob,name){let link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000)}
-$('backup').onclick=()=>run(async()=>{let r=await fetch('/api/backup',{method:'POST',headers:{'X-OpenFood':'1'}});if(!r.ok)throw Error('backup_failed');download(await r.blob(),'openfood-'+new Date().toISOString().replaceAll(':','-')+'.dump');msg('Backup criado. O arquivo contém dados pessoais e deve ser guardado em local protegido.')});
-$('diagnostics').onclick=()=>run(async()=>download(new Blob([JSON.stringify(await api('diagnostics'),null,2)],{type:'application/json'}),'openfood-diagnostics.json'));
-$('restore').onclick=()=>run(async()=>{if($('restoreConfirm').value!=='RESTAURAR'||!$('restoreFile').files[0])throw Error('Selecione o backup e confirme RESTAURAR');let r=await fetch('/api/restore',{method:'POST',headers:{'X-OpenFood':'1','X-Confirm-Restore':'RESTAURAR'},body:$('restoreFile').files[0]});if(!r.ok)throw Error((await r.json()).error);show('login');msg('Banco restaurado. Entre novamente.')});
+$('#loginForm').onsubmit=e=>{e.preventDefault();run(async()=>{await api('login',Object.fromEntries(new FormData(e.target)));e.target.reset();await refresh()})};
 
 (async()=>{try{let state=await api('setup');if(state.required){show('setup');$('setupForm').elements.token.value=setupToken;$('tokenLabel').classList.toggle('hidden',!!setupToken);$('health').textContent='Serviços prontos • configuração necessária'}else{await refresh()}}catch(e){if(e.message==='login_required')show('login');else msg(e.message)}})();
 setInterval(()=>{if(!$('workspace').classList.contains('hidden'))refresh().catch(e=>{$('health').textContent='Serviço indisponível';msg(e.message)})},15000);
