@@ -28,6 +28,12 @@ import (
 //go:embed schema.sql
 var schema string
 
+//go:embed web-cash.js
+var webCash []byte
+
+//go:embed cash-schema.sql
+var cashSchema string
+
 //go:embed web.html
 var web []byte
 
@@ -40,7 +46,7 @@ var webJS []byte
 //go:embed web-ux.js
 var webUX []byte
 
-const Version = "0.5.0-alpha.1"
+const Version = "0.6.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -249,7 +255,9 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 		fmt.Printf("MIGRATE: insert version OK\n")
-		fmt.Printf("MIGRATE: Fresh DB setup complete, committing and returning\n")
+		if e = migrateCash(ctx, tx); e != nil {
+			return e
+		}
 		return tx.Commit(ctx)
 	} else if e == nil {
 		fmt.Printf("MIGRATE: Existing DB detected, version=%d, checksum=%s\n", n, checksum)
@@ -578,18 +586,23 @@ func (a *App) Migrate(ctx context.Context) error {
 			if e != nil {
 				return e
 			}
-		} else if n != 3 || checksum != Hash(schema) {
+		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) {
 			return errors.New("migration_incompatible")
 		}
 	}
 	if e != nil {
 		return e
 	}
+	if n != 4 {
+		if e = migrateCash(ctx, tx); e != nil {
+			return e
+		}
+	}
 	return tx.Commit(ctx)
 }
 
 func ValidateSchema(version int, checksum string) error {
-	if version != 3 || checksum != Hash(schema) {
+	if version != 4 || checksum != Hash(schema+cashSchema) {
 		return errors.New("migration_incompatible")
 	}
 	return nil
@@ -725,6 +738,8 @@ func (a *App) Handler() http.Handler {
 				asset, contentType = webCSS, "text/css; charset=utf-8"
 			case "/assets/web.js":
 				asset, contentType = webJS, "text/javascript; charset=utf-8"
+			case "/assets/web-cash.js":
+				asset, contentType = webCash, "text/javascript; charset=utf-8"
 			case "/assets/web-ux.js":
 				asset, contentType = webUX, "text/javascript; charset=utf-8"
 			}
@@ -929,6 +944,10 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			a.customerDeleteHandler(w, r, targetStore, user)
+		case "/api/cash-sessions":
+			a.cashSessions(w, r, targetStore, user)
+		case "/api/manual-receipts":
+			a.manualReceipts(w, r, targetStore, user)
 		case "/api/payment-configs":
 			if !user.CanAccessStore(targetStore) {
 				failure(w, 403, "forbidden_cross_store_access")
@@ -2427,6 +2446,10 @@ func (a *App) orderState(w http.ResponseWriter, r *http.Request, store int64, us
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if _, e = tx.Exec(r.Context(), "SELECT pg_advisory_xact_lock(hashtextextended($1,1))", fmt.Sprintf("cash:%d", store)); e != nil {
+		failure(w, 503, "database_unavailable")
+		return
+	}
 	var state string
 	if e = tx.QueryRow(r.Context(), "SELECT state FROM orders WHERE store_id=$1 AND id=$2 FOR UPDATE", store, input.ID).Scan(&state); e != nil {
 		failure(w, 404, "order_not_found")
@@ -2437,6 +2460,15 @@ func (a *App) orderState(w http.ResponseWriter, r *http.Request, store int64, us
 		return
 	}
 	if input.State == "cancelled" {
+		var received int64
+		if e = tx.QueryRow(r.Context(), "SELECT COALESCE(sum(amount_cents),0) FROM manual_receipts WHERE store_id=$1 AND order_id=$2", store, input.ID).Scan(&received); e != nil {
+			failure(w, 500, "receipt_failed")
+			return
+		}
+		if received > 0 {
+			failure(w, 409, "refund_before_cancel")
+			return
+		}
 		_, e = tx.Exec(r.Context(), "UPDATE products p SET stock_quantity=stock_quantity+i.quantity FROM (SELECT product_id,sum(quantity) quantity FROM order_items WHERE store_id=$1 AND order_id=$2 GROUP BY product_id) i WHERE p.store_id=$1 AND p.id=i.product_id", store, input.ID)
 		if e != nil {
 			failure(w, 500, "stock_release_failed")

@@ -1594,5 +1594,47 @@ td .order-reference {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
+}
+
+.cash-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.cash-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.cash-totals div {
+  padding: 16px;
+  background: var(--subtle);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.cash-totals strong {
+  display: block;
+  font-size: 1.3rem;
+  margin-top: 6px;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+@media (max-width: 600px) {
+  .section-heading {
+    flex-direction: column;
+  }
+  .cash-pending-table th:nth-child(2),
+  .cash-pending-table th:nth-child(3),
+  .cash-pending-table td:nth-child(2),
+  .cash-pending-table td:nth-child(3) {
+    display: none;
+  }
 }

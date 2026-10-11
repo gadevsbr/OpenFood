@@ -61,6 +61,26 @@ const errors = {
     "O estoque mudou. Confira a quantidade e tente novamente.",
   product_unavailable: "Este produto não está disponível para pedido.",
   order_invalid: "Confira os itens do pedido.",
+  cash_not_open: "Abra um caixa antes de registrar recebimentos ou devoluções.",
+  cash_already_open: "Esta loja já tem um caixa aberto.",
+  cash_changed_reload:
+    "O saldo mudou durante a contagem. Atualize o caixa e confira os valores antes de fechar.",
+  cash_difference_note_required: "Informe o motivo da diferença no fechamento.",
+  cash_insufficient:
+    "O caixa atual não tem dinheiro suficiente para esta devolução.",
+  refund_before_cancel:
+    "Registre a devolução do valor recebido antes de cancelar o pedido.",
+  overpayment: "O valor excede o saldo do pedido. Confira os recebimentos.",
+  receipt_already_refunded: "Este recebimento já foi devolvido.",
+  refund_note_required: "Informe o motivo da devolução.",
+  forbidden_refund_management:
+    "Somente gerentes e administradores podem registrar devoluções.",
+  forbidden_cash_management:
+    "Somente gerentes e administradores podem abrir ou fechar caixa.",
+  integrated_payment_unsupported:
+    "Este pedido possui pagamento integrado e não aceita registro manual nesta etapa.",
+  cash_operation_failed:
+    "Não foi possível registrar a operação. Tente novamente.",
   product_invalid: "Confira os dados do produto.",
   product_changed_reload:
     "O estoque mudou. Feche e reabra a edição para conferir os valores atuais.",
@@ -235,7 +255,7 @@ const pageInfo = {
   pagamentos: [
     "Financeiro",
     "Pagamentos",
-    "Integrações previstas para as próximas etapas.",
+    "Receba pedidos e confira o caixa da loja.",
     null,
   ],
   manutencao: [
@@ -300,6 +320,7 @@ function selectPage(name, focus = false) {
   if (name === "clientes") loadCustomers();
   if (name === "usuarios") loadUsers();
   if (name === "lojas") loadStores();
+  if (name === "pagamentos") run(loadCash);
   document.title = info[1] + " · OpenFood";
 }
 $$(".tab").forEach((b) => (b.onclick = () => selectPage(b.dataset.tab, true)));
@@ -689,6 +710,7 @@ function refresh() {
       }) +
       " · até 200 pedidos";
     renderOrders();
+    if (currentPage === "pagamentos") await loadCash();
     $("connectionNotice").classList.add("hidden");
     show("workspace");
   })()

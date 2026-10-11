@@ -1661,14 +1661,123 @@
         </div>
 
         <div id="panelPagamentos" class="tab-panel">
+          <section>
+            <div class="section-heading">
+              <div>
+                <h2>Caixa e recebimentos manuais</h2>
+                <p>
+                  Registre apenas valores recebidos e conferidos. Pix e cartão
+                  não têm confirmação automática.
+                </p>
+              </div>
+              <button type="button" id="cashReload" class="btn-secondary">
+                Atualizar caixa
+              </button>
+            </div>
+            <div id="cashSummary" aria-live="polite">Carregando caixa…</div>
+            <div class="cash-actions">
+              <button type="button" id="cashOpen">Abrir caixa</button
+              ><button type="button" id="cashClose" class="btn-secondary">
+                Fechar caixa
+              </button>
+            </div>
+          </section>
+          <section>
+            <h2>Pedidos com saldo a receber</h2>
+            <p class="muted">
+              Até 200 pedidos mais recentes com saldo pendente.
+            </p>
+            <div
+              class="scroll"
+              tabindex="0"
+              role="region"
+              aria-label="Pedidos a receber"
+            >
+              <table class="cash-pending-table">
+                <thead>
+                  <tr>
+                    <th>Pedido</th>
+                    <th>Total</th>
+                    <th>Recebido</th>
+                    <th>Saldo</th>
+                    <th>Ação</th>
+                  </tr>
+                </thead>
+                <tbody id="cashPending"></tbody>
+              </table>
+            </div>
+            <p id="cashPendingEmpty" class="hidden">Nenhum saldo pendente.</p>
+          </section>
+          <section>
+            <h2>Movimentações</h2>
+            <p class="muted">
+              Últimos 500 lançamentos. Os totais de caixa incluem todos os
+              lançamentos.
+            </p>
+            <div
+              class="scroll"
+              tabindex="0"
+              role="region"
+              aria-label="Movimentações do caixa"
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Pedido / caixa</th>
+                    <th>Forma</th>
+                    <th>Valor</th>
+                    <th>Operador / motivo</th>
+                    <th>Ação</th>
+                  </tr>
+                </thead>
+                <tbody id="cashReceipts"></tbody>
+              </table>
+            </div>
+            <p id="cashReceiptsEmpty" class="hidden">
+              Nenhum recebimento registrado.
+            </p>
+          </section>
+          <section>
+            <h2>Histórico de caixas</h2>
+            <p class="muted">
+              Últimos 100 caixas. Esperado = saldo inicial + dinheiro líquido.
+              Diferença = contado − esperado. Sangrias, suprimentos e taxas não
+              estão incluídos.
+            </p>
+            <div
+              class="scroll"
+              tabindex="0"
+              role="region"
+              aria-label="Histórico de caixas"
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th>Caixa</th>
+                    <th>Abertura / operador</th>
+                    <th>Fechamento / operador</th>
+                    <th>Dinheiro líquido</th>
+                    <th>Cartão líquido</th>
+                    <th>Pix manual líquido</th>
+                    <th>Esperado</th>
+                    <th>Contado</th>
+                    <th>Diferença / motivo</th>
+                  </tr>
+                </thead>
+                <tbody id="cashHistory"></tbody>
+              </table>
+            </div>
+          </section>
+
           <div class="" id="paymentsUnavailable">
             <section class="feature-unavailable">
               <span class="badge badge-financial">Em desenvolvimento</span>
               <h2>Pagamentos integrados</h2>
               <p>
-                Os pedidos manuais continuam com pagamento pendente. A
-                integração Pix ainda precisa de validação antes de gerar
-                cobranças ou reembolsos por aqui.
+                Recebimentos manuais são conferidos pelo operador. A integração
+                Pix ainda precisa de validação antes de gerar cobranças ou
+                reembolsos por aqui.
               </p>
               <ul>
                 <li>Mercado Pago, Asaas e Efí previstos</li>
@@ -2123,5 +2232,6 @@
 
     <script src="/assets/web.js"></script>
     <script src="/assets/web-ux.js"></script>
+    <script src="/assets/web-cash.js"></script>
   </body>
 </html>

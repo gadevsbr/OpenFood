@@ -51,7 +51,7 @@ jobs:
       - run: |
           mkdir -p dist
           CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -buildid=' -o dist/openfood ./cmd/openfood
-          tar -czf dist/OpenFood-0.5.0-alpha.1-linux-x64.tar.gz -C dist openfood
+          tar -czf dist/OpenFood-0.6.0-alpha.1-linux-x64.tar.gz -C dist openfood
           cd dist && sha256sum *.tar.gz > SHA256SUMS-linux
       - uses: actions/upload-artifact@v4
         with:
@@ -76,5 +76,5 @@ jobs:
           if gh release view '${{ github.ref_name }}' --repo '${{ github.repository }}' >/dev/null 2>&1; then
             gh release upload '${{ github.ref_name }}' dist/* --repo '${{ github.repository }}' --clobber
           else
-            gh release create '${{ github.ref_name }}' dist/* --repo '${{ github.repository }}' --prerelease --title 'OpenFood ${{ github.ref_name }}' --notes-file docs/releases/0.5.0-alpha.1.md
+            gh release create '${{ github.ref_name }}' dist/* --repo '${{ github.repository }}' --prerelease --title 'OpenFood ${{ github.ref_name }}' --notes-file docs/releases/0.6.0-alpha.1.md
           fi

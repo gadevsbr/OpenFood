@@ -48,6 +48,24 @@ assert api("orders")[0]["total_cents"] == 2468
 assert api("products")[0]["stock_quantity"] == 1
 for state in ["preparing", "ready", "completed"]:
     api("order-state", {"id": order["id"], "state": state})
+# Exercise real manual money operations and preserve closed periods across refunds.
+cash = api("cash-sessions", {"action": "open", "opening_cents": 500}, {"Idempotency-Key": "linux-cash-open"})
+receipt_payload = {"order_id": order["id"], "amount_cents": 1000, "method": "cash"}
+receipt = api("manual-receipts", receipt_payload, {"Idempotency-Key": "linux-cash-receipt"})
+assert api("manual-receipts", receipt_payload, {"Idempotency-Key": "linux-cash-receipt"})["id"] == receipt["id"]
+card = api("manual-receipts", {"order_id": order["id"], "amount_cents": 1468, "method": "card"}, {"Idempotency-Key": "linux-card-receipt"})
+assert api("orders")[0]["financial_state"] == "manual_confirmed"
+api("cash-sessions", {"action": "close", "id": cash["id"], "expected_cents": 1500, "counted_cents": 1490, "note": "QA difference 10 cents"}, {"Idempotency-Key": "linux-cash-close"})
+second_cash = api("cash-sessions", {"action": "open", "opening_cents": 2000}, {"Idempotency-Key": "linux-cash-open-next"})
+for entry in [receipt, card]:
+    api("manual-receipts", {"refund_of": entry["id"], "note": "QA manual refund confirmed"}, {"Idempotency-Key": "linux-refund-" + str(entry["id"])})
+api("cash-sessions", {"action": "close", "id": second_cash["id"], "expected_cents": 1000, "counted_cents": 1000}, {"Idempotency-Key": "linux-cash-close-next"})
+summary = api("cash-sessions")
+assert len(summary["receipts"]) == 4
+assert summary["sessions"][0]["cash_cents"] == -1000
+assert summary["sessions"][1]["cash_cents"] == 1000
+assert summary["sessions"][1]["difference_cents"] == -10
+
 with tempfile.TemporaryDirectory() as tmp:
     dump = Path(tmp) / "openfood.dump"
     with dump.open("wb") as file:
@@ -63,4 +81,6 @@ with tempfile.TemporaryDirectory() as tmp:
     api("login", {"email": "linux-qa@example.org", "password": password})
     restored = api("orders")
     assert restored[0]["state"] == "completed" and restored[0]["total_cents"] == 2468
-print("PASS: real Compose setup, authentication, catalog, transactional stock, idempotency, order states, pg_dump/pg_restore, restart")
+assert len(api("cash-sessions")["receipts"]) == 4
+assert api("orders")[0]["financial_state"] == "refunded"
+print("PASS: manual receipts, split payments, cash closing/refunds across periods and real Compose setup, authentication, catalog, transactional stock, idempotency, order states, pg_dump/pg_restore, restart")

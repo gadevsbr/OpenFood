@@ -213,6 +213,15 @@ func (r *Runtime) Restore(ctx context.Context, raw []byte) error {
 	}
 	testURL, _ := url.Parse(r.DSN)
 	testURL.Path = "/" + stage
+	upgraded, e := app.Open(ctx, testURL.String(), "", nil)
+	if e != nil {
+		return e
+	}
+	upgraded.DB.Close()
+	// Dump the migrated staging database; the live restore remains a single transaction.
+	if e = r.run(ctx, "pg_dump", append(r.dbArgs(stage), "--format=custom", "--file="+path, "--no-owner", "--no-acl")...); e != nil {
+		return e
+	}
 	check, e := pgx.Connect(ctx, testURL.String())
 	if e != nil {
 		return e

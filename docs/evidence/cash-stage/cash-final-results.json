@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "date": "2026-10-11",
+  "checks": [
+    "closed cash shows cash/card/manual Pix totals",
+    "opening and closing notes preserved",
+    "latest desktop/dark/mobile assets",
+    "mobile pending actions visible",
+    "attendant receives without close/refund actions",
+    "finance viewer read-only UI",
+    "modal Escape"
+  ],
+  "pageerrors": []
+}

@@ -272,7 +272,12 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   assert.equal(errors.length, 0, errors.join("\n"));
   assert.equal(failures.length, 0, JSON.stringify(failures));
   const report = {
-    date: "2026-10-10",
+    date: new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date()),
     status: "PASS",
     environment:
       "Windows de desenvolvimento, Chromium headless, PostgreSQL 17 real e dados de teste isolados. Sem validação de provedor ou ambiente limpo.",

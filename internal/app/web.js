@@ -129,9 +129,13 @@ function canAccessCustomers() {
 function canAccessPayments() {
   return (
     currentUser &&
-    ["instance_admin", "org_admin", "store_manager", "finance_viewer"].includes(
-      currentUser.role,
-    )
+    [
+      "instance_admin",
+      "org_admin",
+      "store_manager",
+      "finance_viewer",
+      "attendant",
+    ].includes(currentUser.role)
   );
 }
 
