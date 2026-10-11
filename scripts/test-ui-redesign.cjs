@@ -1,4 +1,4 @@
-﻿/* Real local PostgreSQL UI journey. Fixtures are synthetic; backend responses are real. */
+/* Real local PostgreSQL UI journey. Fixtures are synthetic; backend responses are real. */
 const { chromium } = require("../tools/qa/node_modules/playwright");
 const fs = require("fs"),
   path = require("path"),
@@ -67,7 +67,12 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
       .locator("#loginForm [name=password]")
       .fill("QA-test-only-password");
     await page.locator("#loginForm button").click();
+    await page.locator("#modeChooser:not(.hidden)").waitFor();
+    await page.locator("#enterAdmin").click();
     await page.locator("#workspace:not(.hidden)").waitFor();
+    if (!(await page.locator("#tabOperacao").isVisible()))
+      await page.locator("#menuToggle").click();
+    await page.locator("#tabOperacao").click();
   }
   await login();
   await page.locator("#ordersEmptyState:not(.hidden)").waitFor();
@@ -105,6 +110,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     fullPage: true,
     animations: "disabled",
   });
+  if (!(await page.locator("#tabOperacao").isVisible()))
+    await page.locator("#menuToggle").click();
   await page.locator("#tabOperacao").click();
   for (let i = 0; i < 4; i++) {
     await page.locator("#pageAction").click();
@@ -195,6 +202,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
         animations: "disabled",
       });
       await page.locator("#menuToggle").click();
+      if (!(await page.locator("#tabOperacao").isVisible()))
+        await page.locator("#menuToggle").click();
       await page.locator("#tabOperacao").click();
     }
   }
@@ -206,7 +215,12 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     animations: "disabled",
   });
   await page.reload();
+  await page.locator("#modeChooser:not(.hidden)").waitFor();
+  await page.locator("#enterAdmin").click();
   await page.locator("#workspace:not(.hidden)").waitFor();
+  if (!(await page.locator("#tabOperacao").isVisible()))
+    await page.locator("#menuToggle").click();
+  await page.locator("#tabOperacao").click();
   assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
   await page.locator("#themeSelect").selectOption("light");
   await page.locator("#pageAction").click();
@@ -222,6 +236,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     await page.getByText("Em desenvolvimento", { exact: true }).isVisible(),
   );
   assert(!(await page.locator("#paymentCreateForm").isVisible()));
+  if (!(await page.locator("#tabOperacao").isVisible()))
+    await page.locator("#menuToggle").click();
   await page.locator("#tabOperacao").click();
   await page.context().setOffline(true);
   await page.locator("#refresh").click();

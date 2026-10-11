@@ -17,7 +17,12 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
   await p.locator("#loginForm [name=email]").fill("qa@example.org");
   await p.locator("#loginForm [name=password]").fill("QA-test-only-password");
   await p.locator("#loginForm button").click();
+  await p.locator("#modeChooser:not(.hidden)").waitFor();
+  await p.locator("#enterAdmin").click();
   await p.locator("#workspace:not(.hidden)").waitFor();
+  if (!(await p.locator("#tabOperacao").isVisible()))
+    await p.locator("#menuToggle").click();
+  await p.locator("#tabOperacao").click();
   const products = await p.evaluate(async () =>
       (await fetch("/api/products")).json(),
     ),
@@ -42,9 +47,13 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
     .getByRole("button", { name: "Editar", exact: true })
     .click();
   await p.screenshot({
-    path: "docs/evidence/sales-stage/product-edit-desktop.png",
+    path:
+      (process.env.OPENFOOD_SALES_EVIDENCE || "docs/evidence/sales-stage") +
+      "/product-edit-desktop.png",
   });
   await p.keyboard.press("Escape");
+  if (!(await p.locator("#tabOperacao").isVisible()))
+    await p.locator("#menuToggle").click();
   await p.locator("#tabOperacao").click();
   await p.locator("#pageAction").click();
   await p.locator("#productSelect").selectOption(String(burger.id));
@@ -56,7 +65,11 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
   assert.equal(await p.locator("#orderCart .cart-row").count(), 2);
   await p.locator("#orderForm input[type=checkbox]").check();
   assert.match(await p.locator("#orderPreviewTotal").innerText(), /91,50/);
-  await p.screenshot({ path: "docs/evidence/sales-stage/cart-desktop.png" });
+  await p.screenshot({
+    path:
+      (process.env.OPENFOOD_SALES_EVIDENCE || "docs/evidence/sales-stage") +
+      "/cart-desktop.png",
+  });
   await p.locator("#createOrderSubmit").click();
   await p.locator("#orderDialog").waitFor({ state: "hidden" });
   const orders = await p.evaluate(async () =>
@@ -80,11 +93,15 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
     .getByText(/Hambúrguer revisado QA/)
     .waitFor();
   await p.screenshot({
-    path: "docs/evidence/sales-stage/order-items-desktop.png",
+    path:
+      (process.env.OPENFOOD_SALES_EVIDENCE || "docs/evidence/sales-stage") +
+      "/order-items-desktop.png",
   });
   await p.setViewportSize({ width: 390, height: 844 });
   await p.screenshot({
-    path: "docs/evidence/sales-stage/order-items-mobile.png",
+    path:
+      (process.env.OPENFOOD_SALES_EVIDENCE || "docs/evidence/sales-stage") +
+      "/order-items-mobile.png",
   });
   assert(
     await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -149,7 +166,8 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
   }, conflictOrder.id);
   assert.deepEqual(errors, []);
   fs.writeFileSync(
-    "docs/evidence/sales-stage/sales-results.json",
+    (process.env.OPENFOOD_SALES_EVIDENCE || "docs/evidence/sales-stage") +
+      "/sales-results.json",
     JSON.stringify(
       {
         result: "PASS",

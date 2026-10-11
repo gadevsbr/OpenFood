@@ -18,7 +18,12 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
   await p.locator("#loginForm [name=email]").fill("qa@example.org");
   await p.locator("#loginForm [name=password]").fill("QA-test-only-password");
   await p.locator("#loginForm button").click();
+  await p.locator("#modeChooser:not(.hidden)").waitFor();
+  await p.locator("#enterAdmin").click();
   await p.locator("#workspace:not(.hidden)").waitFor();
+  if (!(await p.locator("#tabOperacao").isVisible()))
+    await p.locator("#menuToggle").click();
+  await p.locator("#tabOperacao").click();
   await p.locator("#tabClientes").click();
   await p
     .locator("#customersTable")
@@ -49,6 +54,8 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
     .locator("#consentsTable")
     .getByText("Revogado", { exact: true })
     .waitFor();
+  if (!(await p.locator("#tabOperacao").isVisible()))
+    await p.locator("#menuToggle").click();
   await p.locator("#tabOperacao").click();
   await p.context().setOffline(true);
   await p.locator("#refresh").click();
@@ -68,7 +75,9 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
     (await p.locator("#orderDetailsAmount").textContent()).includes("119,60"),
   );
   await p.screenshot({
-    path: "docs/evidence/ui-redesign/order-summary-mobile.png",
+    path:
+      (process.env.OPENFOOD_UI_EVIDENCE || "docs/evidence/ui-redesign") +
+      "/order-summary-mobile.png",
     fullPage: true,
     animations: "disabled",
   });
@@ -84,13 +93,17 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
   await p.locator("#orderSearch").fill("");
   await p.locator("#orderSearch").blur();
   await p.screenshot({
-    path: "docs/evidence/ui-redesign/orders-mobile.png",
+    path:
+      (process.env.OPENFOOD_UI_EVIDENCE || "docs/evidence/ui-redesign") +
+      "/orders-mobile.png",
     fullPage: true,
     animations: "disabled",
   });
   await p.setViewportSize({ width: 1440, height: 1000 });
   await p.screenshot({
-    path: "docs/evidence/ui-redesign/orders-desktop.png",
+    path:
+      (process.env.OPENFOOD_UI_EVIDENCE || "docs/evidence/ui-redesign") +
+      "/orders-desktop.png",
     fullPage: true,
     animations: "disabled",
   });
@@ -108,7 +121,8 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
     javascript_errors: errors,
   };
   fs.writeFileSync(
-    "docs/evidence/ui-redesign/final-results.json",
+    (process.env.OPENFOOD_UI_EVIDENCE || "docs/evidence/ui-redesign") +
+      "/final-results.json",
     JSON.stringify(report, null, 2),
   );
   console.log(JSON.stringify(report));

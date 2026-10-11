@@ -1,4 +1,4 @@
-﻿const { chromium } = require("../tools/qa/node_modules/playwright");
+const { chromium } = require("../tools/qa/node_modules/playwright");
 const fs = require("fs"),
   assert = require("assert");
 (async () => {
@@ -15,7 +15,12 @@ const fs = require("fs"),
   await p.locator("#loginForm [name=email]").fill("qa@example.org");
   await p.locator("#loginForm [name=password]").fill("QA-test-only-password");
   await p.locator("#loginForm button").click();
+  await p.locator("#modeChooser:not(.hidden)").waitFor();
+  await p.locator("#enterAdmin").click();
   await p.locator("#workspace:not(.hidden)").waitFor();
+  if (!(await p.locator("#tabOperacao").isVisible()))
+    await p.locator("#menuToggle").click();
+  await p.locator("#tabOperacao").click();
   await p.locator("#tabCatalogo").click();
   await p.locator("#subtabCategorias").click();
   await p.locator("#pageAction").click();
@@ -29,7 +34,9 @@ const fs = require("fs"),
     .locator("#categoryForm")
     .evaluate((f) => (f.closest("details").open = false));
   await p
-    .locator("#categoriesTable")
+    .locator("#categoriesTable tr")
+    .filter({ hasText: "Categoria QA" })
+    .last()
     .getByRole("button", { name: "Editar", exact: true })
     .click();
   assert(await p.locator("#categoryForm [name=name]").isVisible());
@@ -74,7 +81,9 @@ const fs = require("fs"),
     .locator("#customerForm")
     .evaluate((f) => (f.closest("details").open = false));
   await p.screenshot({
-    path: "docs/evidence/ui-redesign/customers-desktop.png",
+    path:
+      (process.env.OPENFOOD_UI_EVIDENCE || "docs/evidence/ui-redesign") +
+      "/customers-desktop.png",
     fullPage: true,
     animations: "disabled",
   });
@@ -93,7 +102,9 @@ const fs = require("fs"),
     .getByText("Cozinha de teste · QA", { exact: true })
     .waitFor();
   await p.screenshot({
-    path: "docs/evidence/ui-redesign/stores-desktop.png",
+    path:
+      (process.env.OPENFOOD_UI_EVIDENCE || "docs/evidence/ui-redesign") +
+      "/stores-desktop.png",
     fullPage: true,
     animations: "disabled",
   });
@@ -113,7 +124,8 @@ const fs = require("fs"),
     javascript_errors: errors,
   };
   fs.writeFileSync(
-    "docs/evidence/ui-redesign/admin-results.json",
+    (process.env.OPENFOOD_UI_EVIDENCE || "docs/evidence/ui-redesign") +
+      "/admin-results.json",
     JSON.stringify(report, null, 2),
   );
   console.log(JSON.stringify(report));

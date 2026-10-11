@@ -1,4 +1,4 @@
-﻿const { chromium } = require("../tools/qa/node_modules/playwright"),
+const { chromium } = require("../tools/qa/node_modules/playwright"),
   fs = require("fs"),
   assert = require("assert");
 (async () => {
@@ -18,7 +18,12 @@
   await p.locator("#loginForm [name=email]").fill("qa@example.org");
   await p.locator("#loginForm [name=password]").fill("QA-test-only-password");
   await p.locator("#loginForm button").click();
+  await p.locator("#modeChooser:not(.hidden)").waitFor();
+  await p.locator("#enterAdmin").click();
   await p.locator("#workspace:not(.hidden)").waitFor();
+  if (!(await p.locator("#tabOperacao").isVisible()))
+    await p.locator("#menuToggle").click();
+  await p.locator("#tabOperacao").click();
   const read = (path) =>
     p.evaluate(async (path) => (await fetch("/api/" + path)).json(), path);
   const post = (path, payload, key) =>
@@ -91,7 +96,9 @@
     "manual_confirmed",
   );
   await p.screenshot({
-    path: "docs/evidence/cash-stage/cash-open-desktop.png",
+    path:
+      (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+      "/cash-open-desktop.png",
     fullPage: true,
   });
   assert.equal(
@@ -110,7 +117,9 @@
     .locator("#cashForm [name=note]")
     .fill("Diferença de R$ 0,50 QA conferida");
   await p.screenshot({
-    path: "docs/evidence/cash-stage/cash-close-desktop.png",
+    path:
+      (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+      "/cash-close-desktop.png",
   });
   await p.locator("#cashSubmit").click();
   await p.locator("#cashDialog").waitFor({ state: "hidden" });
@@ -122,7 +131,9 @@
   assert.equal(closed.difference_cents, -50);
   await p.setViewportSize({ width: 390, height: 844 });
   await p.screenshot({
-    path: "docs/evidence/cash-stage/cash-closed-mobile.png",
+    path:
+      (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+      "/cash-closed-mobile.png",
     fullPage: true,
   });
   assert(
@@ -176,18 +187,23 @@
   assert.equal((await read("cash-sessions")).receipts.length, ledgerCount + 1);
   await p.locator("#cashReload").click();
   await p.screenshot({
-    path: "docs/evidence/cash-stage/refunds-desktop.png",
+    path:
+      (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+      "/refunds-desktop.png",
     fullPage: true,
   });
   await p.locator("#themeSelect").selectOption("dark");
   await p.screenshot({
-    path: "docs/evidence/cash-stage/cash-dark-desktop.png",
+    path:
+      (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+      "/cash-dark-desktop.png",
     fullPage: true,
   });
   await p.locator("#themeSelect").selectOption("light");
   assert.deepEqual(errors, []);
   fs.writeFileSync(
-    "docs/evidence/cash-stage/cash-results.json",
+    (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+      "/cash-results.json",
     JSON.stringify(
       {
         status: "PASS",

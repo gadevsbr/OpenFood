@@ -39,7 +39,10 @@ async function loadCash() {
     for (const [label, value] of [
       ["Saldo inicial", open.opening_cents],
       ["Recebimentos líquidos em dinheiro", open.cash_cents],
-      ["Dinheiro esperado", open.opening_cents + open.cash_cents],
+      [
+        "Dinheiro esperado",
+        open.opening_cents + open.cash_cents + open.adjustments_cents,
+      ],
       ["Cartão registrado", open.card_cents],
       ["Pix manual registrado", open.pix_cents],
     ]) {
@@ -53,8 +56,11 @@ async function loadCash() {
     }
     $("cashSummary").append(totals);
   }
-  $("cashOpen").classList.toggle("hidden", !canManageCatalog() || !!open);
-  $("cashClose").classList.toggle("hidden", !canManageCatalog() || !open);
+  $("cashOpen").classList.toggle("hidden", !canReceiveManual() || !!open);
+  $("cashClose").classList.toggle(
+    "hidden",
+    !open || !(canManageCatalog() || open.opened_by_id === currentUser.id),
+  );
   $("cashPending").replaceChildren();
   for (const order of result.pending) {
     const row = document.createElement("tr");
@@ -115,7 +121,13 @@ async function loadCash() {
     td(row, money(s.cash_cents));
     td(row, money(s.card_cents));
     td(row, money(s.pix_cents));
-    td(row, money(s.expected_cents ?? s.opening_cents + s.cash_cents));
+    td(
+      row,
+      money(
+        s.expected_cents ??
+          s.opening_cents + s.cash_cents + s.adjustments_cents,
+      ),
+    );
     td(row, s.counted_cents == null ? "—" : money(s.counted_cents));
     td(
       row,
@@ -188,7 +200,7 @@ $("cashOpen").onclick = () =>
 $("cashClose").onclick = () => {
   const s = cashData?.sessions.find((s) => !s.closed_at);
   if (!s) return;
-  const expected = s.opening_cents + s.cash_cents;
+  const expected = s.opening_cents + s.cash_cents + s.adjustments_cents;
   cashDialog(
     "Fechar caixa #" + s.id,
     "<p>Dinheiro esperado: <strong>" +

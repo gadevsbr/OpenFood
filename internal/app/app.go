@@ -34,6 +34,18 @@ var webCash []byte
 //go:embed cash-schema.sql
 var cashSchema string
 
+//go:embed web-pos.js
+var webPOS []byte
+
+//go:embed web-pos.css
+var webPOSCSS []byte
+
+//go:embed vendor/motion.js
+var motionJS []byte
+
+//go:embed pos-schema.sql
+var posSchema string
+
 //go:embed web.html
 var web []byte
 
@@ -46,7 +58,7 @@ var webJS []byte
 //go:embed web-ux.js
 var webUX []byte
 
-const Version = "0.6.0-alpha.1"
+const Version = "0.7.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -256,6 +268,9 @@ func (a *App) Migrate(ctx context.Context) error {
 		}
 		fmt.Printf("MIGRATE: insert version OK\n")
 		if e = migrateCash(ctx, tx); e != nil {
+			return e
+		}
+		if e = migratePOS(ctx, tx); e != nil {
 			return e
 		}
 		return tx.Commit(ctx)
@@ -586,15 +601,20 @@ func (a *App) Migrate(ctx context.Context) error {
 			if e != nil {
 				return e
 			}
-		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) {
+		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) {
 			return errors.New("migration_incompatible")
 		}
 	}
 	if e != nil {
 		return e
 	}
-	if n != 4 {
+	if n < 4 {
 		if e = migrateCash(ctx, tx); e != nil {
+			return e
+		}
+	}
+	if n < 5 {
+		if e = migratePOS(ctx, tx); e != nil {
 			return e
 		}
 	}
@@ -602,7 +622,7 @@ func (a *App) Migrate(ctx context.Context) error {
 }
 
 func ValidateSchema(version int, checksum string) error {
-	if version != 4 || checksum != Hash(schema+cashSchema) {
+	if version != 5 || checksum != Hash(schema+cashSchema+posSchema) {
 		return errors.New("migration_incompatible")
 	}
 	return nil
@@ -734,6 +754,12 @@ func (a *App) Handler() http.Handler {
 			var asset []byte
 			var contentType string
 			switch r.URL.Path {
+			case "/assets/web-pos.js":
+				asset, contentType = webPOS, "text/javascript; charset=utf-8"
+			case "/assets/web-pos.css":
+				asset, contentType = webPOSCSS, "text/css; charset=utf-8"
+			case "/assets/motion.js":
+				asset, contentType = motionJS, "text/javascript; charset=utf-8"
 			case "/assets/web.css":
 				asset, contentType = webCSS, "text/css; charset=utf-8"
 			case "/assets/web.js":
@@ -944,6 +970,14 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			a.customerDeleteHandler(w, r, targetStore, user)
+		case "/api/pos-checkout":
+			a.posCheckout(w, r, targetStore, user)
+		case "/api/pos-receipt":
+			a.posReceipt(w, r, targetStore, user)
+		case "/api/pos-summary":
+			a.posSummary(w, r, targetStore, user)
+		case "/api/cash-adjustments":
+			a.cashAdjustments(w, r, targetStore, user)
 		case "/api/cash-sessions":
 			a.cashSessions(w, r, targetStore, user)
 		case "/api/manual-receipts":
@@ -2244,13 +2278,25 @@ func (a *App) CreateOrder(ctx context.Context, store, user int64, key string, in
 	if len(key) < 8 || len(key) > 128 || len(input.Items) == 0 || len(input.Items) > 100 {
 		return 0, errors.New("order_invalid")
 	}
-	raw, _ := json.Marshal(input)
-	digest := Hash(string(raw))
 	tx, e := a.DB.Begin(ctx)
 	if e != nil {
 		return 0, e
 	}
 	defer tx.Rollback(ctx)
+	id, e := a.createOrderTx(ctx, tx, store, user, key, input)
+	if e != nil {
+		return 0, e
+	}
+	return id, tx.Commit(ctx)
+}
+
+func (a *App) createOrderTx(ctx context.Context, tx pgx.Tx, store, user int64, key string, input OrderRequest) (int64, error) {
+	if !moneyKey(key) || len(input.Items) < 1 || len(input.Items) > 100 {
+		return 0, errors.New("order_invalid")
+	}
+	raw, _ := json.Marshal(input)
+	digest := Hash(string(raw))
+	var e error
 	// A transaction-scoped key lock serializes duplicate requests even before an order exists.
 	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,0))", fmt.Sprintf("%d:%s", store, key)); e != nil {
 		return 0, e
@@ -2262,7 +2308,7 @@ func (a *App) CreateOrder(ctx context.Context, store, user int64, key string, in
 		if previous != digest {
 			return 0, errors.New("idempotency_conflict")
 		}
-		return id, tx.Commit(ctx)
+		return id, nil
 	}
 	if !errors.Is(e, pgx.ErrNoRows) {
 		return 0, e
@@ -2330,7 +2376,7 @@ func (a *App) CreateOrder(ctx context.Context, store, user int64, key string, in
 	if _, e = tx.Exec(ctx, "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,'order_created',$3)", store, user, id); e != nil {
 		return 0, e
 	}
-	return id, tx.Commit(ctx)
+	return id, nil
 }
 
 func (a *App) orders(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
@@ -2395,7 +2441,7 @@ func (a *App) orders(w http.ResponseWriter, r *http.Request, store int64, user *
 		jsonResponse(w, 200, result)
 		return
 	}
-	rows, e := a.DB.Query(r.Context(), "SELECT id,total_cents,state,financial_state,created_at FROM orders WHERE store_id=$1 ORDER BY id DESC LIMIT 200", store)
+	rows, e := a.DB.Query(r.Context(), "SELECT id,total_cents,state,financial_state,created_at,COALESCE((SELECT p.discount_cents FROM pos_checkouts p WHERE p.store_id=orders.store_id AND p.order_id=orders.id),0) FROM orders WHERE store_id=$1 ORDER BY id DESC LIMIT 200", store)
 	if e != nil {
 		failure(w, 500, "orders_failed")
 		return
@@ -2403,14 +2449,14 @@ func (a *App) orders(w http.ResponseWriter, r *http.Request, store int64, user *
 	defer rows.Close()
 	result := []map[string]any{}
 	for rows.Next() {
-		var id, total int64
+		var id, total, discount int64
 		var state, financial string
 		var at time.Time
-		if rows.Scan(&id, &total, &state, &financial, &at) != nil {
+		if rows.Scan(&id, &total, &state, &financial, &at, &discount) != nil {
 			failure(w, 500, "orders_failed")
 			return
 		}
-		item := map[string]any{"id": id, "total_cents": total, "state": state, "financial_state": financial, "created_at": at}
+		item := map[string]any{"id": id, "total_cents": total, "state": state, "financial_state": financial, "created_at": at, "discount_cents": discount}
 		if !user.CanViewFinancials() {
 			delete(item, "financial_state")
 		}

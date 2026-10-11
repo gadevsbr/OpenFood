@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-10",
+  "status": "PASS",
+  "passed": [
+    "contextual catalog actions",
+    "category creation and editing",
+    "customer creation and editing",
+    "editor disclosures and focus",
+    "isolated sub-tab navigation",
+    "privacy screen without unverified retention promises",
+    "store list"
+  ],
+  "javascript_errors": []
+}

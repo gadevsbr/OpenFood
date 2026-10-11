@@ -17,14 +17,15 @@ New-Item -ItemType Directory -Force dist/windows/licenses | Out-Null
 $modules = go list -m -json all | Out-String
 $entries = @($modules -split '(?m)^\}(?=\s*\{)' | ForEach-Object { ($_.TrimEnd() + $(if (!$_.TrimEnd().EndsWith('}')) {'}'} else {''})) | ConvertFrom-Json })
 foreach ($module in $entries) { if ($module.Dir) { foreach ($name in @('LICENSE','LICENSE.txt','COPYING')) { $source=Join-Path $module.Dir $name; if (Test-Path -LiteralPath $source) { $fileName=($module.Path -replace '[/\\]','_')+'-'+$name; Copy-Item -LiteralPath $source -Destination (Join-Path 'dist/windows/licenses' $fileName) -Force } } } }
+Copy-Item -Path internal/app/vendor/*LICENSE.txt -Destination dist/windows/licenses -Force
 $env:CGO_ENABLED = '0'
 go build -trimpath -ldflags '-H windowsgui -s -w -buildid=' -o dist/windows/OpenFood.exe ./cmd/openfood
 if ($LASTEXITCODE -ne 0) { throw 'Go build failed' }
 if (!$ISCC) { $found = Get-Command iscc.exe -ErrorAction SilentlyContinue; if ($found) { $ISCC=$found.Source } else { $ISCC='C:\Program Files (x86)\Inno Setup 6\ISCC.exe' } }
 & $ISCC /Q packaging/windows/openfood.iss
 if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
-Compress-Archive -Path dist/windows/* -DestinationPath dist/OpenFood-0.6.0-alpha.1-windows-x64.zip -Force
+Compress-Archive -Path dist/windows/* -DestinationPath dist/OpenFood-0.7.0-alpha.1-windows-x64.zip -Force
 if (Test-Path docs/evidence/ui-redesign/results.json) {
-    Compress-Archive -Path docs/evidence/ui-redesign,docs/evidence/sales-stage,docs/evidence/cash-stage -DestinationPath dist/OpenFood-0.6.0-alpha.1-ui-evidence.zip -Force
+    Compress-Archive -Path docs/evidence/ui-redesign,docs/evidence/sales-stage,docs/evidence/cash-stage,docs/evidence/pos-stage -DestinationPath dist/OpenFood-0.7.0-alpha.1-ui-evidence.zip -Force
 }
-Get-ChildItem dist -File | Where-Object { $_.Name -like 'OpenFood-0.6.0-alpha.1-*' -and $_.Extension -in '.exe','.zip' } | ForEach-Object { $hash=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower(); "$hash  $($_.Name)" } | Set-Content -Encoding ASCII dist/SHA256SUMS
+Get-ChildItem dist -File | Where-Object { $_.Name -like 'OpenFood-0.7.0-alpha.1-*' -and $_.Extension -in '.exe','.zip' } | ForEach-Object { $hash=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower(); "$hash  $($_.Name)" } | Set-Content -Encoding ASCII dist/SHA256SUMS

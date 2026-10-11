@@ -35,3 +35,5 @@
 
 
 
+
+- 2026-10-11, 0.7: PostgreSQL real PASS 117.870s; vet PASS; govulncheck zero alcançáveis e uma em módulo requerido sem chamadas; npm audit zero. Setup/ADM/caixa/PDV/vendas Chromium PASS, zero erros JS; POS valida resposta perdida exatamente uma vez e permissões. Relatórios em `docs/evidence/pos-stage/`. CI e publicação pendentes.

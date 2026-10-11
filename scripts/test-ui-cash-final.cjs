@@ -1,4 +1,4 @@
-﻿const { chromium } = require("../tools/qa/node_modules/playwright"),
+const { chromium } = require("../tools/qa/node_modules/playwright"),
   fs = require("fs"),
   assert = require("assert");
 (async () => {
@@ -21,7 +21,12 @@
       .locator("#loginForm [name=password]")
       .fill("QA-test-only-password");
     await page.locator("#loginForm button").click();
+    await page.locator("#modeChooser:not(.hidden)").waitFor();
+    await page.locator("#enterAdmin").click();
     await page.locator("#workspace:not(.hidden)").waitFor();
+    if (!(await page.locator("#tabOperacao").isVisible()))
+      await page.locator("#menuToggle").click();
+    await page.locator("#tabOperacao").click();
     if (await page.locator("#menuToggle").isVisible())
       await page.locator("#menuToggle").click();
     await page.locator("#tabPagamentos").click();
@@ -42,12 +47,16 @@
   assert(cells[1].includes("Abertura QA"));
   assert(cells[8].includes("0,50 QA conferida"));
   await p.screenshot({
-    path: "docs/evidence/cash-stage/cash-final-desktop.png",
+    path:
+      (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+      "/cash-final-desktop.png",
     fullPage: true,
   });
   await p.locator("#themeSelect").selectOption("dark");
   await p.screenshot({
-    path: "docs/evidence/cash-stage/cash-dark-desktop.png",
+    path:
+      (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+      "/cash-dark-desktop.png",
     fullPage: true,
   });
   await p.locator("#themeSelect").selectOption("light");
@@ -56,7 +65,9 @@
     await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   );
   await p.screenshot({
-    path: "docs/evidence/cash-stage/cash-final-mobile.png",
+    path:
+      (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+      "/cash-final-mobile.png",
     fullPage: true,
   });
   const store = (await p.evaluate(async () => (await fetch("/api/me")).json()))
@@ -104,14 +115,19 @@
     } else assert.equal(await receive.count(), 0);
     await q.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
     await q.screenshot({
-      path: "docs/evidence/cash-stage/cash-" + role + "-mobile.png",
+      path:
+        (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+        "/cash-" +
+        role +
+        "-mobile.png",
       fullPage: true,
     });
     await c.close();
   }
   assert.deepEqual(errors, []);
   fs.writeFileSync(
-    "docs/evidence/cash-stage/cash-final-results.json",
+    (process.env.OPENFOOD_CASH_EVIDENCE || "docs/evidence/cash-stage") +
+      "/cash-final-results.json",
     JSON.stringify(
       {
         status: "PASS",

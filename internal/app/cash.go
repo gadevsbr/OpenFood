@@ -20,6 +20,7 @@ func migrateCash(ctx context.Context, tx pgx.Tx) error {
 	return err
 }
 func (u *SessionUser) CanReceiveManual() bool { return u.CanManageCatalog() || u.Role == RoleAttendant }
+func (u *SessionUser) CanOpenCash() bool      { return u.CanReceiveManual() }
 func (u *SessionUser) CanReadCash() bool      { return u.CanViewFinancials() || u.Role == RoleAttendant }
 
 type CashRequest struct {
@@ -73,14 +74,21 @@ func (a *App) cashSessions(w http.ResponseWriter, r *http.Request, store int64, 
 		failure(w, 405, "method_not_allowed")
 		return
 	}
-	if !user.CanManageCatalog() {
-		failure(w, 403, "forbidden_cash_management")
-		return
-	}
 	var input CashRequest
 	if decode(w, r, &input) != nil || !moneyKey(r.Header.Get("Idempotency-Key")) || len(input.Note) > 1000 || input.Opening < 0 || input.Opening > 1000000000000 || input.Counted < 0 || input.Counted > 1000000000000 || (input.Action != "open" && input.Action != "close") {
 		failure(w, 400, "cash_invalid")
 		return
+	}
+	if !user.CanOpenCash() {
+		failure(w, 403, "forbidden_cash_management")
+		return
+	}
+	if input.Action == "close" && !user.CanManageCatalog() {
+		var owner int64
+		if err := a.DB.QueryRow(r.Context(), "SELECT opened_by FROM cash_sessions WHERE store_id=$1 AND id=$2", store, input.ID).Scan(&owner); err != nil || owner != user.ID {
+			failure(w, 403, "forbidden_cash_management")
+			return
+		}
 	}
 	id, err := a.ChangeCash(r.Context(), store, user.ID, r.Header.Get("Idempotency-Key"), input)
 	moneyResponse(w, id, err)
@@ -134,7 +142,11 @@ func (a *App) ChangeCash(ctx context.Context, store, user int64, key string, inp
 		if err = tx.QueryRow(ctx, "SELECT COALESCE(sum(amount_cents),0) FROM manual_receipts WHERE store_id=$1 AND session_id=$2 AND method='cash'", store, input.ID).Scan(&net); err != nil {
 			return 0, err
 		}
-		expected := opening + net
+		var adjustments int64
+		if err = tx.QueryRow(ctx, "SELECT COALESCE(sum(amount_cents),0) FROM cash_adjustments WHERE store_id=$1 AND session_id=$2", store, input.ID).Scan(&adjustments); err != nil {
+			return 0, err
+		}
+		expected := opening + net + adjustments
 		if input.Expected != expected {
 			return 0, errors.New("cash_changed_reload")
 		}
@@ -200,6 +212,15 @@ func (a *App) RecordReceipt(ctx context.Context, store, user int64, key string, 
 	if err = cashLock(ctx, tx, store); err != nil {
 		return 0, err
 	}
+	id, err := a.recordReceiptTx(ctx, tx, store, user, key, input)
+	if err != nil {
+		return 0, err
+	}
+	return id, tx.Commit(ctx)
+}
+
+func (a *App) recordReceiptTx(ctx context.Context, tx pgx.Tx, store, user int64, key string, input ReceiptRequest) (int64, error) {
+	var err error
 	digest := moneyDigest(input)
 	var id int64
 	var previous string
@@ -208,7 +229,7 @@ func (a *App) RecordReceipt(ctx context.Context, store, user int64, key string, 
 		if previous != digest {
 			return 0, errors.New("idempotency_conflict")
 		}
-		return id, tx.Commit(ctx)
+		return id, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return 0, err
@@ -270,7 +291,11 @@ func (a *App) RecordReceipt(ctx context.Context, store, user int64, key string, 
 		if err = tx.QueryRow(ctx, "SELECT COALESCE(sum(amount_cents),0) FROM manual_receipts WHERE store_id=$1 AND session_id=$2 AND method='cash'", store, session).Scan(&cash); err != nil {
 			return 0, err
 		}
-		if opening+cash+amount < 0 {
+		var adjustments int64
+		if err = tx.QueryRow(ctx, "SELECT COALESCE(sum(amount_cents),0) FROM cash_adjustments WHERE store_id=$1 AND session_id=$2", store, session).Scan(&adjustments); err != nil {
+			return 0, err
+		}
+		if opening+cash+adjustments+amount < 0 {
 			return 0, errors.New("cash_insufficient")
 		}
 	}
@@ -298,7 +323,7 @@ func (a *App) RecordReceipt(ctx context.Context, store, user int64, key string, 
 	if _, err = tx.Exec(ctx, "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,$3,$4)", store, user, "manual_"+map[bool]string{true: "refund", false: "receipt"}[amount < 0], id); err != nil {
 		return 0, err
 	}
-	return id, tx.Commit(ctx)
+	return id, nil
 }
 
 type CashSessionView struct {
@@ -313,6 +338,8 @@ type CashSessionView struct {
 	Card        int64      `json:"card_cents"`
 	Pix         int64      `json:"pix_cents"`
 	Note        string     `json:"note"`
+	Adjustments int64      `json:"adjustments_cents"`
+	OpenedByID  int64      `json:"opened_by_id"`
 	OpeningNote string     `json:"opening_note"`
 	OpenedBy    string     `json:"opened_by"`
 	ClosedBy    string     `json:"closed_by"`
@@ -326,7 +353,7 @@ func (a *App) cashOverview(w http.ResponseWriter, r *http.Request, store int64) 
 		return
 	}
 	defer tx.Rollback(ctx)
-	rows, err := tx.Query(ctx, `SELECT s.id,s.opening_cents,s.opened_at,s.closed_at,s.counted_cents,s.expected_cents,s.difference_cents,COALESCE(sum(m.amount_cents) FILTER(WHERE m.method='cash'),0),COALESCE(sum(m.amount_cents) FILTER(WHERE m.method='card'),0),COALESCE(sum(m.amount_cents) FILTER(WHERE m.method='pix_manual'),0),CASE WHEN s.closed_at IS NULL THEN s.note ELSE s.close_note END,s.note,u.email,COALESCE(c.email,'') FROM cash_sessions s JOIN users u ON u.id=s.opened_by LEFT JOIN users c ON c.id=s.closed_by LEFT JOIN manual_receipts m ON m.store_id=s.store_id AND m.session_id=s.id WHERE s.store_id=$1 GROUP BY s.id,u.email,c.email ORDER BY s.id DESC LIMIT 100`, store)
+	rows, err := tx.Query(ctx, `SELECT s.id,s.opening_cents,s.opened_at,s.closed_at,s.counted_cents,s.expected_cents,s.difference_cents,COALESCE(sum(m.amount_cents) FILTER(WHERE m.method='cash'),0),COALESCE(sum(m.amount_cents) FILTER(WHERE m.method='card'),0),COALESCE(sum(m.amount_cents) FILTER(WHERE m.method='pix_manual'),0),CASE WHEN s.closed_at IS NULL THEN s.note ELSE s.close_note END,s.note,u.email,COALESCE(c.email,''),COALESCE((SELECT sum(x.amount_cents) FROM cash_adjustments x WHERE x.store_id=s.store_id AND x.session_id=s.id),0),s.opened_by FROM cash_sessions s JOIN users u ON u.id=s.opened_by LEFT JOIN users c ON c.id=s.closed_by LEFT JOIN manual_receipts m ON m.store_id=s.store_id AND m.session_id=s.id WHERE s.store_id=$1 GROUP BY s.id,u.email,c.email ORDER BY s.id DESC LIMIT 100`, store)
 	if err != nil {
 		failure(w, 500, "cash_read_failed")
 		return
@@ -334,7 +361,7 @@ func (a *App) cashOverview(w http.ResponseWriter, r *http.Request, store int64) 
 	sessions := []CashSessionView{}
 	for rows.Next() {
 		var s CashSessionView
-		if err = rows.Scan(&s.ID, &s.Opening, &s.Opened, &s.Closed, &s.Counted, &s.Expected, &s.Difference, &s.Cash, &s.Card, &s.Pix, &s.Note, &s.OpeningNote, &s.OpenedBy, &s.ClosedBy); err != nil {
+		if err = rows.Scan(&s.ID, &s.Opening, &s.Opened, &s.Closed, &s.Counted, &s.Expected, &s.Difference, &s.Cash, &s.Card, &s.Pix, &s.Note, &s.OpeningNote, &s.OpenedBy, &s.ClosedBy, &s.Adjustments, &s.OpenedByID); err != nil {
 			rows.Close()
 			failure(w, 500, "cash_read_failed")
 			return

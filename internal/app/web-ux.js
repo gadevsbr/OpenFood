@@ -138,10 +138,20 @@ function clearMsg() {
 }
 $("dismissMessage").onclick = clearMsg;
 function show(id) {
-  for (const x of ["setup", "login", "workspace"])
+  for (const x of [
+    "setup",
+    "login",
+    "workspace",
+    "modeChooser",
+    "posWorkspace",
+  ])
     $(x).classList.toggle("hidden", x !== id);
-  document.body.classList.toggle("auth-page", id !== "workspace");
-  if (id !== "workspace") {
+  document.body.classList.toggle("auth-page", ["setup", "login"].includes(id));
+  document.body.classList.toggle("mode-page", id === "modeChooser");
+  document.body.classList.toggle("pos-page", id === "posWorkspace");
+  if (typeof resetModes === "function" && ["setup", "login"].includes(id))
+    resetModes();
+  if (["setup", "login"].includes(id)) {
     document.querySelectorAll("dialog[open]").forEach((d) => d.close());
     closeNavigation();
     currentStoreId = null;
@@ -222,6 +232,12 @@ document.addEventListener("keydown", (e) => {
   }
 });
 const pageInfo = {
+  dashboard: [
+    "Gestão da loja",
+    "Dashboard administrativo",
+    "Visão das vendas, recebimentos e operação.",
+    null,
+  ],
   operacao: [
     "Visão da operação",
     "Pedidos",
@@ -321,6 +337,8 @@ function selectPage(name, focus = false) {
   if (name === "usuarios") loadUsers();
   if (name === "lojas") loadStores();
   if (name === "pagamentos") run(loadCash);
+  if (name === "dashboard" && typeof loadDashboard === "function")
+    run(loadDashboard);
   document.title = info[1] + " · OpenFood";
 }
 $$(".tab").forEach((b) => (b.onclick = () => selectPage(b.dataset.tab, true)));
@@ -591,6 +609,11 @@ async function openOrderDetails(order) {
         money(item.price_cents * item.quantity);
       list.append(row);
     }
+    if (order.discount_cents) {
+      const row = document.createElement("p");
+      row.textContent = "Desconto aplicado: −" + money(order.discount_cents);
+      list.append(row);
+    }
   } catch (e) {
     list.textContent = readableError(e);
   }
@@ -712,7 +735,8 @@ function refresh() {
     renderOrders();
     if (currentPage === "pagamentos") await loadCash();
     $("connectionNotice").classList.add("hidden");
-    show("workspace");
+    if (typeof displayCurrentMode === "function") displayCurrentMode();
+    else show("workspace");
   })()
     .catch((e) => {
       if (!document.body.classList.contains("auth-page")) {
@@ -1030,7 +1054,8 @@ $("loginForm").onsubmit = (e) => {
     await api("login", Object.fromEntries(new FormData(e.target)));
     e.target.reset();
     await refresh();
-    selectPage("operacao");
+    if (typeof chooseMode === "function") chooseMode();
+    else selectPage("operacao");
     clearMsg();
   }, e.target.querySelector("button"));
 };

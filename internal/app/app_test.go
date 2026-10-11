@@ -519,7 +519,7 @@ func TestPostgresUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, version := range []int{1, 2, 3} {
+	for _, version := range []int{1, 2, 3, 4} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 			defer cancel()
@@ -562,11 +562,11 @@ func TestPostgresUpgrade(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err = db.Exec(ctx, "INSERT INTO products(store_id,name,price_cents,"+map[bool]string{true: "stock_quantity", false: "stock"}[version == 3]+") VALUES($1,'Produto preservado',1999,7)", store); err != nil {
+			if _, err = db.Exec(ctx, "INSERT INTO products(store_id,name,price_cents,"+map[bool]string{true: "stock_quantity", false: "stock"}[version >= 3]+") VALUES($1,'Produto preservado',1999,7)", store); err != nil {
 				t.Fatal(err)
 			}
 			var oldDump []byte
-			if version == 3 {
+			if version >= 3 {
 				path, e := r.Backup(ctx)
 				if e != nil {
 					t.Fatal(e)
@@ -588,12 +588,12 @@ func TestPostgresUpgrade(t *testing.T) {
 			if stock != 7 || price != 1999 {
 				t.Fatalf("migration changed product: stock=%d price=%d", stock, price)
 			}
-			if version == 3 {
+			if version >= 3 {
 				if err = r.Restore(ctx, oldDump); err != nil {
 					t.Fatalf("legacy v3 backup restore: %v", err)
 				}
 				var restored int
-				if err = a.DB.QueryRow(ctx, "SELECT max(version) FROM schema_migrations").Scan(&restored); err != nil || restored != 4 {
+				if err = a.DB.QueryRow(ctx, "SELECT max(version) FROM schema_migrations").Scan(&restored); err != nil || restored != 5 {
 					t.Fatalf("legacy backup not upgraded: %d %v", restored, err)
 				}
 			}

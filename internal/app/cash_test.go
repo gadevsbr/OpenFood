@@ -144,8 +144,8 @@ func TestCashJourney(t *testing.T) {
 		t.Fatal("finance mutated")
 	}
 	code, _, _ = call("POST", "/api/cash-sessions", opening, cookies["attendant"], "Idempotency-Key", app.Token())
-	if code != 403 {
-		t.Fatal("attendant opened")
+	if code != 409 {
+		t.Fatal("attendant must not open a second cash session")
 	}
 	// Two concurrent distinct partial receipts cannot exceed the order balance.
 	type result struct {
@@ -260,6 +260,90 @@ func TestCashJourney(t *testing.T) {
 		t.Fatal(e)
 	}
 	mutate("/api/manual-receipts", app.ReceiptRequest{OrderID: integratedOrder, Amount: 100, Method: "cash"}, app.Token(), 409)
+	checkout := app.CheckoutRequest{Items: []app.Item{{ProductID: product, Quantity: 2}}, Expected: 3900, Discount: 98, Note: "Desconto QA", Service: "kitchen", Payments: []app.POSPayment{{Method: "cash", Amount: 1000, Tendered: 2000}, {Method: "card", Amount: 2900}}}
+	posKey := app.Token()
+	posOrder := mutate("/api/pos-checkout", checkout, posKey, 200)
+	if mutate("/api/pos-checkout", checkout, posKey, 200) != posOrder {
+		t.Fatal("POS duplicated")
+	}
+	duplicateResults := make(chan error, 4)
+	for i := 0; i < 4; i++ {
+		go func() {
+			id, err := a.Checkout(ctx, store, user, posKey, checkout)
+			if err == nil && id != posOrder {
+				err = fmt.Errorf("duplicate returned %d", id)
+			}
+			duplicateResults <- err
+		}()
+	}
+	for i := 0; i < 4; i++ {
+		if err := <-duplicateResults; err != nil {
+			t.Fatal(err)
+		}
+	}
+	conflict := checkout
+	conflict.Expected--
+	mutate("/api/pos-checkout", conflict, posKey, 409)
+	var state string
+	var total int64
+	if e = a.DB.QueryRow(ctx, "SELECT state,financial_state,total_cents FROM orders WHERE id=$1", posOrder).Scan(&state, &financial, &total); e != nil || state != "confirmed" || financial != "manual_confirmed" || total != 3900 {
+		t.Fatalf("POS state %s %s %d %v", state, financial, total, e)
+	}
+	code, raw, _ = call("GET", fmt.Sprintf("/api/pos-receipt?id=%d", posOrder), nil, admin)
+	if code != 200 || !bytes.Contains(raw, []byte(`"tendered_cents": 2000`)) && !bytes.Contains(raw, []byte(`"tendered_cents":2000`)) {
+		t.Fatalf("receipt %d %s", code, raw)
+	}
+	var before, after float64
+	a.DB.QueryRow(ctx, "SELECT stock_quantity FROM products WHERE id=$1", product).Scan(&before)
+	bad := checkout
+	bad.Expected = 3800
+	mutate("/api/pos-checkout", bad, app.Token(), 409)
+	bad = checkout
+	bad.Payments = []app.POSPayment{{Method: "cash", Amount: 3900, Tendered: 3899}}
+	mutate("/api/pos-checkout", bad, app.Token(), 409)
+	bad = checkout
+	bad.Items = []app.Item{{ProductID: product, Quantity: 10000}}
+	mutate("/api/pos-checkout", bad, app.Token(), 409)
+	a.DB.QueryRow(ctx, "SELECT stock_quantity FROM products WHERE id=$1", product).Scan(&after)
+	if before != after {
+		t.Fatal("failed checkout changed stock")
+	}
+	code, _, _ = call("POST", "/api/pos-checkout", checkout, cookies["attendant"], "Idempotency-Key", app.Token())
+	if code != 403 {
+		t.Fatal("attendant discounted")
+	}
+	code, _, _ = call("POST", "/api/pos-checkout", checkout, cookies["finance_viewer"], "Idempotency-Key", app.Token())
+	if code != 403 {
+		t.Fatal("finance sold")
+	}
+	mutate("/api/cash-sessions", app.CashRequest{Action: "close", ID: next, Counted: 3500, Expected: 3500}, app.Token(), 200)
+	if mutate("/api/pos-checkout", checkout, posKey, 200) != posOrder {
+		t.Fatal("retry after close")
+	}
+	mutate("/api/pos-checkout", checkout, app.Token(), 409)
+	code, raw, _ = call("POST", "/api/cash-sessions", app.CashRequest{Action: "open", Opening: 1200}, cookies["attendant"], "Idempotency-Key", app.Token())
+	if code != 200 {
+		t.Fatalf("attendant opening %d %s", code, raw)
+	}
+	var opened struct {
+		ID int64 `json:"id"`
+	}
+	json.Unmarshal(raw, &opened)
+	adjust := app.AdjustmentRequest{Session: opened.ID, Amount: -500, Expected: 1200, Note: "Sangria QA"}
+	adjustKey := app.Token()
+	mutate("/api/cash-adjustments", adjust, adjustKey, 200)
+	mutate("/api/cash-adjustments", adjust, adjustKey, 200)
+	adjust.Amount = -800
+	adjust.Expected = 700
+	mutate("/api/cash-adjustments", adjust, app.Token(), 409)
+	code, raw, _ = call("POST", "/api/cash-sessions", app.CashRequest{Action: "close", ID: opened.ID, Counted: 700, Expected: 700}, cookies["attendant"], "Idempotency-Key", app.Token())
+	if code != 200 {
+		t.Fatalf("attendant own close %d %s", code, raw)
+	}
+	code, _, _ = call("POST", "/api/cash-sessions", app.CashRequest{Action: "close", ID: next}, cookies["attendant"], "Idempotency-Key", app.Token())
+	if code != 403 {
+		t.Fatal("attendant closed manager cash")
+	}
 	backup, e := runtime.Backup(ctx)
 	if e != nil {
 		t.Fatal(e)
@@ -272,7 +356,7 @@ func TestCashJourney(t *testing.T) {
 		t.Fatal(e)
 	}
 	var count int
-	if e = a.DB.QueryRow(ctx, "SELECT count(*) FROM manual_receipts WHERE store_id=$1", store).Scan(&count); e != nil || count != 4 {
+	if e = a.DB.QueryRow(ctx, "SELECT count(*) FROM manual_receipts WHERE store_id=$1", store).Scan(&count); e != nil || count != 6 {
 		t.Fatalf("ledger restore %d %v", count, e)
 	}
 	t.Log("PASS: receipts, partial/split payment, idempotency/concurrent ceiling, refunds across periods, cash reconciliation, permissions, cancellation and backup")

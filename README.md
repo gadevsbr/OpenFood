@@ -1,13 +1,15 @@
 # OpenFood
 Software livre para operação local de lojas, sem servidor central obrigatório.
 
-Alpha 0.6.0-alpha.1: Windows x64 com PostgreSQL embarcado e Linux com Docker Compose. [Instalação e atualização](docs/installation.md), [plano](project-memory/plan.md), [decisões](project-memory/decisions.md) e [validação](project-memory/validation.md).
+Alpha 0.7.0-alpha.1: Windows x64 com PostgreSQL embarcado e Linux com Docker Compose. [Instalação e atualização](docs/installation.md), [plano](project-memory/plan.md), [decisões](project-memory/decisions.md) e [validação](project-memory/validation.md).
 
 Catálogo: edição de produtos com proteção de estoque concorrente. Pedidos manuais com múltiplos itens e detalhes dos preços registrados na venda; horários de disponibilidade em America/Sao_Paulo.
 
-Caixa: abertura com saldo inicial, recebimentos manuais parciais em dinheiro/cartão/Pix, devolução integral de um recebimento por gerente, fechamento com contagem/diferença/motivo e histórico por operador. Não executa cobrança ou reembolso bancário. Não inclui sangrias, suprimentos ou taxas. [Uso do caixa](docs/cash.md).
+Caixa: abertura com saldo inicial, recebimentos manuais parciais em dinheiro/cartão/Pix, devolução integral de um recebimento por gerente, fechamento com contagem/diferença/motivo e histórico por operador. Não executa cobrança ou reembolso bancário. Inclui sangrias e suprimentos com motivo/operador; taxas permanecem pendentes. [Uso do caixa](docs/cash.md).
 
 Implementado: setup protegido, login, organizações/lojas e papéis, catálogo, pedidos manuais por unidade/porção, estoque transacional, snapshots de preços, deduplicação e fila local durável. Windows tem supervisor, tray, autostart opt-in, backup/restauração e diagnóstico.
+
+Após login, escolha **PDV | ADM** em duas metades. PDV para restaurante tem produtos/categorias, carrinho, preparo ou balcão, pagamento dividido, troco, desconto gerencial, comprovante não fiscal, carrinhos em espera e caixa obrigatório. ADM abre o dashboard da loja e mantém os cadastros. [Uso do PDV](docs/pos.md).
 
 Painel repaginado: fila por etapa, busca e filtros, cadastro contextual, navegação lateral, temas claro/escuro/sistema e layout mobile. [Contrato visual](project-memory/ui-contract.md) e [evidências](docs/evidence/ui-redesign/results.json). Fontes, CSS, JavaScript e ícones são locais, embutidos no executável.
 
@@ -20,3 +22,5 @@ QA desta etapa: executar a jornada inicial com `OPENFOOD_UI_EVIDENCE=docs/eviden
 QA de caixa: em instalação isolada vazia, executar `scripts/test-ui-redesign.cjs` com `OPENFOOD_UI_EVIDENCE=docs/evidence/cash-stage` e depois `node scripts/test-ui-cash.cjs`; ambos usam `OPENFOOD_UI_TEST_DATA`. Testes reais Go exigem `OPENFOOD_TEST_PG_BIN`.
 
 Licença AGPL-3.0-only. O software não exige assinatura comercial; provedores externos opcionais têm seus próprios custos.
+
+Animações: Motion mini 14.1.0, bundle local e reduced-motion; reconstruir com `npm.cmd ci --prefix frontend` e `npm.cmd run build --prefix frontend`. QA PDV: após os fixtures de caixa e caixa-final, executar `node scripts/test-ui-pos.cjs`.

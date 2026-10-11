@@ -1,5 +1,7 @@
 # UI Finish Gate — 2026-10-10
 
+2026-10-11: o fluxo de entrada direto na fila abaixo é superseded por PDV | ADM. Contrato e evidências da nova etapa em `pos-stage.md` e `docs/evidence/pos-stage/`. Os gates anteriores permanecem como histórico.
+
 Decisão: PASS para a repaginação local testada; produto permanece experimental.
 
 - Primeira leitura é a fila de pedidos, com próxima ação por papel e contagens reais. Cadastro deixou a tela principal; catálogo tem busca, disponibilidade e detalhes.

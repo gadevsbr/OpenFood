@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "esbuild animation-entry.js --bundle --minify --format=iife --outfile=../internal/app/vendor/motion.js --legal-comments=inline && node copy-licenses.cjs"
+  },
+  "dependencies": {
+    "motion": "14.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

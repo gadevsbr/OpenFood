@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "date": "2026-10-11T04:18:37.382Z",
+  "errors": [],
+  "checks": [
+    "mode chooser",
+    "real dashboard",
+    "standalone PDV",
+    "search shortcut",
+    "hold/resume",
+    "manager discount",
+    "kitchen checkout",
+    "split payment",
+    "cash change",
+    "receipt",
+    "dark theme",
+    "local animations",
+    "mobile no overflow",
+    "reduced motion",
+    "switch ADM",
+    "cash close gate",
+    "cash opening",
+    "restaurant category filtering",
+    "lost response retry exactly once",
+    "cash withdrawal history",
+    "attendant own open/close",
+    "finance viewer cannot enter PDV"
+  ]
+}

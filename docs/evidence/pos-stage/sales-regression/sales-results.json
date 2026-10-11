@@ -1,0 +1,12 @@
+{
+  "result": "PASS",
+  "checks": [
+    "product edit",
+    "mixed cart and integer cents total",
+    "snapshot details",
+    "cancellation restores both stocks",
+    "stale editor rejects intervening sale",
+    "desktop/mobile detail"
+  ],
+  "pageerrors": []
+}

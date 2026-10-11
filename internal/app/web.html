@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>OpenFood</title>
     <link class="" rel="stylesheet" href="/assets/web.css" />
+    <link rel="stylesheet" href="/assets/web-pos.css" />
   </head>
   <body class="auth-page">
     <a class="skip-link" href="#mainContent">Pular para o conteúdo</a>
@@ -91,7 +92,15 @@
         </span>
         <div>Open<span>Food</span></div>
       </div>
-      <div class="sidebar-caption">Sua operação</div>
+      <div class="sidebar-caption">Administração</div>
+      <button
+        class="tab"
+        id="tabDashboard"
+        data-tab="dashboard"
+        aria-controls="panelDashboard"
+      >
+        Resumo da loja
+      </button>
       <div class="tabs" role="navigation">
         <button
           class="tab active"
@@ -202,6 +211,9 @@
       </div>
     </aside>
     <header class="app-header">
+      <button id="adminToPOS" class="btn-secondary mode-switch">
+        Ir para PDV
+      </button>
       <div class="store-context">
         <button
           id="menuToggle"
@@ -360,6 +372,200 @@
           Acesso local · Dados neste computador
         </p>
       </section>
+
+      <div id="modeChooser" class="hidden" aria-labelledby="modeTitle">
+        <div class="mode-heading">
+          <div class="mode-brand">OpenFood</div>
+          <h1 id="modeTitle" tabindex="-1">Onde vamos trabalhar?</h1>
+          <p id="modeAccount"></p>
+        </div>
+        <div class="mode-split">
+          <button type="button" id="enterPOS" class="mode-choice mode-pdv">
+            <span class="mode-number">01 / ATENDIMENTO</span
+            ><svg viewBox="0 0 100 90" fill="none" aria-hidden="true">
+              <rect x="10" y="4" width="75" height="50" rx="6" />
+              <path d="M38 54v14h20V54 M20 68h56 M20 22h24 M20 34h16" />
+              <rect x="60" y="58" width="30" height="25" rx="4" /></svg
+            ><strong>PDV</strong
+            ><span class="mode-description"
+              >Venda, receba e cuide do caixa.</span
+            ><span class="mode-enter"
+              >Entrar no ponto de venda <span aria-hidden="true">↗</span></span
+            >
+          </button>
+          <button type="button" id="enterAdmin" class="mode-choice mode-adm">
+            <span class="mode-number">02 / GESTÃO</span
+            ><svg viewBox="0 0 100 90" fill="none" aria-hidden="true">
+              <rect x="8" y="5" width="82" height="70" rx="6" />
+              <path d="M8 24h82 M30 24v51 M43 60V45 M59 60V35 M75 60V41" />
+              <circle cx="20" cy="15" r="1" /></svg
+            ><strong>ADM</strong
+            ><span class="mode-description"
+              >Acompanhe resultados e gerencie a loja.</span
+            ><span class="mode-enter"
+              >Entrar na administração <span aria-hidden="true">↗</span></span
+            >
+          </button>
+        </div>
+        <div class="mode-footer">
+          <span id="modeRole"></span><span>Operação local · OpenFood</span
+          ><button type="button" id="modeLogout">Sair da conta</button>
+        </div>
+      </div>
+      <div id="posWorkspace" class="hidden">
+        <header class="pos-header">
+          <div class="pos-brand">OpenFood <span>PDV</span></div>
+          <label class="pos-store-label"
+            ><span class="sr-only">Loja do PDV</span
+            ><select id="posStore"></select></label
+          ><span id="posOperator" class="pos-operator"></span>
+          <div class="pos-header-actions">
+            <button type="button" id="posCash" class="cash-pill">Caixa</button
+            ><label
+              ><span class="sr-only">Tema do PDV</span
+              ><select id="posTheme">
+                <option value="system">Sistema</option>
+                <option value="light">Claro</option>
+                <option value="dark">Escuro</option>
+              </select></label
+            ><button type="button" id="posToAdmin" class="btn-secondary">
+              Ir para ADM ↗</button
+            ><button type="button" id="posLogout" class="btn-secondary">
+              Sair
+            </button>
+          </div>
+        </header>
+        <div id="posCashGate" class="pos-cash-gate hidden">
+          <div class="eyebrow">Antes de começar</div>
+          <h1>Abra o caixa para vender.</h1>
+          <p>
+            Informe o dinheiro que já está no caixa. As vendas e os recebimentos
+            ficarão vinculados a esta abertura.
+          </p>
+          <form id="posOpenForm">
+            <label
+              >Saldo inicial em dinheiro (R$)<input
+                name="opening"
+                inputmode="decimal"
+                pattern="[0-9]+([,.][0-9]{1,2})?"
+                value="0,00"
+                required /></label
+            ><label
+              >Observação de abertura<input
+                name="note"
+                maxlength="1000"
+                placeholder="Ex.: troco inicial do turno" /></label
+            ><button type="submit" id="posOpenSubmit">
+              Abrir caixa e começar
+            </button>
+            <p
+              class="pos-inline-error hidden"
+              id="posGateError"
+              role="alert"
+            ></p>
+          </form>
+          <button type="button" id="posGateBack" class="btn-secondary">
+            Voltar à escolha de ambiente
+          </button>
+        </div>
+        <div id="posTerminal" class="pos-terminal hidden">
+          <div class="pos-products">
+            <div class="pos-section-title">
+              <div>
+                <div class="eyebrow">Atendimento no balcão</div>
+                <h1>Nova venda</h1>
+              </div>
+              <button type="button" id="posReload" class="btn-secondary">
+                Atualizar
+              </button>
+            </div>
+            <label class="pos-search"
+              ><span aria-hidden="true">⌕</span
+              ><span class="sr-only"
+                >Buscar produto, SKU ou código de barras</span
+              ><input
+                id="posSearch"
+                autocomplete="off"
+                placeholder="Buscar produto, SKU ou código de barras…"
+              /><kbd>F2</kbd></label
+            >
+            <div
+              id="posCategories"
+              class="pos-categories"
+              aria-label="Filtrar por categoria"
+            ></div>
+            <div id="posGrid" class="pos-grid"></div>
+            <div id="posEmpty" class="pos-empty hidden">
+              <h2>Nenhum produto encontrado.</h2>
+              <p>Revise a busca ou cadastre produtos na administração.</p>
+            </div>
+            <nav class="pos-tools" aria-label="Ações do PDV">
+              <button type="button" id="posRecent" class="btn-secondary">
+                Vendas e comprovantes</button
+              ><button type="button" id="posPending" class="btn-secondary">
+                Pedidos a receber</button
+              ><button type="button" id="posHeld" class="btn-secondary">
+                Carrinhos guardados</button
+              ><button type="button" id="posHelp" class="btn-secondary">
+                Atalhos
+              </button>
+            </nav>
+          </div>
+          <aside class="pos-cart" aria-labelledby="posCartTitle">
+            <div class="pos-cart-heading">
+              <div>
+                <div class="eyebrow">Venda atual</div>
+                <h2 id="posCartTitle">
+                  Carrinho <span id="posCartCount">0</span>
+                </h2>
+              </div>
+              <button type="button" id="posBackProducts" class="btn-secondary">
+                Produtos</button
+              ><button type="button" id="posClear" class="btn-secondary">
+                Limpar
+              </button>
+            </div>
+            <div id="posCartLines" class="pos-cart-lines"></div>
+            <div id="posCartEmpty" class="pos-cart-empty">
+              Selecione um produto ou leia o código de barras para começar.
+            </div>
+            <div class="pos-ticket-footer">
+              <label
+                >Atendimento<select id="posService">
+                  <option value="counter">Balcão · concluir na venda</option>
+                  <option value="kitchen">Enviar para preparo</option>
+                </select></label
+              >
+              <details id="posDiscountSection">
+                <summary>Aplicar desconto</summary>
+                <label
+                  >Desconto em reais<input
+                    id="posDiscount"
+                    inputmode="decimal"
+                    pattern="[0-9]+([,.][0-9]{1,2})?"
+                    value="0,00" /></label
+                ><label
+                  >Motivo<input id="posDiscountNote" maxlength="1000"
+                /></label>
+              </details>
+              <div class="pos-subtotal">
+                <span>Subtotal</span><strong id="posSubtotal">R$ 0,00</strong>
+              </div>
+              <div class="pos-total">
+                <span>Total</span><strong id="posTotal">R$ 0,00</strong>
+              </div>
+              <button type="button" id="posPay">
+                Receber e finalizar <kbd>F4</kbd></button
+              ><button type="button" id="posHold" class="btn-secondary">
+                Guardar carrinho nesta aba <kbd>F8</kbd>
+              </button>
+            </div>
+          </aside>
+        </div>
+        <button type="button" id="posMobileCart" class="pos-mobile-cart hidden">
+          Ver carrinho
+        </button>
+      </div>
       <div id="workspace" class="hidden">
         <div class="hidden" id="connectionNotice">
           <span
@@ -385,6 +591,35 @@
             </svg>
             <span>Novo pedido</span>
           </button>
+        </div>
+        <div id="panelDashboard" class="tab-panel">
+          <section class="admin-overview">
+            <div class="eyebrow">Visão de gestão</div>
+            <h2>Seu dia, em números reais.</h2>
+            <p id="dashboardDate"></p>
+            <div id="dashboardStats" class="dashboard-stats"></div>
+          </section>
+          <section>
+            <h2>Atalhos da administração</h2>
+            <div class="admin-shortcuts">
+              <button type="button" data-admin-page="operacao">
+                Acompanhar pedidos</button
+              ><button type="button" data-admin-page="catalogo">
+                Gerenciar catálogo</button
+              ><button type="button" data-admin-page="pagamentos">
+                Conferir caixa</button
+              ><button type="button" id="dashboardPOS">Abrir PDV</button>
+            </div>
+          </section>
+          <section>
+            <h2>Operação e caixa</h2>
+            <p id="dashboardCash"></p>
+            <p class="muted">
+              Vendas de hoje consideram a data de criação e excluem
+              cancelamentos. Recebimentos de hoje incluem valores registrados
+              hoje, inclusive de pedidos anteriores, menos devoluções.
+            </p>
+          </section>
         </div>
         <div id="panelOperacao" class="tab-panel active">
           <div class="metrics">
@@ -2230,8 +2465,10 @@
       aria-label="Fechar navegação"
     ></button>
 
+    <script src="/assets/motion.js"></script>
     <script src="/assets/web.js"></script>
     <script src="/assets/web-ux.js"></script>
     <script src="/assets/web-cash.js"></script>
+    <script src="/assets/web-pos.js"></script>
   </body>
 </html>

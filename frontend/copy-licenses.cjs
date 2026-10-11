@@ -1,0 +1,1 @@
+const fs=require('fs');for(const [module,file] of [['motion','MOTION'],['motion-dom','MOTION-DOM'],['motion-utils','MOTION-UTILS']])fs.copyFileSync('node_modules/'+module+'/LICENSE.md','../internal/app/vendor/'+file+'-LICENSE.txt');
