@@ -13,4 +13,6 @@ Não representa o produto completo dos requisitos. Existem cadastros de categori
 
 QA de navegador: `npm.cmd install --prefix tools/qa playwright@1.63.0`, `npx.cmd --prefix tools/qa playwright install chromium`; executar `node scripts/test-ui-redesign.cjs`, `node scripts/test-ui-admin.cjs` e `node scripts/test-ui-final.cjs` com `OPENFOOD_UI_TEST_DATA` apontando para uma instalação de teste isolada, iniciada com `OPENFOOD_TEST_HEADLESS=1`. A primeira suíte exige instalação vazia; as demais usam seus dados. Nunca apontar para dados de trabalho.
 
+QA desta etapa: executar a jornada inicial com `OPENFOOD_UI_EVIDENCE=docs/evidence/sales-stage`, seguida de `node scripts/test-ui-sales.cjs`, no mesmo diretório isolado informado por `OPENFOOD_UI_TEST_DATA`. A jornada de vendas exige os fixtures da primeira suíte.
+
 Licença AGPL-3.0-only. O software não exige assinatura comercial; provedores externos opcionais têm seus próprios custos.
