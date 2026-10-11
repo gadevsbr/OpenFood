@@ -1,4 +1,4 @@
-param([string]$Installer='dist/OpenFood-0.2.0-alpha.1-windows-x64-setup.exe')
+param([string]$Installer='dist/OpenFood-0.4.0-alpha.1-windows-x64-setup.exe')
 $ErrorActionPreference='Stop'
 $repoDir=Split-Path $PSScriptRoot -Parent
 Set-Location -LiteralPath $repoDir
@@ -49,7 +49,7 @@ try {
     if (!$p.WaitForExit(5000)) {throw 'Second instance did not exit'}
     $busy=Start-Process -FilePath (Join-Path $installDir 'OpenFood.exe') -ArgumentList '--prepare-update' -WindowStyle Hidden -PassThru
     if (!$busy.WaitForExit(5000) -or $busy.ExitCode -ne 3) {throw 'Update with running app was not blocked'}
-    $product=Invoke-RestMethod -Uri ($state.URL+'/api/products') -Method Post -Headers @{'X-OpenFood'='1'} -WebSession $session -ContentType application/json -Body (@{name='Produto instalado QA';price_cents=2500;stock=4}|ConvertTo-Json)
+    $product=Invoke-RestMethod -Uri ($state.URL+'/api/products') -Method Post -Headers @{'X-OpenFood'='1'} -WebSession $session -ContentType application/json -Body (@{name='Produto instalado QA';price_cents=2500;stock_quantity=4;active=$true}|ConvertTo-Json)
     $order=Invoke-RestMethod -Uri ($state.URL+'/api/orders') -Method Post -Headers @{'X-OpenFood'='1';'Idempotency-Key'='installed-qa-order'} -WebSession $session -ContentType application/json -Body (@{items=@(@{product_id=$product.id;quantity=2})}|ConvertTo-Json -Depth 5)
     # Kill only this isolated test application's process, never a user process.
     Stop-Process -Id $state.Process.Id -Force

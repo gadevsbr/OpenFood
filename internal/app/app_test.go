@@ -14,6 +14,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestTransitions(t *testing.T) {
@@ -167,7 +169,7 @@ func TestPostgresJourney(t *testing.T) {
 
 	// --- Products in store ---
 	var product int64
-	if e = a.DB.QueryRow(ctx, "INSERT INTO products(store_id,name,price_cents,stock) VALUES($1,'Último item',1999,1) RETURNING id", store).Scan(&product); e != nil {
+	if e = a.DB.QueryRow(ctx, "INSERT INTO products(store_id,name,price_cents,stock_quantity) VALUES($1,'Último item',1999,1) RETURNING id", store).Scan(&product); e != nil {
 		t.Fatal(e)
 	}
 
@@ -182,6 +184,39 @@ func TestPostgresJourney(t *testing.T) {
 	}
 
 	// --- Concurrent stock isolation ---
+	// Organization admins cannot select another organization's store; managers cannot promote roles via PATCH.
+	for _, account := range []struct{ email, role string }{{"org-admin@example.org", "org_admin"}, {"manager@example.org", "store_manager"}} {
+		if _, e = a.DB.Exec(ctx, "INSERT INTO users(org_id,store_id,email,password_hash,role) SELECT $1,$2,$3,password_hash,$4 FROM users WHERE id=$5", orgID, store, account.email, account.role, adminUserID); e != nil {
+			t.Fatal(e)
+		}
+		code, _, loginRes := call("POST", "/api/login", map[string]string{"email": account.email, "password": "secure-password-long"}, nil)
+		if code != 200 {
+			t.Fatalf("role login: got %d", code)
+		}
+		roleCookie := loginRes.Cookies()[0]
+		if account.role == "org_admin" {
+			code, _, _ = call("POST", "/api/users", map[string]any{"email": "cross-org@example.org", "password": "secure-password-long", "role": "attendant", "store_id": otherStore}, roleCookie)
+			if code != 403 {
+				t.Fatalf("cross-org user assignment: expected 403, got %d", code)
+			}
+		}
+		code, _, _ = call("GET", "/api/products", nil, roleCookie, "X-Store-ID", fmt.Sprint(otherStore))
+		if code != 403 {
+			t.Fatalf("%s cross-org catalog: expected 403, got %d", account.role, code)
+		}
+		var roleUserID int64
+		if e = a.DB.QueryRow(ctx, "SELECT id FROM users WHERE email=$1", account.email).Scan(&roleUserID); e != nil {
+			t.Fatal(e)
+		}
+		code, _, _ = call("PATCH", "/api/users", map[string]any{"id": roleUserID, "role": "instance_admin"}, roleCookie)
+		if code != 403 {
+			t.Fatalf("%s promotion: expected 403, got %d", account.role, code)
+		}
+		code, _, _ = call("PATCH", "/api/users", map[string]any{"id": adminUserID, "active": false}, roleCookie)
+		if code != 403 {
+			t.Fatalf("%s admin deactivation: expected 403, got %d", account.role, code)
+		}
+	}
 	var wg sync.WaitGroup
 	results := make(chan error, 2)
 	ids := make(chan int64, 2)
@@ -209,13 +244,13 @@ func TestPostgresJourney(t *testing.T) {
 	}
 	orderID := <-ids
 	var stock int64
-	a.DB.QueryRow(ctx, "SELECT stock FROM products WHERE id=$1", product).Scan(&stock)
+	a.DB.QueryRow(ctx, "SELECT stock_quantity FROM products WHERE id=$1", product).Scan(&stock)
 	if stock != 0 {
 		t.Fatalf("stock should be 0, got %d", stock)
 	}
 
 	// --- Idempotency ---
-	a.DB.Exec(ctx, "UPDATE products SET stock=10 WHERE id=$1", product)
+	a.DB.Exec(ctx, "UPDATE products SET stock_quantity=10 WHERE id=$1", product)
 	key := app.Token()
 	input := app.OrderRequest{Items: []app.Item{{ProductID: product, Quantity: 2}}}
 	first, e := a.CreateOrder(ctx, store, adminUserID, key, input)
@@ -323,6 +358,42 @@ func TestPostgresJourney(t *testing.T) {
 	}
 
 	// --- Backup and restore ---
+	// Customer/contact fields and consent lists remain usable when optional timestamps are NULL.
+	var customerID int64
+	for _, name := range []string{"Cliente sem contato A", "Cliente sem contato B"} {
+		code, body, _ = call("POST", "/api/customers", map[string]any{"name": name}, cookie)
+		if code != 201 {
+			t.Fatalf("optional contact: expected 201, got %d %s", code, body)
+		}
+		var result map[string]int64
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatal(err)
+		}
+		customerID = result["id"]
+	}
+	code, body, _ = call("GET", "/api/customers", nil, cookie)
+	if code != 200 {
+		t.Fatalf("nullable customer list: expected 200, got %d %s", code, body)
+	}
+	code, body, _ = call("POST", "/api/consents", map[string]any{"customer_id": customerID, "purpose": "qa-contact", "version": "1", "granted": true, "source": "qa"}, cookie)
+	if code != 200 {
+		t.Fatalf("consent registration: got %d %s", code, body)
+	}
+	code, body, _ = call("GET", "/api/consents", nil, cookie)
+	if code != 200 {
+		t.Fatalf("consent list: got %d %s", code, body)
+	}
+	// Empty optional SKUs must not collide, and nullable legacy fields must remain readable.
+	for _, name := range []string{"Produto sem SKU A", "Produto sem SKU B"} {
+		code, body, _ = call("POST", "/api/products", map[string]any{"name": name, "price_cents": 1200, "stock_quantity": 3, "active": true}, cookie)
+		if code != 201 {
+			t.Fatalf("optional SKU: expected 201, got %d %s", code, body)
+		}
+	}
+	code, body, _ = call("GET", "/api/products", nil, cookie)
+	if code != 200 {
+		t.Fatalf("nullable catalog read: expected 200, got %d %s", code, body)
+	}
 	backup, e := r.Backup(ctx)
 	if e != nil {
 		t.Fatal(e)
@@ -361,4 +432,80 @@ func TestPostgresJourney(t *testing.T) {
 	}
 
 	t.Log("PASS: orgs, stores, RBAC setup, me endpoint, cross-store isolation, concurrent stock, dedup, snapshots, role-based permissions, immediate session revocation on deactivate, transitions, expired lease recovery, backup/restore, session invalidation, database reopen")
+}
+
+// Historical fixtures come from b3676d3 (v1) and v0.2.0-alpha.1 (v2).
+// All databases are disposable test instances beneath t.TempDir(), never user data.
+func TestPostgresUpgrade(t *testing.T) {
+	bin := os.Getenv("OPENFOOD_TEST_PG_BIN")
+	if bin == "" {
+		t.Skip("set OPENFOOD_TEST_PG_BIN to run real PostgreSQL upgrades")
+	}
+	bin, err := filepath.Abs(bin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, version := range []int{1, 2} {
+		t.Run(fmt.Sprint(version), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel()
+			r, err := local.Load(filepath.Join(t.TempDir(), "Upgrade isolado"), bin)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = r.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			defer func() { stop, c := context.WithTimeout(context.Background(), 30*time.Second); defer c(); r.Stop(stop) }()
+			db, err := pgxpool.New(ctx, r.DSN)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			fixture, err := os.ReadFile(fmt.Sprintf("testdata/schema-v%d.sql", version))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = db.Exec(ctx, string(fixture)); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = db.Exec(ctx, "CREATE TABLE schema_migrations(version integer PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())"); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = db.Exec(ctx, "INSERT INTO schema_migrations(version,checksum) VALUES($1,$2)", version, app.Hash(string(fixture))); err != nil {
+				t.Fatal(err)
+			}
+			var store int64
+			if version == 2 {
+				var org int64
+				if err = db.QueryRow(ctx, "INSERT INTO organizations(name) VALUES('Org histórica') RETURNING id").Scan(&org); err != nil {
+					t.Fatal(err)
+				}
+				err = db.QueryRow(ctx, "INSERT INTO stores(org_id,name) VALUES($1,'Loja histórica') RETURNING id", org).Scan(&store)
+			} else {
+				err = db.QueryRow(ctx, "INSERT INTO stores(name) VALUES('Loja histórica') RETURNING id").Scan(&store)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = db.Exec(ctx, "INSERT INTO products(store_id,name,price_cents,stock) VALUES($1,'Produto preservado',1999,7)", store); err != nil {
+				t.Fatal(err)
+			}
+			a, err := app.Open(ctx, r.DSN, r.Config.SetupToken, r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer a.DB.Close()
+			var stock, price int64
+			if err = a.DB.QueryRow(ctx, "SELECT stock_quantity,price_cents FROM products WHERE store_id=$1", store).Scan(&stock, &price); err != nil {
+				t.Fatal(err)
+			}
+			if stock != 7 || price != 1999 {
+				t.Fatalf("migration changed product: stock=%d price=%d", stock, price)
+			}
+			if err = a.Migrate(ctx); err != nil {
+				t.Fatalf("migration reopen: %v", err)
+			}
+		})
+	}
 }

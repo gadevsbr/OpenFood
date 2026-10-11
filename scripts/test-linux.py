@@ -39,13 +39,13 @@ ready()
 assert api("setup")["required"]
 api("setup", {"token": env["SETUP_TOKEN"], "store": "QA Compose", "email": "linux-qa@example.org", "password": password})
 api("login", {"email": "linux-qa@example.org", "password": password})
-product = api("products", {"name": "QA Product", "price_cents": 1234, "stock": 3})
+product = api("products", {"name": "QA Product", "price_cents": 1234, "stock_quantity": 3, "active": True})
 payload = {"items": [{"product_id": product["id"], "quantity": 2}]}
 headers = {"Idempotency-Key": "linux-compose-test-order"}
 order = api("orders", payload, headers)
 assert api("orders", payload, headers)["id"] == order["id"]
 assert api("orders")[0]["total_cents"] == 2468
-assert api("products")[0]["stock"] == 1
+assert api("products")[0]["stock_quantity"] == 1
 for state in ["preparing", "ready", "completed"]:
     api("order-state", {"id": order["id"], "state": state})
 with tempfile.TemporaryDirectory() as tmp:

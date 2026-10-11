@@ -31,7 +31,16 @@ var schema string
 //go:embed web.html
 var web []byte
 
-const Version = "0.2.0-alpha.1"
+//go:embed web.css
+var webCSS []byte
+
+//go:embed web.js
+var webJS []byte
+
+//go:embed web-ux.js
+var webUX []byte
+
+const Version = "0.4.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -98,83 +107,83 @@ type PaymentCapabilities struct {
 }
 
 type ChargeRequest struct {
-	OrderID          int64
-	AmountCents      int64
-	Description      string
-	PayerName        string
-	PayerEmail       string
-	PayerPhone       string
-	PayerDocument    string
-	IdempotencyKey   string
+	OrderID           int64
+	AmountCents       int64
+	Description       string
+	PayerName         string
+	PayerEmail        string
+	PayerPhone        string
+	PayerDocument     string
+	IdempotencyKey    string
 	ExpirationMinutes int
-	Metadata         map[string]string
+	Metadata          map[string]string
 }
 
 type ChargeResponse struct {
-	PaymentID       string
-	ExternalID      string
-	QRCode          string
-	PixCopyPaste    string
-	ExpiresAt       time.Time
-	Status          string
-	Provider        string
-	AmountCents     int64
+	PaymentID    string
+	ExternalID   string
+	QRCode       string
+	PixCopyPaste string
+	ExpiresAt    time.Time
+	Status       string
+	Provider     string
+	AmountCents  int64
 }
 
 type PaymentStatus struct {
-	PaymentID       string
-	ExternalID      string
-	Status          string
-	AmountCents     int64
-	PaidAt          *time.Time
-	ProviderData    map[string]any
+	PaymentID    string
+	ExternalID   string
+	Status       string
+	AmountCents  int64
+	PaidAt       *time.Time
+	ProviderData map[string]any
 }
 
 type RefundRequest struct {
-	PaymentID     string
-	AmountCents   int64
-	Reason        string
+	PaymentID      string
+	AmountCents    int64
+	Reason         string
 	IdempotencyKey string
 }
 
 type RefundResponse struct {
-	RefundID      string
-	ExternalID    string
-	Status        string
-	AmountCents   int64
+	RefundID    string
+	ExternalID  string
+	Status      string
+	AmountCents int64
 }
 
 type PaymentConnector interface {
 	// CreateCharge creates a new Pix charge
 	CreateCharge(ctx context.Context, req ChargeRequest) (*ChargeResponse, error)
-	
+
 	// GetChargeStatus checks the status of a payment
 	GetChargeStatus(ctx context.Context, paymentID string) (*PaymentStatus, error)
-	
+
 	// ProcessWebhook processes an incoming webhook notification
 	ProcessWebhook(ctx context.Context, payload []byte, headers http.Header) (*PaymentStatus, error)
-	
+
 	// Refund processes a refund request
 	Refund(ctx context.Context, req RefundRequest) (*RefundResponse, error)
-	
+
 	// GetRefundStatus checks the status of a refund
 	GetRefundStatus(ctx context.Context, refundID string) (*RefundResponse, error)
-	
+
 	// Capabilities returns the connector's capabilities
 	Capabilities() PaymentCapabilities
-	
+
 	// ProviderName returns the provider identifier
 	ProviderName() string
 }
 
 // PaymentConfig holds configuration for a payment connector
 type PaymentConfig struct {
-	Provider        string                 `json:"provider"`
-	Enabled         bool                   `json:"enabled"`
-	Credentials     map[string]string      `json:"credentials"`
-	StoreID         int64                  `json:"store_id"`
-	WebhookSecret   string                 `json:"webhook_secret"`
-	Settings        map[string]any         `json:"settings"`
+	Provider      string            `json:"provider"`
+	Enabled       bool              `json:"enabled"`
+	Credentials   map[string]string `json:"credentials"`
+	StoreID       int64             `json:"store_id"`
+	WebhookSecret string            `json:"webhook_secret"`
+	Settings      map[string]any    `json:"settings"`
 }
 
 func Token() string {
@@ -244,7 +253,7 @@ func (a *App) Migrate(ctx context.Context) error {
 		return tx.Commit(ctx)
 	} else if e == nil {
 		fmt.Printf("MIGRATE: Existing DB detected, version=%d, checksum=%s\n", n, checksum)
-if n == 1 {
+		if n == 1 {
 			// Migration from v1 to v2 (Organizations, RBAC, Store scoping)
 			migrationSQL := `
 				CREATE TABLE IF NOT EXISTS organizations(id bigserial PRIMARY KEY, name text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
@@ -256,41 +265,41 @@ if n == 1 {
 					SELECT id INTO default_org FROM organizations ORDER BY id LIMIT 1;
 					IF default_org IS NULL THEN
 						INSERT INTO organizations(name) VALUES('Organização Principal') RETURNING id INTO default_org;
-					END IF.
+					END IF;
 
 					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stores' AND column_name='org_id') THEN
 						ALTER TABLE stores ADD COLUMN org_id bigint REFERENCES organizations(id) ON DELETE CASCADE;
 						UPDATE stores SET org_id = default_org WHERE org_id IS NULL;
 						ALTER TABLE stores ALTER COLUMN org_id SET NOT NULL;
 						ALTER TABLE stores ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-					END IF.
+					END IF;
 
 					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='org_id') THEN
 						ALTER TABLE users ADD COLUMN org_id bigint REFERENCES organizations(id) ON DELETE CASCADE;
 						UPDATE users SET org_id = default_org WHERE org_id IS NULL;
-						ALTER TABLE users ALTER COLUMN org_id SET NOT NULL.
-					END IF.
+						ALTER TABLE users ALTER COLUMN org_id SET NOT NULL;
+					END IF;
 
 					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='role') THEN
 						ALTER TABLE users ADD COLUMN role text NOT NULL DEFAULT 'instance_admin';
 						ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('instance_admin','org_admin','store_manager','attendant','kitchen','dispatch','finance_viewer'));
-					END IF.
+					END IF;
 
 					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='active') THEN
 						ALTER TABLE users ADD COLUMN active boolean NOT NULL DEFAULT true;
-					END IF.
+					END IF;
 
 					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='token_version') THEN
 						ALTER TABLE users ADD COLUMN token_version integer NOT NULL DEFAULT 1;
-					END IF.
+					END IF;
 
 					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='created_at') THEN
 						ALTER TABLE users ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
-					END IF.
+					END IF;
 
 					IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='token_version') THEN
 						ALTER TABLE sessions ADD COLUMN token_version integer NOT NULL DEFAULT 1;
-					END IF.
+					END IF;
 				END $$;
 			`
 			if _, e = tx.Exec(ctx, migrationSQL); e != nil {
@@ -708,6 +717,25 @@ func (a *App) Handler() http.Handler {
 		defer cancel()
 		r = r.WithContext(ctx)
 
+		if r.Method == "GET" || r.Method == "HEAD" {
+			var asset []byte
+			var contentType string
+			switch r.URL.Path {
+			case "/assets/web.css":
+				asset, contentType = webCSS, "text/css; charset=utf-8"
+			case "/assets/web.js":
+				asset, contentType = webJS, "text/javascript; charset=utf-8"
+			case "/assets/web-ux.js":
+				asset, contentType = webUX, "text/javascript; charset=utf-8"
+			}
+			if asset != nil {
+				w.Header().Set("Content-Type", contentType)
+				if r.Method == "GET" {
+					_, _ = w.Write(asset)
+				}
+				return
+			}
+		}
 		switch r.URL.Path {
 		case "/":
 			if r.Method != "GET" {
@@ -759,6 +787,14 @@ func (a *App) Handler() http.Handler {
 		} else {
 			// Find first accessible store for org
 			a.DB.QueryRow(ctx, "SELECT id FROM stores WHERE org_id=$1 ORDER BY id LIMIT 1", user.OrgID).Scan(&targetStore)
+		}
+
+		if user.Role == RoleOrgAdmin && targetStore > 0 {
+			var storeOrg int64
+			if err := a.DB.QueryRow(ctx, "SELECT org_id FROM stores WHERE id=$1", targetStore).Scan(&storeOrg); err != nil || storeOrg != user.OrgID {
+				failure(w, 403, "forbidden_cross_org")
+				return
+			}
 		}
 
 		switch r.URL.Path {
@@ -1226,6 +1262,16 @@ func (a *App) usersHandler(w http.ResponseWriter, r *http.Request, u *SessionUse
 			targetOrg = *input.OrgID
 		}
 
+		if input.StoreID != nil {
+			var storeOrg int64
+			if err := a.DB.QueryRow(r.Context(), "SELECT org_id FROM stores WHERE id=$1", *input.StoreID).Scan(&storeOrg); err != nil || storeOrg != targetOrg {
+				failure(w, 403, "forbidden_cross_org")
+				return
+			}
+		} else if input.Role != RoleInstanceAdmin && input.Role != RoleOrgAdmin {
+			failure(w, 400, "user_store_required")
+			return
+		}
 		hash, e := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
 		if e != nil {
 			failure(w, 500, "password_hash_failed")
@@ -1287,6 +1333,14 @@ func (a *App) usersHandler(w http.ResponseWriter, r *http.Request, u *SessionUse
 		}
 		defer tx.Rollback(r.Context())
 
+		if u.Role == RoleStoreManager && (targetRole == RoleInstanceAdmin || targetRole == RoleOrgAdmin || targetRole == RoleStoreManager || (input.Role != nil && (*input.Role == RoleInstanceAdmin || *input.Role == RoleOrgAdmin || *input.Role == RoleStoreManager))) {
+			failure(w, 403, "store_manager_cannot_change_admins")
+			return
+		}
+		if u.Role == RoleOrgAdmin && (targetRole == RoleInstanceAdmin || (input.Role != nil && *input.Role == RoleInstanceAdmin)) {
+			failure(w, 403, "org_admin_cannot_change_instance_admin")
+			return
+		}
 		// Increment token_version to immediately revoke existing active sessions for this user
 		if input.Active != nil && input.Role != nil {
 			_, e = tx.Exec(r.Context(), "UPDATE users SET active=$1, role=$2, token_version=token_version+1 WHERE id=$3", *input.Active, *input.Role, input.ID)
@@ -1311,7 +1365,7 @@ func (a *App) usersHandler(w http.ResponseWriter, r *http.Request, u *SessionUse
 
 func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), `SELECT id,name,description,price_cents,stock_quantity,unit,sku,barcode,active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id FROM products WHERE store_id=$1 ORDER BY display_order, id`, store)
+		rows, e := a.DB.Query(r.Context(), `SELECT id,name,COALESCE(description,''),price_cents,stock_quantity,unit,COALESCE(sku,''),COALESCE(barcode,''),active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id FROM products WHERE store_id=$1 ORDER BY display_order, id`, store)
 		if e != nil {
 			failure(w, 500, "catalog_failed")
 			return
@@ -1336,24 +1390,24 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 				return
 			}
 			item := map[string]any{
-				"id":                      id,
-				"name":                    name,
-				"description":             description,
-				"price_cents":             priceCents,
-				"stock_quantity":          stockQuantity,
-				"unit":                    unit,
-				"sku":                     sku,
-				"barcode":                 barcode,
-				"active":                  active,
-				"available_from":          availableFrom,
-				"available_until":         availableUntil,
-				"min_order_quantity":      minOrderQty,
-				"max_order_quantity":      maxOrderQty,
-				"is_weight_based":         isWeightBased,
-				"substitution_allowed":    substitutionAllowed,
+				"id":                       id,
+				"name":                     name,
+				"description":              description,
+				"price_cents":              priceCents,
+				"stock_quantity":           stockQuantity,
+				"unit":                     unit,
+				"sku":                      sku,
+				"barcode":                  barcode,
+				"active":                   active,
+				"available_from":           availableFrom,
+				"available_until":          availableUntil,
+				"min_order_quantity":       minOrderQty,
+				"max_order_quantity":       maxOrderQty,
+				"is_weight_based":          isWeightBased,
+				"substitution_allowed":     substitutionAllowed,
 				"preparation_time_minutes": prepTime,
-				"display_order":           displayOrder,
-				"category_id":             categoryID,
+				"display_order":            displayOrder,
+				"category_id":              categoryID,
 			}
 			result = append(result, item)
 		}
@@ -1369,23 +1423,23 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 		return
 	}
 	var p struct {
-		Name                 string   `json:"name"`
-		Description          string   `json:"description"`
-		PriceCents           int64    `json:"price_cents"`
-		StockQuantity        float64  `json:"stock_quantity"`
-		Unit                 string   `json:"unit"`
-		SKU                  string   `json:"sku"`
-		Barcode              string   `json:"barcode"`
-		Active               bool     `json:"active"`
-		AvailableFrom        string   `json:"available_from"`
-		AvailableUntil       string   `json:"available_until"`
-		MinOrderQuantity     float64  `json:"min_order_quantity"`
-		MaxOrderQuantity     float64  `json:"max_order_quantity"`
-		IsWeightBased        bool     `json:"is_weight_based"`
-		SubstitutionAllowed  bool     `json:"substitution_allowed"`
-		PreparationTimeMinutes int    `json:"preparation_time_minutes"`
-		DisplayOrder         int64    `json:"display_order"`
-		CategoryID           *int64   `json:"category_id"`
+		Name                   string  `json:"name"`
+		Description            string  `json:"description"`
+		PriceCents             int64   `json:"price_cents"`
+		StockQuantity          float64 `json:"stock_quantity"`
+		Unit                   string  `json:"unit"`
+		SKU                    string  `json:"sku"`
+		Barcode                string  `json:"barcode"`
+		Active                 bool    `json:"active"`
+		AvailableFrom          string  `json:"available_from"`
+		AvailableUntil         string  `json:"available_until"`
+		MinOrderQuantity       float64 `json:"min_order_quantity"`
+		MaxOrderQuantity       float64 `json:"max_order_quantity"`
+		IsWeightBased          bool    `json:"is_weight_based"`
+		SubstitutionAllowed    bool    `json:"substitution_allowed"`
+		PreparationTimeMinutes int     `json:"preparation_time_minutes"`
+		DisplayOrder           int64   `json:"display_order"`
+		CategoryID             *int64  `json:"category_id"`
 	}
 	if decode(w, r, &p) != nil {
 		failure(w, 400, "product_invalid")
@@ -1433,7 +1487,7 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 		maxQty = p.MaxOrderQuantity
 	}
 	var id int64
-	e := a.DB.QueryRow(r.Context(), `INSERT INTO products(store_id,name,description,price_cents,stock_quantity,unit,sku,barcode,active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
+	e := a.DB.QueryRow(r.Context(), `INSERT INTO products(store_id,name,description,price_cents,stock_quantity,unit,sku,barcode,active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id) VALUES($1,$2,$3,$4,$5,$6,NULLIF($7,''),NULLIF($8,''),$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
 		store, p.Name, p.Description, p.PriceCents, p.StockQuantity, p.Unit, p.SKU, p.Barcode, p.Active, availFrom, availUntil, minQty, maxQty, p.IsWeightBased, p.SubstitutionAllowed, p.PreparationTimeMinutes, p.DisplayOrder, p.CategoryID).Scan(&id)
 	if e != nil {
 		if strings.Contains(e.Error(), "unique") && strings.Contains(e.Error(), "sku") {
@@ -1485,11 +1539,11 @@ func (a *App) categoriesHandler(w http.ResponseWriter, r *http.Request, store in
 	}
 	if r.Method == "POST" {
 		var input struct {
-			Name         string  `json:"name"`
-			Description  string  `json:"description"`
-			ParentID     *int64  `json:"parent_id"`
-			DisplayOrder int64   `json:"display_order"`
-			Active       bool    `json:"active"`
+			Name         string `json:"name"`
+			Description  string `json:"description"`
+			ParentID     *int64 `json:"parent_id"`
+			DisplayOrder int64  `json:"display_order"`
+			Active       bool   `json:"active"`
 		}
 		if decode(w, r, &input) != nil || len(input.Name) < 1 || len(input.Name) > 120 {
 			failure(w, 400, "category_invalid")
@@ -1514,12 +1568,12 @@ func (a *App) categoriesHandler(w http.ResponseWriter, r *http.Request, store in
 	}
 	if r.Method == "PATCH" {
 		var input struct {
-			ID           int64    `json:"id"`
-			Name         *string  `json:"name"`
-			Description  *string  `json:"description"`
-			ParentID     *int64   `json:"parent_id"`
-			DisplayOrder *int64   `json:"display_order"`
-			Active       *bool    `json:"active"`
+			ID           int64   `json:"id"`
+			Name         *string `json:"name"`
+			Description  *string `json:"description"`
+			ParentID     *int64  `json:"parent_id"`
+			DisplayOrder *int64  `json:"display_order"`
+			Active       *bool   `json:"active"`
 		}
 		if decode(w, r, &input) != nil || input.ID <= 0 {
 			failure(w, 400, "category_patch_invalid")
@@ -1654,13 +1708,13 @@ func (a *App) productVariantsHandler(w http.ResponseWriter, r *http.Request, sto
 				return
 			}
 			result = append(result, map[string]any{
-				"id":                      id,
-				"name":                    name,
-				"price_adjustment_cents":  priceAdj,
-				"stock_quantity":          stockQty,
-				"sku":                     sku,
-				"display_order":           displayOrder,
-				"active":                  active,
+				"id":                     id,
+				"name":                   name,
+				"price_adjustment_cents": priceAdj,
+				"stock_quantity":         stockQty,
+				"sku":                    sku,
+				"display_order":          displayOrder,
+				"active":                 active,
 			})
 		}
 		jsonResponse(w, 200, result)
@@ -1668,12 +1722,12 @@ func (a *App) productVariantsHandler(w http.ResponseWriter, r *http.Request, sto
 	}
 	if r.Method == "POST" {
 		var input struct {
-			Name                    string  `json:"name"`
-			PriceAdjustmentCents    int64   `json:"price_adjustment_cents"`
-			StockQuantity           float64 `json:"stock_quantity"`
-			SKU                     string  `json:"sku"`
-			DisplayOrder            int64   `json:"display_order"`
-			Active                  bool    `json:"active"`
+			Name                 string  `json:"name"`
+			PriceAdjustmentCents int64   `json:"price_adjustment_cents"`
+			StockQuantity        float64 `json:"stock_quantity"`
+			SKU                  string  `json:"sku"`
+			DisplayOrder         int64   `json:"display_order"`
+			Active               bool    `json:"active"`
 		}
 		if decode(w, r, &input) != nil || len(input.Name) < 1 || len(input.Name) > 120 {
 			failure(w, 400, "variant_invalid")
@@ -1721,14 +1775,14 @@ func (a *App) addonGroupsHandler(w http.ResponseWriter, r *http.Request, store i
 				return
 			}
 			result = append(result, map[string]any{
-				"id":                id,
-				"name":              name,
-				"description":       description,
-				"min_selections":    minSel,
-				"max_selections":    maxSel,
-				"required":          required,
-				"display_order":     displayOrder,
-				"active":            active,
+				"id":             id,
+				"name":           name,
+				"description":    description,
+				"min_selections": minSel,
+				"max_selections": maxSel,
+				"required":       required,
+				"display_order":  displayOrder,
+				"active":         active,
 			})
 		}
 		jsonResponse(w, 200, result)
@@ -1736,13 +1790,13 @@ func (a *App) addonGroupsHandler(w http.ResponseWriter, r *http.Request, store i
 	}
 	if r.Method == "POST" {
 		var input struct {
-			Name           string `json:"name"`
-			Description    string `json:"description"`
-			MinSelections  int    `json:"min_selections"`
-			MaxSelections  int    `json:"max_selections"`
-			Required       bool   `json:"required"`
-			DisplayOrder   int64  `json:"display_order"`
-			Active         bool   `json:"active"`
+			Name          string `json:"name"`
+			Description   string `json:"description"`
+			MinSelections int    `json:"min_selections"`
+			MaxSelections int    `json:"max_selections"`
+			Required      bool   `json:"required"`
+			DisplayOrder  int64  `json:"display_order"`
+			Active        bool   `json:"active"`
 		}
 		if decode(w, r, &input) != nil || len(input.Name) < 1 || len(input.Name) > 120 {
 			failure(w, 400, "addon_group_invalid")
@@ -1796,14 +1850,14 @@ func (a *App) addonOptionsHandler(w http.ResponseWriter, r *http.Request, store 
 				return
 			}
 			result = append(result, map[string]any{
-				"id":                id,
-				"name":              name,
-				"description":       description,
-				"price_cents":       priceCents,
-				"stock_quantity":    stockQty,
-				"is_default":        isDefault,
-				"display_order":     displayOrder,
-				"active":            active,
+				"id":             id,
+				"name":           name,
+				"description":    description,
+				"price_cents":    priceCents,
+				"stock_quantity": stockQty,
+				"is_default":     isDefault,
+				"display_order":  displayOrder,
+				"active":         active,
 			})
 		}
 		jsonResponse(w, 200, result)
@@ -1811,13 +1865,13 @@ func (a *App) addonOptionsHandler(w http.ResponseWriter, r *http.Request, store 
 	}
 	if r.Method == "POST" {
 		var input struct {
-			Name            string  `json:"name"`
-			Description     string  `json:"description"`
-			PriceCents      int64   `json:"price_cents"`
-			StockQuantity   float64 `json:"stock_quantity"`
-			IsDefault       bool    `json:"is_default"`
-			DisplayOrder    int64   `json:"display_order"`
-			Active          bool    `json:"active"`
+			Name          string  `json:"name"`
+			Description   string  `json:"description"`
+			PriceCents    int64   `json:"price_cents"`
+			StockQuantity float64 `json:"stock_quantity"`
+			IsDefault     bool    `json:"is_default"`
+			DisplayOrder  int64   `json:"display_order"`
+			Active        bool    `json:"active"`
 		}
 		if decode(w, r, &input) != nil || len(input.Name) < 1 || len(input.Name) > 120 {
 			failure(w, 400, "addon_option_invalid")
@@ -1946,14 +2000,14 @@ func (a *App) combosHandler(w http.ResponseWriter, r *http.Request, store int64,
 				return
 			}
 			result = append(result, map[string]any{
-				"id":               id,
-				"name":             name,
-				"description":      description,
-				"price_cents":      priceCents,
-				"pricing_policy":   pricingPolicy,
-				"active":           active,
-				"display_order":    displayOrder,
-				"created_at":       createdAt,
+				"id":             id,
+				"name":           name,
+				"description":    description,
+				"price_cents":    priceCents,
+				"pricing_policy": pricingPolicy,
+				"active":         active,
+				"display_order":  displayOrder,
+				"created_at":     createdAt,
 			})
 		}
 		jsonResponse(w, 200, result)
@@ -1961,12 +2015,12 @@ func (a *App) combosHandler(w http.ResponseWriter, r *http.Request, store int64,
 	}
 	if r.Method == "POST" {
 		var input struct {
-			Name            string  `json:"name"`
-			Description     string  `json:"description"`
-			PriceCents      int64   `json:"price_cents"`
-			PricingPolicy   string  `json:"pricing_policy"`
-			Active          bool    `json:"active"`
-			DisplayOrder    int64   `json:"display_order"`
+			Name          string `json:"name"`
+			Description   string `json:"description"`
+			PriceCents    int64  `json:"price_cents"`
+			PricingPolicy string `json:"pricing_policy"`
+			Active        bool   `json:"active"`
+			DisplayOrder  int64  `json:"display_order"`
 		}
 		if decode(w, r, &input) != nil || len(input.Name) < 1 || len(input.Name) > 120 {
 			failure(w, 400, "combo_invalid")
@@ -2030,14 +2084,14 @@ func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store in
 				return
 			}
 			result = append(result, map[string]any{
-				"product_id":      productID,
-				"name":            name,
-				"quantity":        quantity,
-				"is_optional":     isOptional,
-				"group_name":      groupName,
-				"min_selections":  minSel,
-				"max_selections":  maxSel,
-				"display_order":   displayOrder,
+				"product_id":     productID,
+				"name":           name,
+				"quantity":       quantity,
+				"is_optional":    isOptional,
+				"group_name":     groupName,
+				"min_selections": minSel,
+				"max_selections": maxSel,
+				"display_order":  displayOrder,
 			})
 		}
 		jsonResponse(w, 200, result)
@@ -2045,13 +2099,13 @@ func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store in
 	}
 	if r.Method == "POST" {
 		var input struct {
-			ProductID      int64   `json:"product_id"`
-			Quantity       float64 `json:"quantity"`
-			IsOptional     bool    `json:"is_optional"`
-			GroupName      string  `json:"group_name"`
-			MinSelections  int     `json:"min_selections"`
-			MaxSelections  int     `json:"max_selections"`
-			DisplayOrder   int64   `json:"display_order"`
+			ProductID     int64   `json:"product_id"`
+			Quantity      float64 `json:"quantity"`
+			IsOptional    bool    `json:"is_optional"`
+			GroupName     string  `json:"group_name"`
+			MinSelections int     `json:"min_selections"`
+			MaxSelections int     `json:"max_selections"`
+			DisplayOrder  int64   `json:"display_order"`
 		}
 		if decode(w, r, &input) != nil || input.ProductID <= 0 {
 			failure(w, 400, "combo_item_invalid")
@@ -2148,18 +2202,19 @@ func (a *App) CreateOrder(ctx context.Context, store, user int64, key string, in
 			return 0, errors.New("quantity_invalid")
 		}
 		var name string
-		var price, stock int64
-		if e = tx.QueryRow(ctx, "SELECT name,price_cents,stock FROM products WHERE store_id=$1 AND id=$2 FOR UPDATE", store, item.ProductID).Scan(&name, &price, &stock); e != nil {
+		var price int64
+		var stock float64
+		if e = tx.QueryRow(ctx, "SELECT name,price_cents,stock_quantity FROM products WHERE store_id=$1 AND id=$2 FOR UPDATE", store, item.ProductID).Scan(&name, &price, &stock); e != nil {
 			return 0, errors.New("product_unavailable")
 		}
-		if stock < item.Quantity {
+		if stock < float64(item.Quantity) {
 			return 0, errors.New("stock_insufficient")
 		}
 		total += price * item.Quantity
 		if total > 1000000000000 {
 			return 0, errors.New("total_limit")
 		}
-		if _, e = tx.Exec(ctx, "UPDATE products SET stock=stock-$3 WHERE store_id=$1 AND id=$2", store, item.ProductID, item.Quantity); e != nil {
+		if _, e = tx.Exec(ctx, "UPDATE products SET stock_quantity=stock_quantity-$3 WHERE store_id=$1 AND id=$2", store, item.ProductID, item.Quantity); e != nil {
 			return 0, e
 		}
 		snapshots = append(snapshots, snapshot{item, name, price})
@@ -2266,7 +2321,7 @@ func (a *App) orderState(w http.ResponseWriter, r *http.Request, store int64, us
 		return
 	}
 	if input.State == "cancelled" {
-		_, e = tx.Exec(r.Context(), "UPDATE products p SET stock=stock+i.quantity FROM (SELECT product_id,sum(quantity) quantity FROM order_items WHERE store_id=$1 AND order_id=$2 GROUP BY product_id) i WHERE p.store_id=$1 AND p.id=i.product_id", store, input.ID)
+		_, e = tx.Exec(r.Context(), "UPDATE products p SET stock_quantity=stock_quantity+i.quantity FROM (SELECT product_id,sum(quantity) quantity FROM order_items WHERE store_id=$1 AND order_id=$2 GROUP BY product_id) i WHERE p.store_id=$1 AND p.id=i.product_id", store, input.ID)
 		if e != nil {
 			failure(w, 500, "stock_release_failed")
 			return
@@ -2371,7 +2426,7 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 		return
 	}
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), "SELECT id,name,phone,email,document,notes,marketing_consent,marketing_consent_at,created_at,updated_at FROM customers WHERE store_id=$1 ORDER BY created_at DESC", store)
+		rows, e := a.DB.Query(r.Context(), "SELECT id,name,COALESCE(phone,''),COALESCE(email,''),COALESCE(document,''),COALESCE(notes,''),marketing_consent,marketing_consent_at,created_at,updated_at FROM customers WHERE store_id=$1 ORDER BY created_at DESC", store)
 		if e != nil {
 			failure(w, 500, "customers_failed")
 			return
@@ -2382,7 +2437,8 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 			var id int64
 			var name, phone, email, document, notes string
 			var marketingConsent bool
-			var marketingConsentAt, createdAt, updatedAt time.Time
+			var marketingConsentAt *time.Time
+			var createdAt, updatedAt time.Time
 			if rows.Scan(&id, &name, &phone, &email, &document, &notes, &marketingConsent, &marketingConsentAt, &createdAt, &updatedAt) != nil {
 				failure(w, 500, "customers_scan_failed")
 				return
@@ -2405,12 +2461,12 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 	}
 	if r.Method == "POST" {
 		var input struct {
-			Name            string `json:"name"`
-			Phone           string `json:"phone"`
-			Email           string `json:"email"`
-			Document        string `json:"document"`
-			Notes           string `json:"notes"`
-			MarketingConsent bool  `json:"marketing_consent"`
+			Name             string `json:"name"`
+			Phone            string `json:"phone"`
+			Email            string `json:"email"`
+			Document         string `json:"document"`
+			Notes            string `json:"notes"`
+			MarketingConsent bool   `json:"marketing_consent"`
 		}
 		if decode(w, r, &input) != nil || len(input.Name) < 1 || len(input.Name) > 200 {
 			failure(w, 400, "customer_invalid")
@@ -2429,7 +2485,7 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 			marketingConsentAt = time.Now()
 		}
 		var id int64
-		e := a.DB.QueryRow(r.Context(), `INSERT INTO customers(store_id,name,phone,email,document,notes,marketing_consent,marketing_consent_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+		e := a.DB.QueryRow(r.Context(), `INSERT INTO customers(store_id,name,phone,email,document,notes,marketing_consent,marketing_consent_at) VALUES($1,$2,NULLIF($3,''),NULLIF($4,''),$5,$6,$7,$8) RETURNING id`,
 			store, input.Name, input.Phone, input.Email, input.Document, input.Notes, input.MarketingConsent, marketingConsentAt).Scan(&id)
 		if e != nil {
 			if strings.Contains(e.Error(), "unique") && strings.Contains(e.Error(), "phone") {
@@ -2473,11 +2529,11 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 			return
 		}
 		defer tx.Rollback(r.Context())
-		
+
 		query := "UPDATE customers SET updated_at=now()"
 		args := []any{}
 		argNum := 1
-		
+
 		if input.Name != nil {
 			if len(*input.Name) < 1 || len(*input.Name) > 200 {
 				failure(w, 400, "name_invalid")
@@ -2492,7 +2548,7 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 				failure(w, 400, "phone_invalid")
 				return
 			}
-			query += fmt.Sprintf(", phone=$%d", argNum)
+			query += fmt.Sprintf(", phone=NULLIF($%d,'')", argNum)
 			args = append(args, *input.Phone)
 			argNum++
 		}
@@ -2501,7 +2557,7 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 				failure(w, 400, "email_invalid")
 				return
 			}
-			query += fmt.Sprintf(", email=$%d", argNum)
+			query += fmt.Sprintf(", email=NULLIF($%d,'')", argNum)
 			args = append(args, *input.Email)
 			argNum++
 		}
@@ -2527,10 +2583,10 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 				query += ", marketing_consent_at=NULL"
 			}
 		}
-		
+
 		query += fmt.Sprintf(" WHERE store_id=$%d AND id=$%d", argNum, argNum+1)
 		args = append(args, store, input.ID)
-		
+
 		_, e = tx.Exec(r.Context(), query, args...)
 		if e != nil {
 			failure(w, 500, "customer_update_failed")
@@ -2587,7 +2643,7 @@ func (a *App) consentsHandler(w http.ResponseWriter, r *http.Request, store int6
 			query += " AND customer_id=$2"
 			args = append(args, customerID)
 		}
-		query += " ORDER BY created_at DESC"
+		query += " ORDER BY id DESC"
 		rows, e := a.DB.Query(r.Context(), query, args...)
 		if e != nil {
 			failure(w, 500, "consents_failed")
@@ -2606,15 +2662,15 @@ func (a *App) consentsHandler(w http.ResponseWriter, r *http.Request, store int6
 				return
 			}
 			result = append(result, map[string]any{
-				"id":            id,
-				"customer_id":   custID,
-				"purpose":       purpose,
-				"version":       version,
-				"granted":       granted,
-				"granted_at":    grantedAt,
-				"revoked_at":    revokedAt,
-				"source":        source,
-				"evidence":      evidence,
+				"id":          id,
+				"customer_id": custID,
+				"purpose":     purpose,
+				"version":     version,
+				"granted":     granted,
+				"granted_at":  grantedAt,
+				"revoked_at":  revokedAt,
+				"source":      source,
+				"evidence":    evidence,
 			})
 		}
 		jsonResponse(w, 200, result)
@@ -2696,7 +2752,7 @@ func (a *App) customerExportHandler(w http.ResponseWriter, r *http.Request, stor
 		failure(w, 400, "customer_id_required")
 		return
 	}
-	
+
 	// Verify customer belongs to store
 	var customerName string
 	e := a.DB.QueryRow(r.Context(), "SELECT name FROM customers WHERE store_id=$1 AND id=$2", store, customerID).Scan(&customerName)
@@ -2704,7 +2760,7 @@ func (a *App) customerExportHandler(w http.ResponseWriter, r *http.Request, stor
 		failure(w, 404, "customer_not_found")
 		return
 	}
-	
+
 	// Collect all data related to customer
 	ctx := r.Context()
 	export := map[string]any{
@@ -2713,26 +2769,26 @@ func (a *App) customerExportHandler(w http.ResponseWriter, r *http.Request, stor
 		"consents": []map[string]any{},
 		"payments": []map[string]any{},
 	}
-	
+
 	// Customer data
 	var customer struct {
-		ID                int64
-		Name              string
-		Phone             *string
-		Email             *string
-		Document          *string
-		Notes             *string
-		MarketingConsent  bool
+		ID                 int64
+		Name               string
+		Phone              *string
+		Email              *string
+		Document           *string
+		Notes              *string
+		MarketingConsent   bool
 		MarketingConsentAt *time.Time
-		CreatedAt         time.Time
-		UpdatedAt         time.Time
+		CreatedAt          time.Time
+		UpdatedAt          time.Time
 	}
 	a.DB.QueryRow(ctx, "SELECT id,name,phone,email,document,notes,marketing_consent,marketing_consent_at,created_at,updated_at FROM customers WHERE store_id=$1 AND id=$2", store, customerID).Scan(
 		&customer.ID, &customer.Name, &customer.Phone, &customer.Email, &customer.Document, &customer.Notes, &customer.MarketingConsent, &customer.MarketingConsentAt, &customer.CreatedAt, &customer.UpdatedAt)
 	export["customer"] = customer
-	
+
 	// Orders
-	rows, e := a.DB.Query(ctx, "SELECT id,total_cents,state,financial_state,delivery_type,delivery_fee_cents,notes,created_at,confirmed_at FROM orders WHERE store_id=$1 AND customer_id=$2 ORDER BY created_at DESC", store, customerID)
+	rows, e := a.DB.Query(ctx, "SELECT id,total_cents,state,financial_state,delivery_type,delivery_fee_cents,notes,created_at,confirmed_at FROM orders WHERE store_id=$1 AND customer_id=$2 ORDER BY id DESC", store, customerID)
 	if e == nil {
 		defer rows.Close()
 		orders := []map[string]any{}
@@ -2751,7 +2807,7 @@ func (a *App) customerExportHandler(w http.ResponseWriter, r *http.Request, stor
 		}
 		export["orders"] = orders
 	}
-	
+
 	// Order items for each order
 	for _, order := range export["orders"].([]map[string]any) {
 		orderID := order["id"].(int64)
@@ -2774,9 +2830,9 @@ func (a *App) customerExportHandler(w http.ResponseWriter, r *http.Request, stor
 			order["items"] = items
 		}
 	}
-	
+
 	// Consents
-	consentRows, e := a.DB.Query(ctx, "SELECT id,purpose,version,granted,granted_at,revoked_at,source,evidence FROM consents WHERE store_id=$1 AND customer_id=$2 ORDER BY created_at DESC", store, customerID)
+	consentRows, e := a.DB.Query(ctx, "SELECT id,purpose,version,granted,granted_at,revoked_at,source,evidence FROM consents WHERE store_id=$1 AND customer_id=$2 ORDER BY id DESC", store, customerID)
 	if e == nil {
 		consents := []map[string]any{}
 		defer consentRows.Close()
@@ -2794,7 +2850,7 @@ func (a *App) customerExportHandler(w http.ResponseWriter, r *http.Request, stor
 		}
 		export["consents"] = consents
 	}
-	
+
 	// Payments
 	paymentRows, e := a.DB.Query(ctx, "SELECT id,provider,external_id,amount_cents,currency,status,qr_code,pix_copy_paste,expires_at,confirmed_at,refunded_amount_cents,created_at FROM payments WHERE store_id=$1 AND order_id IN (SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2)", store, customerID)
 	if e == nil {
@@ -2818,7 +2874,7 @@ func (a *App) customerExportHandler(w http.ResponseWriter, r *http.Request, stor
 		}
 		export["payments"] = payments
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=customer-export-%d-%s.json", customerID, time.Now().Format("20060102")))
 	json.NewEncoder(w).Encode(export)
@@ -2839,7 +2895,7 @@ func (a *App) customerDeleteHandler(w http.ResponseWriter, r *http.Request, stor
 		failure(w, 400, "customer_id_required")
 		return
 	}
-	
+
 	// Check if customer has orders that need to be retained for fiscal reasons
 	var orderCount int
 	e := a.DB.QueryRow(r.Context(), "SELECT count(*) FROM orders WHERE store_id=$1 AND customer_id=$2 AND state NOT IN ('cancelled')", store, customerID).Scan(&orderCount)
@@ -2851,7 +2907,7 @@ func (a *App) customerDeleteHandler(w http.ResponseWriter, r *http.Request, stor
 			return
 		}
 		defer tx.Rollback(r.Context())
-		
+
 		// Anonymize customer data
 		_, e = tx.Exec(r.Context(), `UPDATE customers SET 
 			name='Cliente Anonimizado', 
@@ -2867,14 +2923,14 @@ func (a *App) customerDeleteHandler(w http.ResponseWriter, r *http.Request, stor
 			failure(w, 500, "anonymization_failed")
 			return
 		}
-		
+
 		// Revoke all consents
 		_, e = tx.Exec(r.Context(), "UPDATE consents SET revoked_at=now() WHERE store_id=$1 AND customer_id=$2", store, customerID)
 		if e != nil {
 			failure(w, 500, "consent_revocation_failed")
 			return
 		}
-		
+
 		// Anonymize order customer data
 		_, e = tx.Exec(r.Context(), `UPDATE orders SET 
 			customer_name='Cliente Anonimizado',
@@ -2885,7 +2941,7 @@ func (a *App) customerDeleteHandler(w http.ResponseWriter, r *http.Request, stor
 			failure(w, 500, "order_anonymization_failed")
 			return
 		}
-		
+
 		e = tx.Commit(r.Context())
 		if e != nil {
 			failure(w, 500, "anonymization_failed")
@@ -2894,7 +2950,7 @@ func (a *App) customerDeleteHandler(w http.ResponseWriter, r *http.Request, stor
 		jsonResponse(w, 200, map[string]any{"ok": true, "anonymized": true, "message": "Dados do cliente anonimizados. Pedidos mantidos para conformidade fiscal."})
 		return
 	}
-	
+
 	// No active orders - full deletion allowed
 	_, e = a.DB.Exec(r.Context(), "DELETE FROM customers WHERE store_id=$1 AND id=$2", store, customerID)
 	if e != nil {
@@ -2910,7 +2966,7 @@ func (a *App) customerDeleteHandler(w http.ResponseWriter, r *http.Request, stor
 
 // BasePaymentConnector provides common functionality for payment connectors
 type BasePaymentConnector struct {
-	Config    PaymentConfig
+	Config     PaymentConfig
 	HTTPClient *http.Client
 }
 
@@ -2991,54 +3047,54 @@ func (m *MercadoPagoConnector) CreateCharge(ctx context.Context, req ChargeReque
 	if err != nil {
 		return nil, err
 	}
-	
+
 	baseURL := m.getCredential("base_url")
 	if baseURL == "" {
 		baseURL = "https://api.mercadopago.com"
 	}
-	
+
 	expiration := time.Now().Add(time.Duration(req.ExpirationMinutes) * time.Minute)
-	
+
 	payload := map[string]any{
 		"transaction_amount": float64(req.AmountCents) / 100.0,
 		"description":        req.Description,
 		"payment_method_id":  "pix",
 		"payer": map[string]any{
-			"email": req.PayerEmail,
+			"email":      req.PayerEmail,
 			"first_name": req.PayerName,
 			"identification": map[string]string{
-				"type": "CPF",
+				"type":   "CPF",
 				"number": strings.ReplaceAll(strings.ReplaceAll(req.PayerDocument, ".", ""), "-", ""),
 			},
 			"phone": map[string]string{
 				"area_code": strings.TrimPrefix(req.PayerPhone, "+55 ")[:2],
-				"number": strings.TrimPrefix(req.PayerPhone, "+55 ")[2:],
+				"number":    strings.TrimPrefix(req.PayerPhone, "+55 ")[2:],
 			},
 		},
 		"date_of_expiration": expiration.Format(time.RFC3339),
-		"notification_url": m.getCredential("webhook_url"),
+		"notification_url":   m.getCredential("webhook_url"),
 		"external_reference": req.IdempotencyKey,
-		"metadata": req.Metadata,
+		"metadata":           req.Metadata,
 	}
-	
+
 	resp, err := m.makeRequest(ctx, "POST", baseURL+"/v1/payments", map[string]string{
-		"Authorization": "Bearer " + token,
+		"Authorization":     "Bearer " + token,
 		"X-Idempotency-Key": req.IdempotencyKey,
 	}, payload)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("mercadopago: %v", result)
 	}
-	
+
 	// Extract Pix data
 	var qrCode, pixCopyPaste string
 	if pointOfInteraction, ok := result["point_of_interaction"].(map[string]any); ok {
@@ -3047,9 +3103,9 @@ func (m *MercadoPagoConnector) CreateCharge(ctx context.Context, req ChargeReque
 			pixCopyPaste = getString(txData, "qr_code_base64")
 		}
 	}
-	
+
 	expiresAt, _ := time.Parse(time.RFC3339, getString(result, "date_of_expiration"))
-	
+
 	return &ChargeResponse{
 		PaymentID:    getString(result, "id"),
 		ExternalID:   getString(result, "id"),
@@ -3067,12 +3123,12 @@ func (m *MercadoPagoConnector) GetChargeStatus(ctx context.Context, paymentID st
 	if err != nil {
 		return nil, err
 	}
-	
+
 	baseURL := m.getCredential("base_url")
 	if baseURL == "" {
 		baseURL = "https://api.mercadopago.com"
 	}
-	
+
 	resp, err := m.makeRequest(ctx, "GET", baseURL+"/v1/payments/"+paymentID, map[string]string{
 		"Authorization": "Bearer " + token,
 	}, nil)
@@ -3080,22 +3136,22 @@ func (m *MercadoPagoConnector) GetChargeStatus(ctx context.Context, paymentID st
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("mercadopago: %v", result)
 	}
-	
+
 	var paidAt *time.Time
 	if dateApproved := getString(result, "date_approved"); dateApproved != "" {
 		t, _ := time.Parse(time.RFC3339, dateApproved)
 		paidAt = &t
 	}
-	
+
 	return &PaymentStatus{
 		PaymentID:    paymentID,
 		ExternalID:   getString(result, "id"),
@@ -3112,7 +3168,7 @@ func (m *MercadoPagoConnector) ProcessWebhook(ctx context.Context, payload []byt
 	if signature == "" || m.Config.WebhookSecret == "" {
 		return nil, errors.New("mercadopago: missing webhook signature")
 	}
-	
+
 	// Mercado Pago signature verification
 	// Format: ts=<timestamp>,v1=<signature>
 	parts := strings.Split(signature, ",")
@@ -3127,31 +3183,31 @@ func (m *MercadoPagoConnector) ProcessWebhook(ctx context.Context, payload []byt
 			}
 		}
 	}
-	
+
 	if ts == "" || v1 == "" {
 		return nil, errors.New("mercadopago: invalid signature format")
 	}
-	
+
 	manifest := ts + "." + string(payload)
 	mac := hmac.New(sha256.New, []byte(m.Config.WebhookSecret))
 	mac.Write([]byte(manifest))
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
-	
+
 	if !hmac.Equal([]byte(expectedSignature), []byte(v1)) {
 		return nil, errors.New("mercadopago: invalid signature")
 	}
-	
+
 	var webhook map[string]any
 	if err := json.Unmarshal(payload, &webhook); err != nil {
 		return nil, err
 	}
-	
+
 	// Extract payment ID from webhook
 	paymentID := getString(webhook, "data.id")
 	if paymentID == "" {
 		return nil, errors.New("mercadopago: payment id not found in webhook")
 	}
-	
+
 	// Fetch payment details
 	return m.GetChargeStatus(ctx, paymentID)
 }
@@ -3161,34 +3217,34 @@ func (m *MercadoPagoConnector) Refund(ctx context.Context, req RefundRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	
+
 	baseURL := m.getCredential("base_url")
 	if baseURL == "" {
 		baseURL = "https://api.mercadopago.com"
 	}
-	
+
 	payload := map[string]any{
 		"amount": float64(req.AmountCents) / 100.0,
 	}
-	
+
 	resp, err := m.makeRequest(ctx, "POST", baseURL+"/v1/payments/"+req.PaymentID+"/refunds", map[string]string{
-		"Authorization": "Bearer " + token,
+		"Authorization":     "Bearer " + token,
 		"X-Idempotency-Key": req.IdempotencyKey,
 	}, payload)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("mercadopago refund: %v", result)
 	}
-	
+
 	return &RefundResponse{
 		RefundID:    getString(result, "id"),
 		ExternalID:  getString(result, "id"),
@@ -3202,12 +3258,12 @@ func (m *MercadoPagoConnector) GetRefundStatus(ctx context.Context, refundID str
 	if err != nil {
 		return nil, err
 	}
-	
+
 	baseURL := m.getCredential("base_url")
 	if baseURL == "" {
 		baseURL = "https://api.mercadopago.com"
 	}
-	
+
 	resp, err := m.makeRequest(ctx, "GET", baseURL+"/v1/refunds/"+refundID, map[string]string{
 		"Authorization": "Bearer " + token,
 	}, nil)
@@ -3215,16 +3271,16 @@ func (m *MercadoPagoConnector) GetRefundStatus(ctx context.Context, refundID str
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("mercadopago refund status: %v", result)
 	}
-	
+
 	return &RefundResponse{
 		RefundID:    refundID,
 		ExternalID:  getString(result, "id"),
@@ -3278,24 +3334,24 @@ func (a *AsaasConnector) CreateCharge(ctx context.Context, req ChargeRequest) (*
 	if token == "" {
 		return nil, errors.New("asaas: access_token not configured")
 	}
-	
+
 	// First, ensure customer exists in Asaas
 	customerID, err := a.ensureCustomer(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	dueDate := time.Now().Add(time.Duration(req.ExpirationMinutes) * time.Minute).Format("2006-01-02")
-	
+
 	payload := map[string]any{
-		"customer": customerID,
-		"billingType": "PIX",
-		"value": float64(req.AmountCents) / 100.0,
-		"dueDate": dueDate,
-		"description": req.Description,
+		"customer":          customerID,
+		"billingType":       "PIX",
+		"value":             float64(req.AmountCents) / 100.0,
+		"dueDate":           dueDate,
+		"description":       req.Description,
 		"externalReference": req.IdempotencyKey,
 	}
-	
+
 	resp, err := a.makeRequest(ctx, "POST", a.getBaseURL()+"/payments", map[string]string{
 		"access_token": token,
 	}, payload)
@@ -3303,18 +3359,18 @@ func (a *AsaasConnector) CreateCharge(ctx context.Context, req ChargeRequest) (*
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("asaas: %v", result)
 	}
-	
+
 	paymentID := getString(result, "id")
-	
+
 	// Get Pix details
 	pixResp, err := a.makeRequest(ctx, "GET", a.getBaseURL()+"/payments/"+paymentID+"/pixQrCode", map[string]string{
 		"access_token": token,
@@ -3323,12 +3379,12 @@ func (a *AsaasConnector) CreateCharge(ctx context.Context, req ChargeRequest) (*
 		return nil, err
 	}
 	defer pixResp.Body.Close()
-	
+
 	var pixResult map[string]any
 	json.NewDecoder(pixResp.Body).Decode(&pixResult)
-	
+
 	expiresAt, _ := time.Parse("2006-01-02", getString(result, "dueDate"))
-	
+
 	return &ChargeResponse{
 		PaymentID:    paymentID,
 		ExternalID:   paymentID,
@@ -3344,7 +3400,7 @@ func (a *AsaasConnector) CreateCharge(ctx context.Context, req ChargeRequest) (*
 func (a *AsaasConnector) ensureCustomer(ctx context.Context, req ChargeRequest) (string, error) {
 	// Check if customer exists by email or CPF/CNPJ
 	doc := strings.ReplaceAll(strings.ReplaceAll(req.PayerDocument, ".", ""), "-", "")
-	
+
 	// Search for existing customer
 	resp, err := a.makeRequest(ctx, "GET", a.getBaseURL()+"/customers?email="+url.QueryEscape(req.PayerEmail), map[string]string{
 		"access_token": a.getAccessToken(),
@@ -3359,15 +3415,15 @@ func (a *AsaasConnector) ensureCustomer(ctx context.Context, req ChargeRequest) 
 			}
 		}
 	}
-	
+
 	// Create new customer
 	payload := map[string]any{
-		"name": req.PayerName,
-		"email": req.PayerEmail,
+		"name":    req.PayerName,
+		"email":   req.PayerEmail,
 		"cpfCnpj": doc,
-		"phone": req.PayerPhone,
+		"phone":   req.PayerPhone,
 	}
-	
+
 	resp, err = a.makeRequest(ctx, "POST", a.getBaseURL()+"/customers", map[string]string{
 		"access_token": a.getAccessToken(),
 	}, payload)
@@ -3375,16 +3431,16 @@ func (a *AsaasConnector) ensureCustomer(ctx context.Context, req ChargeRequest) 
 		return "", err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return "", fmt.Errorf("asaas create customer: %v", result)
 	}
-	
+
 	return getString(result, "id"), nil
 }
 
@@ -3393,7 +3449,7 @@ func (a *AsaasConnector) GetChargeStatus(ctx context.Context, paymentID string) 
 	if token == "" {
 		return nil, errors.New("asaas: access_token not configured")
 	}
-	
+
 	resp, err := a.makeRequest(ctx, "GET", a.getBaseURL()+"/payments/"+paymentID, map[string]string{
 		"access_token": token,
 	}, nil)
@@ -3401,22 +3457,22 @@ func (a *AsaasConnector) GetChargeStatus(ctx context.Context, paymentID string) 
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("asaas: %v", result)
 	}
-	
+
 	var paidAt *time.Time
 	if paymentDate := getString(result, "paymentDate"); paymentDate != "" {
 		t, _ := time.Parse("2006-01-02", paymentDate)
 		paidAt = &t
 	}
-	
+
 	return &PaymentStatus{
 		PaymentID:    paymentID,
 		ExternalID:   paymentID,
@@ -3433,27 +3489,27 @@ func (a *AsaasConnector) ProcessWebhook(ctx context.Context, payload []byte, hea
 	if signature == "" || a.Config.WebhookSecret == "" {
 		return nil, errors.New("asaas: missing webhook signature")
 	}
-	
+
 	// Verify signature
 	mac := hmac.New(sha256.New, []byte(a.Config.WebhookSecret))
 	mac.Write(payload)
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
-	
+
 	if !hmac.Equal([]byte(expectedSignature), []byte(signature)) {
 		return nil, errors.New("asaas: invalid signature")
 	}
-	
+
 	var webhook map[string]any
 	if err := json.Unmarshal(payload, &webhook); err != nil {
 		return nil, err
 	}
-	
+
 	// Asaas webhook has payment object directly
 	paymentID := getString(webhook, "payment.id")
 	if paymentID == "" {
 		return nil, errors.New("asaas: payment id not found in webhook")
 	}
-	
+
 	return a.GetChargeStatus(ctx, paymentID)
 }
 
@@ -3462,13 +3518,13 @@ func (a *AsaasConnector) Refund(ctx context.Context, req RefundRequest) (*Refund
 	if token == "" {
 		return nil, errors.New("asaas: access_token not configured")
 	}
-	
+
 	// Asaas doesn't have a direct refund API for Pix, need to use the refund endpoint
 	payload := map[string]any{
-		"value": float64(req.AmountCents) / 100.0,
+		"value":       float64(req.AmountCents) / 100.0,
 		"description": req.Reason,
 	}
-	
+
 	resp, err := a.makeRequest(ctx, "POST", a.getBaseURL()+"/payments/"+req.PaymentID+"/refund", map[string]string{
 		"access_token": token,
 	}, payload)
@@ -3476,16 +3532,16 @@ func (a *AsaasConnector) Refund(ctx context.Context, req RefundRequest) (*Refund
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("asaas refund: %v", result)
 	}
-	
+
 	return &RefundResponse{
 		RefundID:    getString(result, "id"),
 		ExternalID:  getString(result, "id"),
@@ -3508,7 +3564,7 @@ func (a *AsaasConnector) GetRefundStatus(ctx context.Context, refundID string) (
 // EfiConnector implements PaymentConnector for Efí (formerly Gerencianet)
 type EfiConnector struct {
 	*BasePaymentConnector
-	Token string
+	Token       string
 	TokenExpiry time.Time
 }
 
@@ -3547,43 +3603,43 @@ func (e *EfiConnector) getAuth(ctx context.Context) (string, error) {
 	if e.Token != "" && time.Now().Before(e.TokenExpiry) {
 		return e.Token, nil
 	}
-	
+
 	clientID := e.getCredential("client_id")
 	clientSecret := e.getCredential("client_secret")
 	if clientID == "" || clientSecret == "" {
 		return "", errors.New("efi: client_id and client_secret required")
 	}
-	
+
 	// OAuth2 client credentials flow
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
-	
+
 	req, err := http.NewRequestWithContext(ctx, "POST", e.getBaseURL()+"/oauth/token", strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth(clientID, clientSecret)
-	
+
 	resp, err := e.HTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return "", fmt.Errorf("efi auth: %v", result)
 	}
-	
+
 	e.Token = getString(result, "access_token")
 	expiresIn := getInt(result, "expires_in")
 	e.TokenExpiry = time.Now().Add(time.Duration(expiresIn-60) * time.Second)
-	
+
 	return e.Token, nil
 }
 
@@ -3592,7 +3648,7 @@ func (e *EfiConnector) makeAuthenticatedRequest(ctx context.Context, method, pat
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var reqBody io.Reader
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
@@ -3601,67 +3657,67 @@ func (e *EfiConnector) makeAuthenticatedRequest(ctx context.Context, method, pat
 		}
 		reqBody = bytes.NewReader(jsonBody)
 	}
-	
+
 	req, err := http.NewRequestWithContext(ctx, method, e.getBaseURL()+path, reqBody)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	
+
 	return e.HTTPClient.Do(req)
 }
 
 func (e *EfiConnector) CreateCharge(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
 	expiration := time.Now().Add(time.Duration(req.ExpirationMinutes) * time.Minute)
-	
+
 	payload := map[string]any{
 		"calendario": map[string]any{
 			"expiracao": int(expiration.Sub(time.Now()).Seconds()),
 		},
 		"devedor": map[string]any{
-			"cpf": strings.ReplaceAll(strings.ReplaceAll(req.PayerDocument, ".", ""), "-", ""),
+			"cpf":  strings.ReplaceAll(strings.ReplaceAll(req.PayerDocument, ".", ""), "-", ""),
 			"nome": req.PayerName,
 		},
 		"valor": map[string]any{
 			"original": fmt.Sprintf("%.2f", float64(req.AmountCents)/100.0),
 		},
-		"chave": e.getCredential("pix_key"),
+		"chave":              e.getCredential("pix_key"),
 		"solicitacaoPagador": req.Description,
 		"infoAdicionais": []map[string]string{
 			{"nome": "external_reference", "valor": req.IdempotencyKey},
 		},
 	}
-	
+
 	resp, err := e.makeAuthenticatedRequest(ctx, "POST", "/v2/cob", payload)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("efi: %v", result)
 	}
-	
+
 	txid := getString(result, "txid")
-	
+
 	// Get Pix QR code
 	pixResp, err := e.makeAuthenticatedRequest(ctx, "GET", "/v2/loc/"+getString(result, "loc.id")+"/qrcode", nil)
 	if err != nil {
 		return nil, err
 	}
 	defer pixResp.Body.Close()
-	
+
 	var pixResult map[string]any
 	json.NewDecoder(pixResp.Body).Decode(&pixResult)
-	
+
 	expiresAt, _ := time.Parse(time.RFC3339, getString(result, "calendario.expiracao"))
-	
+
 	return &ChargeResponse{
 		PaymentID:    txid,
 		ExternalID:   txid,
@@ -3680,16 +3736,16 @@ func (e *EfiConnector) GetChargeStatus(ctx context.Context, paymentID string) (*
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("efi: %v", result)
 	}
-	
+
 	var paidAt *time.Time
 	if pix := getStringMap(result, "pix"); pix != nil {
 		if pixData, ok := pix[0].(map[string]any); ok {
@@ -3698,7 +3754,7 @@ func (e *EfiConnector) GetChargeStatus(ctx context.Context, paymentID string) (*
 			}
 		}
 	}
-	
+
 	return &PaymentStatus{
 		PaymentID:    paymentID,
 		ExternalID:   paymentID,
@@ -3715,21 +3771,21 @@ func (e *EfiConnector) ProcessWebhook(ctx context.Context, payload []byte, heade
 	if signature == "" || e.Config.WebhookSecret == "" {
 		return nil, errors.New("efi: missing webhook signature")
 	}
-	
+
 	// Verify signature
 	mac := hmac.New(sha256.New, []byte(e.Config.WebhookSecret))
 	mac.Write(payload)
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
-	
+
 	if !hmac.Equal([]byte(expectedSignature), []byte(signature)) {
 		return nil, errors.New("efi: invalid signature")
 	}
-	
+
 	var webhook map[string]any
 	if err := json.Unmarshal(payload, &webhook); err != nil {
 		return nil, err
 	}
-	
+
 	// Efí webhook structure
 	paymentID := getString(webhook, "pix.txid")
 	if paymentID == "" {
@@ -3738,7 +3794,7 @@ func (e *EfiConnector) ProcessWebhook(ctx context.Context, payload []byte, heade
 	if paymentID == "" {
 		return nil, errors.New("efi: payment id not found in webhook")
 	}
-	
+
 	return e.GetChargeStatus(ctx, paymentID)
 }
 
@@ -3750,22 +3806,22 @@ func (e *EfiConnector) Refund(ctx context.Context, req RefundRequest) (*RefundRe
 			"descricao": req.Reason,
 		},
 	}
-	
+
 	resp, err := e.makeAuthenticatedRequest(ctx, "PUT", "/v2/pix/"+req.PaymentID+"/devolucao", payload)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("efi refund: %v", result)
 	}
-	
+
 	return &RefundResponse{
 		RefundID:    getString(result, "id"),
 		ExternalID:  getString(result, "id"),
@@ -3780,16 +3836,16 @@ func (e *EfiConnector) GetRefundStatus(ctx context.Context, refundID string) (*R
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("efi refund status: %v", result)
 	}
-	
+
 	return &RefundResponse{
 		RefundID:    refundID,
 		ExternalID:  refundID,
@@ -3933,7 +3989,7 @@ func (a *App) paymentConfigsHandler(w http.ResponseWriter, r *http.Request, stor
 		failure(w, 403, "forbidden_payments_access")
 		return
 	}
-	
+
 	if r.Method == "GET" {
 		rows, e := a.DB.Query(r.Context(), "SELECT id,provider,enabled,credentials,settings,created_at,updated_at FROM payment_configs WHERE store_id=$1 ORDER BY id", store)
 		if e != nil {
@@ -3971,7 +4027,7 @@ func (a *App) paymentConfigsHandler(w http.ResponseWriter, r *http.Request, stor
 		jsonResponse(w, 200, result)
 		return
 	}
-	
+
 	if r.Method == "POST" {
 		var input struct {
 			Provider      string            `json:"provider"`
@@ -3984,16 +4040,16 @@ func (a *App) paymentConfigsHandler(w http.ResponseWriter, r *http.Request, stor
 			failure(w, 400, "payment_config_invalid")
 			return
 		}
-		
+
 		validProviders := map[string]bool{"mercadopago": true, "asaas": true, "efi": true}
 		if !validProviders[input.Provider] {
 			failure(w, 400, "provider_invalid")
 			return
 		}
-		
+
 		credJSON, _ := json.Marshal(input.Credentials)
 		settingsJSON, _ := json.Marshal(input.Settings)
-		
+
 		var id int64
 		e := a.DB.QueryRow(r.Context(), `INSERT INTO payment_configs(store_id,provider,enabled,credentials,settings,webhook_secret) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
 			store, input.Provider, input.Enabled, credJSON, settingsJSON, input.WebhookSecret).Scan(&id)
@@ -4004,31 +4060,31 @@ func (a *App) paymentConfigsHandler(w http.ResponseWriter, r *http.Request, stor
 		jsonResponse(w, 201, map[string]int64{"id": id})
 		return
 	}
-	
+
 	if r.Method == "PATCH" {
 		var input struct {
-			ID            int64               `json:"id"`
-			Enabled       *bool               `json:"enabled"`
-			Credentials   map[string]string   `json:"credentials"`
-			Settings      map[string]any      `json:"settings"`
-			WebhookSecret *string             `json:"webhook_secret"`
+			ID            int64             `json:"id"`
+			Enabled       *bool             `json:"enabled"`
+			Credentials   map[string]string `json:"credentials"`
+			Settings      map[string]any    `json:"settings"`
+			WebhookSecret *string           `json:"webhook_secret"`
 		}
 		if decode(w, r, &input) != nil || input.ID <= 0 {
 			failure(w, 400, "payment_config_patch_invalid")
 			return
 		}
-		
+
 		tx, e := a.DB.Begin(r.Context())
 		if e != nil {
 			failure(w, 500, "database_unavailable")
 			return
 		}
 		defer tx.Rollback(r.Context())
-		
+
 		query := "UPDATE payment_configs SET updated_at=now()"
 		args := []any{}
 		argNum := 1
-		
+
 		if input.Enabled != nil {
 			query += fmt.Sprintf(", enabled=$%d", argNum)
 			args = append(args, *input.Enabled)
@@ -4051,10 +4107,10 @@ func (a *App) paymentConfigsHandler(w http.ResponseWriter, r *http.Request, stor
 			args = append(args, *input.WebhookSecret)
 			argNum++
 		}
-		
+
 		query += fmt.Sprintf(" WHERE store_id=$%d AND id=$%d", argNum, argNum+1)
 		args = append(args, store, input.ID)
-		
+
 		_, e = tx.Exec(r.Context(), query, args...)
 		if e != nil {
 			failure(w, 500, "payment_config_update_failed")
@@ -4068,7 +4124,7 @@ func (a *App) paymentConfigsHandler(w http.ResponseWriter, r *http.Request, stor
 		jsonResponse(w, 200, map[string]bool{"ok": true})
 		return
 	}
-	
+
 	if r.Method == "DELETE" {
 		idStr := r.URL.Query().Get("id")
 		if idStr == "" {
@@ -4088,7 +4144,7 @@ func (a *App) paymentConfigsHandler(w http.ResponseWriter, r *http.Request, stor
 		jsonResponse(w, 200, map[string]bool{"ok": true})
 		return
 	}
-	
+
 	failure(w, 405, "method_not_allowed")
 }
 
@@ -4097,7 +4153,7 @@ func (a *App) paymentsHandler(w http.ResponseWriter, r *http.Request, store int6
 		failure(w, 403, "forbidden_payments_access")
 		return
 	}
-	
+
 	if r.Method == "GET" {
 		rows, e := a.DB.Query(r.Context(), `SELECT p.id,p.provider,p.external_id,p.amount_cents,p.currency,p.status,p.qr_code,p.pix_copy_paste,p.expires_at,p.confirmed_at,p.refunded_amount_cents,p.created_at,o.id as order_id
 			FROM payments p LEFT JOIN orders o ON o.store_id=p.store_id AND o.id=p.order_id
@@ -4126,24 +4182,24 @@ func (a *App) paymentsHandler(w http.ResponseWriter, r *http.Request, store int6
 		jsonResponse(w, 200, result)
 		return
 	}
-	
+
 	if r.Method == "POST" {
 		var input struct {
-			OrderID          int64  `json:"order_id"`
-			Provider         string `json:"provider"`
-			AmountCents      int64  `json:"amount_cents"`
-			Description      string `json:"description"`
-			PayerName        string `json:"payer_name"`
-			PayerEmail       string `json:"payer_email"`
-			PayerPhone       string `json:"payer_phone"`
-			PayerDocument    string `json:"payer_document"`
-			ExpirationMinutes int   `json:"expiration_minutes"`
+			OrderID           int64  `json:"order_id"`
+			Provider          string `json:"provider"`
+			AmountCents       int64  `json:"amount_cents"`
+			Description       string `json:"description"`
+			PayerName         string `json:"payer_name"`
+			PayerEmail        string `json:"payer_email"`
+			PayerPhone        string `json:"payer_phone"`
+			PayerDocument     string `json:"payer_document"`
+			ExpirationMinutes int    `json:"expiration_minutes"`
 		}
 		if decode(w, r, &input) != nil || input.OrderID <= 0 || input.Provider == "" || input.AmountCents <= 0 {
 			failure(w, 400, "payment_create_invalid")
 			return
 		}
-		
+
 		// Get payment config
 		var configID int64
 		var credJSON, settingsJSON []byte
@@ -4153,11 +4209,11 @@ func (a *App) paymentsHandler(w http.ResponseWriter, r *http.Request, store int6
 			failure(w, 404, "payment_config_not_found")
 			return
 		}
-		
+
 		var credentials, settings map[string]any
 		json.Unmarshal(credJSON, &credentials)
 		json.Unmarshal(settingsJSON, &settings)
-		
+
 		config := PaymentConfig{
 			Provider:      input.Provider,
 			Enabled:       true,
@@ -4171,13 +4227,13 @@ func (a *App) paymentsHandler(w http.ResponseWriter, r *http.Request, store int6
 				config.Credentials[k] = s
 			}
 		}
-		
+
 		connector, err := NewPaymentConnector(config)
 		if err != nil {
 			failure(w, 500, "connector_creation_failed")
 			return
 		}
-		
+
 		// Get order details
 		var order struct {
 			CustomerName  string
@@ -4185,9 +4241,9 @@ func (a *App) paymentsHandler(w http.ResponseWriter, r *http.Request, store int6
 			CustomerEmail string
 		}
 		a.DB.QueryRow(r.Context(), "SELECT customer_name,customer_phone,customer_email FROM orders WHERE store_id=$1 AND id=$2", store, input.OrderID).Scan(&order.CustomerName, &order.CustomerPhone, &order.CustomerEmail)
-		
+
 		idempotencyKey := fmt.Sprintf("pay-%d-%s-%d", store, input.Provider, time.Now().UnixNano())
-		
+
 		chargeReq := ChargeRequest{
 			OrderID:           input.OrderID,
 			AmountCents:       input.AmountCents,
@@ -4202,13 +4258,13 @@ func (a *App) paymentsHandler(w http.ResponseWriter, r *http.Request, store int6
 		if chargeReq.ExpirationMinutes == 0 {
 			chargeReq.ExpirationMinutes = 60
 		}
-		
+
 		chargeResp, err := connector.CreateCharge(r.Context(), chargeReq)
 		if err != nil {
 			failure(w, 500, "charge_creation_failed: "+err.Error())
 			return
 		}
-		
+
 		// Save payment record
 		var paymentID int64
 		e = a.DB.QueryRow(r.Context(), `INSERT INTO payments(store_id,order_id,provider,external_id,amount_cents,currency,status,idempotency_key,qr_code,pix_copy_paste,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
@@ -4217,24 +4273,24 @@ func (a *App) paymentsHandler(w http.ResponseWriter, r *http.Request, store int6
 			failure(w, 500, "payment_save_failed")
 			return
 		}
-		
+
 		// Update order financial state
 		_, e = a.DB.Exec(r.Context(), "UPDATE orders SET financial_state='payment_pending' WHERE store_id=$1 AND id=$2", store, input.OrderID)
 		if e != nil {
 			failure(w, 500, "order_update_failed")
 			return
 		}
-		
+
 		jsonResponse(w, 201, map[string]any{
-			"payment_id": paymentID,
-			"external_id": chargeResp.ExternalID,
-			"qr_code": chargeResp.QRCode,
+			"payment_id":     paymentID,
+			"external_id":    chargeResp.ExternalID,
+			"qr_code":        chargeResp.QRCode,
 			"pix_copy_paste": chargeResp.PixCopyPaste,
-			"expires_at": chargeResp.ExpiresAt,
+			"expires_at":     chargeResp.ExpiresAt,
 		})
 		return
 	}
-	
+
 	failure(w, 405, "method_not_allowed")
 }
 
@@ -4243,13 +4299,13 @@ func (a *App) paymentWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		failure(w, 405, "method_not_allowed")
 		return
 	}
-	
+
 	provider := r.URL.Query().Get("provider")
 	if provider == "" {
 		failure(w, 400, "provider_required")
 		return
 	}
-	
+
 	// Get payment config for this provider
 	var storeID int64
 	var credJSON, settingsJSON []byte
@@ -4259,11 +4315,11 @@ func (a *App) paymentWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		failure(w, 404, "payment_config_not_found")
 		return
 	}
-	
+
 	var credentials, settings map[string]any
 	json.Unmarshal(credJSON, &credentials)
 	json.Unmarshal(settingsJSON, &settings)
-	
+
 	config := PaymentConfig{
 		Provider:      provider,
 		Enabled:       true,
@@ -4277,25 +4333,25 @@ func (a *App) paymentWebhookHandler(w http.ResponseWriter, r *http.Request) {
 			config.Credentials[k] = s
 		}
 	}
-	
+
 	connector, err := NewPaymentConnector(config)
 	if err != nil {
 		failure(w, 500, "connector_creation_failed")
 		return
 	}
-	
+
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		failure(w, 400, "webhook_body_invalid")
 		return
 	}
-	
+
 	status, err := connector.ProcessWebhook(r.Context(), body, r.Header)
 	if err != nil {
 		// Log error but don't fail - some providers require 200 OK
 		log.Printf("webhook processing error for %s: %v", provider, err)
 	}
-	
+
 	if status != nil {
 		// Update payment record
 		tx, err := a.DB.Begin(r.Context())
@@ -4329,7 +4385,7 @@ func (a *App) paymentWebhookHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	
+
 	jsonResponse(w, 200, map[string]bool{"ok": true})
 }
 
@@ -4338,29 +4394,29 @@ func (a *App) paymentRefundHandler(w http.ResponseWriter, r *http.Request, store
 		failure(w, 403, "forbidden_refund_access")
 		return
 	}
-	
+
 	if r.Method != "POST" {
 		failure(w, 405, "method_not_allowed")
 		return
 	}
-	
+
 	var input struct {
-		PaymentID     int64  `json:"payment_id"`
-		AmountCents   int64  `json:"amount_cents"`
-		Reason        string `json:"reason"`
+		PaymentID   int64  `json:"payment_id"`
+		AmountCents int64  `json:"amount_cents"`
+		Reason      string `json:"reason"`
 	}
 	if decode(w, r, &input) != nil || input.PaymentID <= 0 || input.AmountCents <= 0 || input.Reason == "" {
 		failure(w, 400, "refund_invalid")
 		return
 	}
-	
+
 	// Get payment
 	var payment struct {
-		ID           int64
-		Provider     string
-		ExternalID   string
-		AmountCents  int64
-		Status       string
+		ID            int64
+		Provider      string
+		ExternalID    string
+		AmountCents   int64
+		Status        string
 		RefundedCents int64
 	}
 	e := a.DB.QueryRow(r.Context(), "SELECT id,provider,external_id,amount_cents,status,refunded_amount_cents FROM payments WHERE store_id=$1 AND id=$2", store, input.PaymentID).Scan(&payment.ID, &payment.Provider, &payment.ExternalID, &payment.AmountCents, &payment.Status, &payment.RefundedCents)
@@ -4368,17 +4424,17 @@ func (a *App) paymentRefundHandler(w http.ResponseWriter, r *http.Request, store
 		failure(w, 404, "payment_not_found")
 		return
 	}
-	
+
 	if payment.Status != "confirmed" {
 		failure(w, 409, "payment_not_confirmed")
 		return
 	}
-	
+
 	if payment.RefundedCents+input.AmountCents > payment.AmountCents {
 		failure(w, 400, "refund_exceeds_amount")
 		return
 	}
-	
+
 	// Get payment config
 	var configID int64
 	var credJSON, settingsJSON []byte
@@ -4388,11 +4444,11 @@ func (a *App) paymentRefundHandler(w http.ResponseWriter, r *http.Request, store
 		failure(w, 404, "payment_config_not_found")
 		return
 	}
-	
+
 	var credentials, settings map[string]any
 	json.Unmarshal(credJSON, &credentials)
 	json.Unmarshal(settingsJSON, &settings)
-	
+
 	config := PaymentConfig{
 		Provider:      payment.Provider,
 		Enabled:       true,
@@ -4406,28 +4462,28 @@ func (a *App) paymentRefundHandler(w http.ResponseWriter, r *http.Request, store
 			config.Credentials[k] = s
 		}
 	}
-	
+
 	connector, err := NewPaymentConnector(config)
 	if err != nil {
 		failure(w, 500, "connector_creation_failed")
 		return
 	}
-	
+
 	idempotencyKey := fmt.Sprintf("refund-%d-%s-%d", store, payment.Provider, time.Now().UnixNano())
-	
+
 	refundReq := RefundRequest{
 		PaymentID:      payment.ExternalID,
 		AmountCents:    input.AmountCents,
 		Reason:         input.Reason,
 		IdempotencyKey: idempotencyKey,
 	}
-	
+
 	refundResp, err := connector.Refund(r.Context(), refundReq)
 	if err != nil {
 		failure(w, 500, "refund_failed: "+err.Error())
 		return
 	}
-	
+
 	// Save refund record (could add refunds table, for now update payment)
 	_, e = a.DB.Exec(r.Context(), `UPDATE payments SET refunded_amount_cents=refunded_amount_cents+$1,status=CASE WHEN refunded_amount_cents+$1>=amount_cents THEN 'refunded' ELSE 'refund_partial' END,updated_at=now() WHERE id=$2`,
 		input.AmountCents, payment.ID)
@@ -4435,10 +4491,10 @@ func (a *App) paymentRefundHandler(w http.ResponseWriter, r *http.Request, store
 		failure(w, 500, "refund_save_failed")
 		return
 	}
-	
+
 	jsonResponse(w, 200, map[string]any{
-		"refund_id": refundResp.RefundID,
-		"status": refundResp.Status,
+		"refund_id":    refundResp.RefundID,
+		"status":       refundResp.Status,
 		"amount_cents": refundResp.AmountCents,
 	})
 }

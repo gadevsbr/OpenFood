@@ -1,4 +1,7 @@
 # Decisões
+- 2026-10-10: UI anterior centrada em formulários na Operação: superseded pela fila de pedidos, catálogo separado e cadastros contextuais. Assets locais separados e embutidos em Go; temas claro/escuro/sistema. Contrato em `ui-contract.md`.
+- 2026-10-10: Go 1.26.8 como baseline e builds locais com Go 1.27.0: superseded por Go 1.27.2 no go.mod, Docker e CI após varredura identificar vulnerabilidades da biblioteca padrão. Repetir varredura e artefatos antes da release.
+- 2026-10-10: Pagamentos Pix não são apresentados como operacionais; UI de credenciais/cobranças/reembolsos anterior superseded pelo estado explícito Em desenvolvimento, pois faltam schema e homologação. Cadastro não equivale aos critérios completos das Fases 3–5.
 - 2026-10-02: PostgreSQL 17 nas duas distribuições; Windows gerencia binários locais. SQLite não adotado. Não há decisão anterior substituída.
 - Filas PostgreSQL transacionais, com leases e SKIP LOCKED; Redis não obrigatório.
 - Código de negócio único. Windows usa navegador padrão e bandeja; fechar navegador mantém o processo.

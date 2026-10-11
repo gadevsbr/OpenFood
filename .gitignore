@@ -2,6 +2,8 @@
 /tools/
 /runtime/
 /.env
+/.env.*
+!/.env.example
 *.log
 *.dump
 *.zip

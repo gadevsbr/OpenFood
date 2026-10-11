@@ -110,7 +110,12 @@ func (r *Runtime) Start(ctx context.Context) error {
 			return e
 		}
 		defer os.Remove(pass)
-		if e = r.run(ctx, "initdb", "-D", data, "-U", "openfood", "--encoding=UTF8", "--locale=C", "--auth=scram-sha-256", "--pwfile="+pass); e != nil {
+		shareDir := filepath.Join(filepath.Dir(r.Bin), "share")
+		initdbArgs := []string{"-D", data, "-U", "openfood", "--encoding=UTF8", "--locale=C", "--auth=scram-sha-256", "--pwfile=" + pass}
+		if _, e := os.Stat(shareDir); e == nil {
+			initdbArgs = append([]string{"-L", shareDir}, initdbArgs...)
+		}
+		if e = r.run(ctx, "initdb", initdbArgs...); e != nil {
 			return e
 		}
 		config := fmt.Sprintf("\nlisten_addresses = '127.0.0.1'\nport = %d\npassword_encryption = 'scram-sha-256'\nlogging_collector = off\nlog_statement = 'none'\nlog_min_error_statement = panic\n", r.Config.DBPort)
