@@ -1,6 +1,6 @@
 # Mesas e comandas — etapa 0.8
 
-Skills: Backend Architect, Payments & Billing Engineer e UX Architect. Em execução, sem declaração de pronto.
+Skills: Backend Architect, Payments & Billing Engineer e UX Architect. Concluída no escopo testado; distribuição experimental, com os limites abaixo.
 
 Mesas cadastradas por gerente, comanda avulsa ou vinculada à mesa; uma comanda aberta por mesa/identificação na loja. Atendimento cria rodadas como pedidos reais para preparo, com estoque e preços registrados no lançamento. Novos itens não alteram rodadas anteriores. Comandas persistem no PostgreSQL e nos backups.
 
@@ -13,3 +13,5 @@ Aceite: PostgreSQL real com concorrência, isolamento, estoque, saldos e rollbac
 Primeira validação: TestCashJourney PostgreSQL real PASS 23.058s, com duas rodadas, saldo parcial, pagamentos distribuídos, quatro retries simultâneos, permissões, mesa ocupada e backup/restauração. Suíte completa PASS 125.205s, incluindo upgrades v1–v5 e restauração de v3–v5. Chromium mesas PASS com resposta perdida sem duplicar, teclas F4/F8 no contexto, mobile, tema e perfis. Regressões/distribuição ainda pendentes.
 
 Validação local final: base isolada dining-20261011-a, jornadas setup/UI, ADM, consentimentos/offline, caixa, caixa-final, PDV, mesas e vendas PASS; zero pageerrors. TestCashJourney repetido após unicidade de nome sem diferença de caixa PASS 20.923s; vet/diff/sintaxe PASS. Govulncheck zero alcançáveis (uma em módulo requerido sem chamada), npm audit zero. Consulta com caixa fechado, financeiro somente leitura e F4/F8 no contexto verificados. Capturas desktop/mobile/escuro inspecionadas. CI/publicação pendentes.
+
+Distribuição final: CI 38132309483 Linux/Windows/publish PASS; release experimental v0.8.0-alpha.1 com seis assets. Quatro artefatos baixados em dist/release-0.8.0 e SHA-256 iguais aos manifests. Gates CI/publicação antes pendentes: superseded pela evidência. Implementação 5635218; memória de encerramento em main. Dados de trabalho não foram usados; ambiente limpo/periféricos/fiscal continuam sem certificação.
