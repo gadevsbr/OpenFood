@@ -1,3 +1,5 @@
+let editingProductStock = null;
+let cartItems = [];
 /* OpenFood operations workspace. No external assets or synthetic metrics. */
 const icons = {
   orders: "M7 3h10v18l-3-2-2 2-2-2-3 2V3Z M10 7h4 M10 11h4 M10 15h2",
@@ -58,10 +60,15 @@ const errors = {
   stock_insufficient:
     "O estoque mudou. Confira a quantidade e tente novamente.",
   product_unavailable: "Este produto não está disponível para pedido.",
-  quantity_invalid: "Use uma quantidade inteira válida.",
   order_invalid: "Confira os itens do pedido.",
   product_invalid: "Confira os dados do produto.",
-  sku_already_exists: "Este SKU já está cadastrado na loja.",
+  product_changed_reload:
+    "O estoque mudou. Feche e reabra a edição para conferir os valores atuais.",
+  quantity_invalid: "Confira a quantidade mínima e máxima de cada produto.",
+  order_duplicate_product: "Agrupe as quantidades do mesmo produto em um item.",
+  availability_invalid: "Informe os dois horários de disponibilidade válidos.",
+  category_invalid: "Escolha uma categoria desta loja.",
+  sku_already_exists: "Este SKU já está cadastrado nesta loja.",
   email_already_registered: "Já existe uma conta com este e-mail.",
   forbidden_catalog_management_required:
     "Sua conta não pode alterar o catálogo.",
@@ -520,7 +527,7 @@ function setOrderFilter(value) {
   });
   renderOrders();
 }
-function openOrderDetails(order) {
+async function openOrderDetails(order) {
   let dialog = $("orderDetailsDialog");
   if (!dialog) {
     dialog = document.createElement("dialog");
@@ -541,6 +548,32 @@ function openOrderDetails(order) {
     : "";
   $("orderDetailsDate").textContent =
     "Criado em " + new Date(order.created_at).toLocaleString("pt-BR");
+  let list = $("orderDetailItems");
+  if (!list) {
+    list = document.createElement("div");
+    list.id = "orderDetailItems";
+    $("orderDetailsDate").before(list);
+  }
+  list.textContent = "Carregando itens…";
+  try {
+    const items = await api("orders?id=" + order.id);
+    list.replaceChildren();
+    for (const item of items) {
+      const row = document.createElement("p");
+      row.textContent =
+        item.quantity +
+        " × " +
+        item.name +
+        " · " +
+        money(item.price_cents) +
+        " = " +
+        money(item.price_cents * item.quantity);
+      list.append(row);
+    }
+  } catch (e) {
+    list.textContent = readableError(e);
+  }
+
   dialog.showModal();
 }
 $$("[data-order-filter]").forEach(
@@ -701,6 +734,9 @@ $("storeSelector").onchange = async () => {
 function openOrderDialog() {
   clearMsg();
   if (!canCreateOrders()) return;
+  cartItems = [];
+  orderKey = crypto.randomUUID();
+  renderCart();
   $("orderDialog").showModal();
   updateOrderPreview();
 }
@@ -708,6 +744,8 @@ function openProductDialog() {
   if (!canManageCatalog()) return;
   clearMsg();
   resetAdvProductForm();
+  editingProductStock = null;
+  $("productDialogTitle").textContent = "Novo produto";
   $("productDialog").showModal();
 }
 $$("[data-close-dialog]").forEach(
@@ -718,7 +756,10 @@ function updateOrderPreview() {
     (p) => String(p.id) === $("productSelect").value,
   );
   const qty = Number($("#orderForm input[name=quantity]").value) || 0;
-  $("orderPreviewTotal").textContent = money((product?.price_cents || 0) * qty);
+  $("orderPreviewTotal").textContent = money(
+    cartItems.reduce((sum, item) => sum + item.price_cents * item.quantity, 0) +
+      (product?.price_cents || 0) * qty,
+  );
 }
 $("orderForm").oninput = updateOrderPreview;
 $("orderForm").onchange = updateOrderPreview;
@@ -728,19 +769,24 @@ $("orderForm").onsubmit = (e) => {
   const data = new FormData(e.target);
   const product = Number(data.get("product")),
     quantity = Number(data.get("quantity"));
-  if (!product || !Number.isInteger(quantity) || quantity < 1) {
+  if (
+    (!product && !cartItems.length) ||
+    (product && (!Number.isInteger(quantity) || quantity < 1))
+  ) {
     msg("Escolha um produto e uma quantidade inteira válida.", "error");
     return;
   }
   run(async () => {
     const result = await api(
       "orders",
-      { items: [{ product_id: product, quantity }] },
+      { items: orderItems(product, quantity) },
       { "Idempotency-Key": orderKey },
     );
     orderKey = crypto.randomUUID();
     $("orderDialog").close();
     e.target.reset();
+    cartItems = [];
+    renderCart();
     await refresh();
     setOrderFilter("active");
     msg("Pedido #" + result.id + " criado. Pagamento pendente.");
@@ -770,7 +816,14 @@ $("advProductForm").onsubmit = (e) => {
     category_id: d.get("category_id") ? Number(d.get("category_id")) : null,
   };
   run(async () => {
-    await api("products", payload);
+    const id = Number(d.get("id"));
+    if (id)
+      await apiPatch("products", {
+        ...payload,
+        id,
+        expected_stock_quantity: editingProductStock,
+      });
+    else await api("products", payload);
     $("productDialog").close();
     resetAdvProductForm();
     await refresh();
@@ -841,6 +894,13 @@ async function renderAdvancedProducts() {
     button.className = "btn-secondary";
     button.onclick = () => openProductDetails(p);
     action.append(button);
+    if (canManageCatalog()) {
+      const edit = document.createElement("button");
+      edit.textContent = "Editar";
+      edit.className = "btn-secondary";
+      edit.onclick = () => editProduct(p);
+      action.append(edit);
+    }
     tbody.append(row);
   }
   $("catalogCount").textContent =
@@ -870,7 +930,7 @@ function openProductDetails(product) {
     dialog.className = "dialog";
     dialog.setAttribute("aria-labelledby", "productDetailsTitle");
     dialog.innerHTML =
-      '<div class="dialog-header"><h2 id="productDetailsTitle"></h2><button type="button" class="icon-button" aria-label="Fechar detalhes">✕</button></div><div class="dialog-body"><p id="productDetailDescription" class="detail-description"></p><dl id="productDefinition" class="definition-list"></dl><p class="muted">Alterações de produto serão disponibilizadas em uma próxima etapa.</p></div>';
+      '<div class="dialog-header"><h2 id="productDetailsTitle"></h2><button type="button" class="icon-button" aria-label="Fechar detalhes">✕</button></div><div class="dialog-body"><p id="productDetailDescription" class="detail-description"></p><dl id="productDefinition" class="definition-list"></dl></div>';
     dialog.querySelector("button").onclick = () => dialog.close();
     document.body.append(dialog);
   }
@@ -1025,3 +1085,101 @@ setInterval(() => {
         msg(readableError(e), "error");
     });
 }, 15000);
+
+function editProduct(product) {
+  clearMsg();
+  resetAdvProductForm();
+  editingProductStock = product.stock_quantity;
+  const f = $("advProductForm");
+  const values = {
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    price: (product.price_cents / 100).toFixed(2).replace(".", ","),
+    stock: product.stock_quantity,
+    unit: product.unit,
+    sku: product.sku,
+    barcode: product.barcode,
+    min_qty: product.min_order_quantity || 1,
+    max_qty: product.max_order_quantity || "",
+    prep_time: product.preparation_time_minutes,
+    display_order: product.display_order,
+    category_id: product.category_id || "",
+    available_from: (product.available_from || "").slice(0, 5),
+    available_until: (product.available_until || "").slice(0, 5),
+  };
+  for (const [key, value] of Object.entries(values))
+    f.elements.namedItem(key).value = value;
+  for (const [key, value] of Object.entries({
+    active: product.active,
+    weight_based: product.is_weight_based,
+    substitution_allowed: product.substitution_allowed,
+  }))
+    f.elements.namedItem(key).checked = value;
+  $("productDialogTitle").textContent = "Editar produto";
+  $("advProductSubmit").textContent = "Salvar alterações";
+  $("productDialog").showModal();
+}
+function orderItems(product, quantity) {
+  const items = cartItems.map((i) => ({
+    product_id: i.product_id,
+    quantity: i.quantity,
+  }));
+  if (product) {
+    const existing = items.find((i) => i.product_id === product);
+    if (existing) existing.quantity += quantity;
+    else items.push({ product_id: product, quantity });
+  }
+  return items;
+}
+function renderCart() {
+  const list = $("orderCart");
+  list.replaceChildren();
+  for (const item of cartItems) {
+    const row = document.createElement("div");
+    row.className = "cart-row";
+    const text = document.createElement("span");
+    text.textContent =
+      item.quantity +
+      " × " +
+      item.name +
+      " · " +
+      money(item.price_cents * item.quantity);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn-secondary";
+    remove.textContent = "Remover";
+    remove.setAttribute("aria-label", "Remover " + item.name);
+    remove.onclick = () => {
+      cartItems = cartItems.filter((i) => i !== item);
+      renderCart();
+      updateOrderPreview();
+    };
+    row.append(text, remove);
+    list.append(row);
+  }
+  $("productSelect").required = !cartItems.length;
+}
+$("addOrderItem").onclick = () => {
+  const product = latestProducts.find(
+      (p) => String(p.id) === $("productSelect").value,
+    ),
+    quantity = Number($("#orderForm input[name=quantity]").value);
+  if (!product || !Number.isInteger(quantity) || quantity < 1) {
+    msg("Escolha um produto e uma quantidade inteira válida.", "error");
+    return;
+  }
+  const existing = cartItems.find((i) => i.product_id === product.id);
+  if (existing) existing.quantity += quantity;
+  else
+    cartItems.push({
+      product_id: product.id,
+      name: product.name,
+      price_cents: product.price_cents,
+      quantity,
+    });
+  $("productSelect").value = "";
+  $("#orderForm input[name=quantity]").value = "1";
+  renderCart();
+  updateOrderPreview();
+};

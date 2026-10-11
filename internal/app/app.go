@@ -40,7 +40,7 @@ var webJS []byte
 //go:embed web-ux.js
 var webUX []byte
 
-const Version = "0.4.0-alpha.1"
+const Version = "0.5.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -1414,7 +1414,7 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 		jsonResponse(w, 200, result)
 		return
 	}
-	if r.Method != "POST" {
+	if r.Method != "POST" && r.Method != "PATCH" {
 		failure(w, 405, "method_not_allowed")
 		return
 	}
@@ -1423,28 +1423,31 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 		return
 	}
 	var p struct {
-		Name                   string  `json:"name"`
-		Description            string  `json:"description"`
-		PriceCents             int64   `json:"price_cents"`
-		StockQuantity          float64 `json:"stock_quantity"`
-		Unit                   string  `json:"unit"`
-		SKU                    string  `json:"sku"`
-		Barcode                string  `json:"barcode"`
-		Active                 bool    `json:"active"`
-		AvailableFrom          string  `json:"available_from"`
-		AvailableUntil         string  `json:"available_until"`
-		MinOrderQuantity       float64 `json:"min_order_quantity"`
-		MaxOrderQuantity       float64 `json:"max_order_quantity"`
-		IsWeightBased          bool    `json:"is_weight_based"`
-		SubstitutionAllowed    bool    `json:"substitution_allowed"`
-		PreparationTimeMinutes int     `json:"preparation_time_minutes"`
-		DisplayOrder           int64   `json:"display_order"`
-		CategoryID             *int64  `json:"category_id"`
+		ID                     int64    `json:"id"`
+		ExpectedStock          *float64 `json:"expected_stock_quantity"`
+		Name                   string   `json:"name"`
+		Description            string   `json:"description"`
+		PriceCents             int64    `json:"price_cents"`
+		StockQuantity          float64  `json:"stock_quantity"`
+		Unit                   string   `json:"unit"`
+		SKU                    string   `json:"sku"`
+		Barcode                string   `json:"barcode"`
+		Active                 bool     `json:"active"`
+		AvailableFrom          string   `json:"available_from"`
+		AvailableUntil         string   `json:"available_until"`
+		MinOrderQuantity       float64  `json:"min_order_quantity"`
+		MaxOrderQuantity       float64  `json:"max_order_quantity"`
+		IsWeightBased          bool     `json:"is_weight_based"`
+		SubstitutionAllowed    bool     `json:"substitution_allowed"`
+		PreparationTimeMinutes int      `json:"preparation_time_minutes"`
+		DisplayOrder           int64    `json:"display_order"`
+		CategoryID             *int64   `json:"category_id"`
 	}
 	if decode(w, r, &p) != nil {
 		failure(w, 400, "product_invalid")
 		return
 	}
+	p.Name = strings.TrimSpace(p.Name)
 	if len(p.Name) < 1 || len(p.Name) > 200 {
 		failure(w, 400, "product_name_invalid")
 		return
@@ -1453,7 +1456,7 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 		failure(w, 400, "price_invalid")
 		return
 	}
-	if p.StockQuantity < 0 {
+	if p.StockQuantity < 0 || p.StockQuantity > 1000000 {
 		failure(w, 400, "stock_invalid")
 		return
 	}
@@ -1485,6 +1488,65 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 	}
 	if p.MaxOrderQuantity > 0 {
 		maxQty = p.MaxOrderQuantity
+	}
+	if p.CategoryID != nil {
+		var exists bool
+		if err := a.DB.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM categories WHERE id=$1 AND store_id=$2)", *p.CategoryID, store).Scan(&exists); err != nil || !exists {
+			failure(w, 400, "category_invalid")
+			return
+		}
+	}
+	if p.PreparationTimeMinutes < 0 || p.PreparationTimeMinutes > 480 || p.DisplayOrder < 0 || p.DisplayOrder > 2147483647 || len(p.SKU) > 64 || len(p.Barcode) > 64 || len(p.Description) > 1000 || p.MinOrderQuantity > 100000 || p.MaxOrderQuantity < 0 || p.MaxOrderQuantity > 100000 {
+		failure(w, 400, "product_invalid")
+		return
+	}
+	for _, clock := range []string{p.AvailableFrom, p.AvailableUntil} {
+		if clock != "" {
+			if _, err := time.Parse("15:04", clock); err != nil {
+				failure(w, 400, "availability_invalid")
+				return
+			}
+		}
+	}
+	if (p.AvailableFrom == "") != (p.AvailableUntil == "") {
+		failure(w, 400, "availability_invalid")
+		return
+	}
+	if r.Method == "PATCH" {
+		if p.ID <= 0 || p.ExpectedStock == nil {
+			failure(w, 400, "product_invalid")
+			return
+		}
+		tx, err := a.DB.Begin(r.Context())
+		if err != nil {
+			failure(w, 503, "database_unavailable")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		// Compare stock under the UPDATE lock: an intervening sale must not be overwritten.
+		var id int64
+		err = tx.QueryRow(r.Context(), `UPDATE products SET updated_at=now(),name=$3,description=$4,price_cents=$5,stock_quantity=$6,unit=$7,sku=NULLIF($8,''),barcode=NULLIF($9,''),active=$10,available_from=$11,available_until=$12,min_order_quantity=$13,max_order_quantity=$14,is_weight_based=$15,substitution_allowed=$16,preparation_time_minutes=$17,display_order=$18,category_id=$19 WHERE store_id=$1 AND id=$2 AND stock_quantity=$20 RETURNING id`, store, p.ID, p.Name, p.Description, p.PriceCents, p.StockQuantity, p.Unit, p.SKU, p.Barcode, p.Active, availFrom, availUntil, minQty, maxQty, p.IsWeightBased, p.SubstitutionAllowed, p.PreparationTimeMinutes, p.DisplayOrder, p.CategoryID, *p.ExpectedStock).Scan(&id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			failure(w, 409, "product_changed_reload")
+			return
+		}
+		if err != nil {
+			if strings.Contains(err.Error(), "unique") {
+				failure(w, 409, "sku_already_exists")
+			} else {
+				failure(w, 500, "product_failed")
+			}
+			return
+		}
+		if _, err = tx.Exec(r.Context(), "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,'product_updated',$3)", store, user.ID, id); err == nil {
+			err = tx.Commit(r.Context())
+		}
+		if err != nil {
+			failure(w, 500, "product_failed")
+			return
+		}
+		jsonResponse(w, 200, map[string]int64{"id": id})
+		return
 	}
 	var id int64
 	e := a.DB.QueryRow(r.Context(), `INSERT INTO products(store_id,name,description,price_cents,stock_quantity,unit,sku,barcode,active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id) VALUES($1,$2,$3,$4,$5,$6,NULLIF($7,''),NULLIF($8,''),$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
@@ -2190,6 +2252,7 @@ func (a *App) CreateOrder(ctx context.Context, store, user int64, key string, in
 		Item
 		Name  string
 		Price int64
+		Unit  string
 	}
 	snapshots := []snapshot{}
 	var total int64
@@ -2197,15 +2260,29 @@ func (a *App) CreateOrder(ctx context.Context, store, user int64, key string, in
 	if _, e = tx.Exec(ctx, "SELECT id FROM stores WHERE id=$1 FOR UPDATE", store); e != nil {
 		return 0, e
 	}
+	seen := map[int64]bool{}
 	for _, item := range input.Items {
+		if seen[item.ProductID] {
+			return 0, errors.New("order_duplicate_product")
+		}
+		seen[item.ProductID] = true
 		if item.Quantity < 1 || item.Quantity > 100000 {
 			return 0, errors.New("quantity_invalid")
 		}
 		var name string
 		var price int64
 		var stock float64
-		if e = tx.QueryRow(ctx, "SELECT name,price_cents,stock_quantity FROM products WHERE store_id=$1 AND id=$2 FOR UPDATE", store, item.ProductID).Scan(&name, &price, &stock); e != nil {
+		var active, weight, available bool
+		var unit string
+		var minimum, maximum float64
+		if e = tx.QueryRow(ctx, `SELECT name,price_cents,stock_quantity,active,is_weight_based,unit,COALESCE(min_order_quantity,1),COALESCE(max_order_quantity,0),CASE WHEN available_from IS NULL OR available_until IS NULL THEN true WHEN available_from<=available_until THEN (now() AT TIME ZONE 'America/Sao_Paulo')::time BETWEEN available_from AND available_until ELSE (now() AT TIME ZONE 'America/Sao_Paulo')::time>=available_from OR (now() AT TIME ZONE 'America/Sao_Paulo')::time<=available_until END FROM products WHERE store_id=$1 AND id=$2 FOR UPDATE`, store, item.ProductID).Scan(&name, &price, &stock, &active, &weight, &unit, &minimum, &maximum, &available); e != nil {
 			return 0, errors.New("product_unavailable")
+		}
+		if !active || weight || (unit != "unidade" && unit != "porcao") || !available {
+			return 0, errors.New("product_unavailable")
+		}
+		if float64(item.Quantity) < minimum || (maximum > 0 && float64(item.Quantity) > maximum) {
+			return 0, errors.New("quantity_invalid")
 		}
 		if stock < float64(item.Quantity) {
 			return 0, errors.New("stock_insufficient")
@@ -2217,14 +2294,14 @@ func (a *App) CreateOrder(ctx context.Context, store, user int64, key string, in
 		if _, e = tx.Exec(ctx, "UPDATE products SET stock_quantity=stock_quantity-$3 WHERE store_id=$1 AND id=$2", store, item.ProductID, item.Quantity); e != nil {
 			return 0, e
 		}
-		snapshots = append(snapshots, snapshot{item, name, price})
+		snapshots = append(snapshots, snapshot{item, name, price, unit})
 	}
 	e = tx.QueryRow(ctx, "INSERT INTO orders(store_id,idempotency_key,request_hash,total_cents,state) VALUES($1,$2,$3,$4,'confirmed') RETURNING id", store, key, digest, total).Scan(&id)
 	if e != nil {
 		return 0, e
 	}
 	for _, s := range snapshots {
-		if _, e = tx.Exec(ctx, "INSERT INTO order_items(order_id,store_id,product_id,name,price_cents,quantity) VALUES($1,$2,$3,$4,$5,$6)", id, store, s.ProductID, s.Name, s.Price, s.Quantity); e != nil {
+		if _, e = tx.Exec(ctx, "INSERT INTO order_items(order_id,store_id,product_id,name,price_cents,quantity,unit) VALUES($1,$2,$3,$4,$5,$6,$7)", id, store, s.ProductID, s.Name, s.Price, s.Quantity, s.Unit); e != nil {
 			return 0, e
 		}
 	}
@@ -2258,6 +2335,45 @@ func (a *App) orders(w http.ResponseWriter, r *http.Request, store int64, user *
 	}
 	if r.Method != "GET" {
 		failure(w, 405, "method_not_allowed")
+		return
+	}
+	if requested := r.URL.Query().Get("id"); requested != "" {
+		id, err := strconv.ParseInt(requested, 10, 64)
+		if err != nil || id < 1 {
+			failure(w, 400, "order_invalid")
+			return
+		}
+		var exists bool
+		if err = a.DB.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM orders WHERE store_id=$1 AND id=$2)", store, id).Scan(&exists); err != nil {
+			failure(w, 500, "orders_failed")
+			return
+		}
+		if !exists {
+			failure(w, 404, "order_not_found")
+			return
+		}
+		rows, err := a.DB.Query(r.Context(), "SELECT product_id,name,price_cents,quantity,unit FROM order_items WHERE store_id=$1 AND order_id=$2 ORDER BY id", store, id)
+		if err != nil {
+			failure(w, 500, "orders_failed")
+			return
+		}
+		defer rows.Close()
+		result := []map[string]any{}
+		for rows.Next() {
+			var product, price int64
+			var name, unit string
+			var quantity float64
+			if rows.Scan(&product, &name, &price, &quantity, &unit) != nil {
+				failure(w, 500, "orders_failed")
+				return
+			}
+			result = append(result, map[string]any{"product_id": product, "name": name, "price_cents": price, "quantity": quantity, "unit": unit})
+		}
+		if rows.Err() != nil {
+			failure(w, 500, "orders_failed")
+			return
+		}
+		jsonResponse(w, 200, result)
 		return
 	}
 	rows, e := a.DB.Query(r.Context(), "SELECT id,total_cents,state,financial_state,created_at FROM orders WHERE store_id=$1 ORDER BY id DESC LIMIT 200", store)

@@ -1,4 +1,4 @@
-param([string]$PostgresArchive = "tools/postgresql.zip", [string]$ISCC = "")
+﻿param([string]$PostgresArchive = "tools/postgresql.zip", [string]$ISCC = "")
 $ErrorActionPreference = 'Stop'
 $repoDir = Split-Path $PSScriptRoot -Parent
 Set-Location -LiteralPath $repoDir
@@ -23,8 +23,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Go build failed' }
 if (!$ISCC) { $found = Get-Command iscc.exe -ErrorAction SilentlyContinue; if ($found) { $ISCC=$found.Source } else { $ISCC='C:\Program Files (x86)\Inno Setup 6\ISCC.exe' } }
 & $ISCC /Q packaging/windows/openfood.iss
 if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
-Compress-Archive -Path dist/windows/* -DestinationPath dist/OpenFood-0.4.0-alpha.1-windows-x64.zip -Force
+Compress-Archive -Path dist/windows/* -DestinationPath dist/OpenFood-0.5.0-alpha.1-windows-x64.zip -Force
 if (Test-Path docs/evidence/ui-redesign/results.json) {
-    Compress-Archive -Path docs/evidence/ui-redesign/* -DestinationPath dist/OpenFood-0.4.0-alpha.1-ui-evidence.zip -Force
+    Compress-Archive -Path docs/evidence/ui-redesign,docs/evidence/sales-stage -DestinationPath dist/OpenFood-0.5.0-alpha.1-ui-evidence.zip -Force
 }
-Get-ChildItem dist -File | Where-Object { $_.Name -like 'OpenFood-0.4.0-alpha.1-*' -and $_.Extension -in '.exe','.zip' } | ForEach-Object { $hash=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower(); "$hash  $($_.Name)" } | Set-Content -Encoding ASCII dist/SHA256SUMS
+Get-ChildItem dist -File | Where-Object { $_.Name -like 'OpenFood-0.5.0-alpha.1-*' -and $_.Extension -in '.exe','.zip' } | ForEach-Object { $hash=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower(); "$hash  $($_.Name)" } | Set-Content -Encoding ASCII dist/SHA256SUMS

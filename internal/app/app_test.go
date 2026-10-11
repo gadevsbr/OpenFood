@@ -274,6 +274,76 @@ func TestPostgresJourney(t *testing.T) {
 		t.Fatalf("price snapshot should be 3998, got %d", snapshot)
 	}
 
+	// Product edits, stale stock, availability and snapshot detail use the real API/database.
+	edit := map[string]any{"id": product, "name": "Produto revisado", "price_cents": 2500, "stock_quantity": 8, "expected_stock_quantity": 8, "unit": "porcao", "active": true, "min_order_quantity": 2, "max_order_quantity": 4}
+	code, body, _ = call("PATCH", "/api/products", edit, cookie, "X-Store-ID", fmt.Sprint(store))
+	if code != 200 {
+		t.Fatalf("product edit: %d %s", code, body)
+	}
+	edit["expected_stock_quantity"] = 10
+	code, _, _ = call("PATCH", "/api/products", edit, cookie, "X-Store-ID", fmt.Sprint(store))
+	if code != 409 {
+		t.Fatalf("stale stock must conflict: %d", code)
+	}
+	code, body, _ = call("GET", fmt.Sprintf("/api/orders?id=%d", first), nil, cookie, "X-Store-ID", fmt.Sprint(store))
+	var detail []map[string]any
+	if code != 200 || json.Unmarshal(body, &detail) != nil || len(detail) != 1 || detail[0]["price_cents"] != float64(1999) || detail[0]["name"] != "Último item" {
+		t.Fatalf("snapshot detail: %d %s", code, body)
+	}
+	code, _, _ = call("GET", fmt.Sprintf("/api/orders?id=%d", first), nil, cookie, "X-Store-ID", fmt.Sprint(otherStore))
+	if code != 404 {
+		t.Fatalf("detail cross-store: %d", code)
+	}
+	for _, quantity := range []int64{1, 5} {
+		if _, err := a.CreateOrder(ctx, store, adminUserID, app.Token(), app.OrderRequest{Items: []app.Item{{ProductID: product, Quantity: quantity}}}); err == nil {
+			t.Fatal("quantity limits not enforced")
+		}
+	}
+	if _, err := a.CreateOrder(ctx, store, adminUserID, app.Token(), app.OrderRequest{Items: []app.Item{{ProductID: product, Quantity: 2}, {ProductID: product, Quantity: 2}}}); err == nil {
+		t.Fatal("duplicate products not rejected")
+	}
+	for _, change := range []string{"active=false", "is_weight_based=true", "available_from='00:00',available_until='00:00'"} {
+		if _, err := a.DB.Exec(ctx, "UPDATE products SET "+change+" WHERE id=$1", product); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := a.CreateOrder(ctx, store, adminUserID, app.Token(), app.OrderRequest{Items: []app.Item{{ProductID: product, Quantity: 2}}}); err == nil {
+			t.Fatalf("availability: %s", change)
+		}
+		if _, err := a.DB.Exec(ctx, "UPDATE products SET active=true,is_weight_based=false,available_from=NULL,available_until=NULL WHERE id=$1", product); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var secondProduct int64
+	if err := a.DB.QueryRow(ctx, "INSERT INTO products(store_id,name,price_cents,stock_quantity) VALUES($1,'Segundo produto QA',999,5) RETURNING id", store).Scan(&secondProduct); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.CreateOrder(ctx, store, adminUserID, app.Token(), app.OrderRequest{Items: []app.Item{{ProductID: product, Quantity: 2}, {ProductID: secondProduct, Quantity: 6}}}); err == nil {
+		t.Fatal("insufficient second product accepted")
+	}
+	var unchanged float64
+	if err := a.DB.QueryRow(ctx, "SELECT stock_quantity FROM products WHERE id=$1", product).Scan(&unchanged); err != nil || unchanged != 8 {
+		t.Fatal("failed mixed order consumed first stock")
+	}
+	mixed, err := a.CreateOrder(ctx, store, adminUserID, app.Token(), app.OrderRequest{Items: []app.Item{{ProductID: product, Quantity: 2}, {ProductID: secondProduct, Quantity: 3}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mixedTotal int64
+	if err = a.DB.QueryRow(ctx, "SELECT total_cents FROM orders WHERE id=$1", mixed).Scan(&mixedTotal); err != nil || mixedTotal != 7997 {
+		t.Fatalf("mixed total: %d %v", mixedTotal, err)
+	}
+	code, _, _ = call("POST", "/api/order-state", map[string]any{"id": mixed, "state": "cancelled"}, cookie, "X-Store-ID", fmt.Sprint(store))
+	if code != 200 {
+		t.Fatal("mixed cancellation")
+	}
+	code, _, _ = call("POST", "/api/order-state", map[string]any{"id": mixed, "state": "cancelled"}, cookie, "X-Store-ID", fmt.Sprint(store))
+	if code != 409 {
+		t.Fatal("repeated cancellation must not release stock twice")
+	}
+	var returned float64
+	if err = a.DB.QueryRow(ctx, "SELECT stock_quantity FROM products WHERE id=$1", secondProduct).Scan(&returned); err != nil || returned != 5 {
+		t.Fatal("stock not restored once")
+	}
 	// --- State transitions ---
 	code, _, _ = call("POST", "/api/order-state", map[string]any{"id": orderID, "state": "completed"}, cookie,
 		"X-Store-ID", fmt.Sprint(store))
@@ -304,6 +374,10 @@ func TestPostgresJourney(t *testing.T) {
 		t.Fatalf("attendant login should be 200: got %d", code)
 	}
 	attCookie := attRes.Cookies()[0]
+	code, _, _ = call("PATCH", "/api/products", map[string]any{"id": product}, attCookie, "X-Store-ID", fmt.Sprint(store))
+	if code != 403 {
+		t.Fatalf("attendant product edit: %d", code)
+	}
 	// Attendant cannot create products
 	code, _, _ = call("POST", "/api/products", map[string]any{
 		"Name": "Produto do Garçom", "PriceCents": int64(100), "Stock": int64(10),

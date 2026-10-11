@@ -7,7 +7,9 @@ const root = path.resolve(__dirname, ".."),
   data =
     process.env.OPENFOOD_UI_TEST_DATA ||
     path.join(root, "runtime", "ui-redesign-20261010");
-const evidence = path.join(root, "docs", "evidence", "ui-redesign");
+const evidence =
+  process.env.OPENFOOD_UI_EVIDENCE ||
+  path.join(root, "docs", "evidence", "ui-redesign");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 (async () => {
   for (

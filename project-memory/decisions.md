@@ -1,4 +1,5 @@
 # Decisões
+- 2026-10-10, etapa 0.5: produto sem edição e pedido UI de item único: superseded por edição com comparação de estoque e carrinho agrupado. Snapshot inclui unidade e detalhes vêm do pedido, sem consultar preço atual. Servidor valida disponibilidade e limites; horário America/Sao_Paulo até timezone por loja. Pagamentos/caixa são etapas seguintes.
 - 2026-10-10: UI anterior centrada em formulários na Operação: superseded pela fila de pedidos, catálogo separado e cadastros contextuais. Assets locais separados e embutidos em Go; temas claro/escuro/sistema. Contrato em `ui-contract.md`.
 - 2026-10-10: Go 1.26.8 como baseline e builds locais com Go 1.27.0: superseded por Go 1.27.2 no go.mod, Docker e CI após varredura identificar vulnerabilidades da biblioteca padrão. Repetir varredura e artefatos antes da release.
 - 2026-10-10: Pagamentos Pix não são apresentados como operacionais; UI de credenciais/cobranças/reembolsos anterior superseded pelo estado explícito Em desenvolvimento, pois faltam schema e homologação. Cadastro não equivale aos critérios completos das Fases 3–5.
