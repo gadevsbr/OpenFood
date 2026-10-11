@@ -43,6 +43,12 @@ var webPOSCSS []byte
 //go:embed vendor/motion.js
 var motionJS []byte
 
+//go:embed dining-schema.sql
+var diningSchema string
+
+//go:embed web-dining.js
+var webDining []byte
+
 //go:embed pos-schema.sql
 var posSchema string
 
@@ -58,7 +64,7 @@ var webJS []byte
 //go:embed web-ux.js
 var webUX []byte
 
-const Version = "0.7.0-alpha.1"
+const Version = "0.8.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -271,6 +277,9 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 		if e = migratePOS(ctx, tx); e != nil {
+			return e
+		}
+		if e = migrateDining(ctx, tx); e != nil {
 			return e
 		}
 		return tx.Commit(ctx)
@@ -601,7 +610,7 @@ func (a *App) Migrate(ctx context.Context) error {
 			if e != nil {
 				return e
 			}
-		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) {
+		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) {
 			return errors.New("migration_incompatible")
 		}
 	}
@@ -618,11 +627,16 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 	}
+	if n < 6 {
+		if e = migrateDining(ctx, tx); e != nil {
+			return e
+		}
+	}
 	return tx.Commit(ctx)
 }
 
 func ValidateSchema(version int, checksum string) error {
-	if version != 5 || checksum != Hash(schema+cashSchema+posSchema) {
+	if version != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema) {
 		return errors.New("migration_incompatible")
 	}
 	return nil
@@ -754,6 +768,8 @@ func (a *App) Handler() http.Handler {
 			var asset []byte
 			var contentType string
 			switch r.URL.Path {
+			case "/assets/web-dining.js":
+				asset, contentType = webDining, "text/javascript; charset=utf-8"
 			case "/assets/web-pos.js":
 				asset, contentType = webPOS, "text/javascript; charset=utf-8"
 			case "/assets/web-pos.css":
@@ -970,6 +986,12 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			a.customerDeleteHandler(w, r, targetStore, user)
+		case "/api/dining-tables":
+			a.diningTables(w, r, targetStore, user)
+		case "/api/dining-tabs":
+			a.diningTabs(w, r, targetStore, user)
+		case "/api/dining-receipt":
+			a.diningReceipt(w, r, targetStore, user)
 		case "/api/pos-checkout":
 			a.posCheckout(w, r, targetStore, user)
 		case "/api/pos-receipt":
@@ -2441,7 +2463,7 @@ func (a *App) orders(w http.ResponseWriter, r *http.Request, store int64, user *
 		jsonResponse(w, 200, result)
 		return
 	}
-	rows, e := a.DB.Query(r.Context(), "SELECT id,total_cents,state,financial_state,created_at,COALESCE((SELECT p.discount_cents FROM pos_checkouts p WHERE p.store_id=orders.store_id AND p.order_id=orders.id),0) FROM orders WHERE store_id=$1 ORDER BY id DESC LIMIT 200", store)
+	rows, e := a.DB.Query(r.Context(), "SELECT id,total_cents,state,financial_state,created_at,COALESCE((SELECT p.discount_cents FROM pos_checkouts p WHERE p.store_id=orders.store_id AND p.order_id=orders.id),0),COALESCE(notes,''),COALESCE((SELECT t.label FROM dining_orders d JOIN dining_tabs t ON t.store_id=d.store_id AND t.id=d.tab_id WHERE d.store_id=orders.store_id AND d.order_id=orders.id),'') FROM orders WHERE store_id=$1 ORDER BY id DESC LIMIT 200", store)
 	if e != nil {
 		failure(w, 500, "orders_failed")
 		return
@@ -2450,13 +2472,13 @@ func (a *App) orders(w http.ResponseWriter, r *http.Request, store int64, user *
 	result := []map[string]any{}
 	for rows.Next() {
 		var id, total, discount int64
-		var state, financial string
+		var state, financial, note, tabLabel string
 		var at time.Time
-		if rows.Scan(&id, &total, &state, &financial, &at, &discount) != nil {
+		if rows.Scan(&id, &total, &state, &financial, &at, &discount, &note, &tabLabel) != nil {
 			failure(w, 500, "orders_failed")
 			return
 		}
-		item := map[string]any{"id": id, "total_cents": total, "state": state, "financial_state": financial, "created_at": at, "discount_cents": discount}
+		item := map[string]any{"id": id, "total_cents": total, "state": state, "financial_state": financial, "created_at": at, "discount_cents": discount, "notes": note, "tab_label": tabLabel}
 		if !user.CanViewFinancials() {
 			delete(item, "financial_state")
 		}

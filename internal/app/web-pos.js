@@ -34,6 +34,7 @@ function posAnimate(el) {
     } catch {}
 }
 function resetModes() {
+  if (typeof resetDiningContext === "function") resetDiningContext();
   appMode = null;
   posCart = [];
   posAttempt = null;
@@ -68,6 +69,7 @@ function enterAdmin() {
   document.body.classList.remove("pos-cart-open");
   selectPage("dashboard");
   posAnimate($("workspace"));
+  refresh().catch(posError);
 }
 async function enterPOS() {
   window.scrollTo(0, 0);
@@ -89,6 +91,16 @@ function posError(e) {
     product_unavailable: "Um produto ficou indisponível. Revise a venda.",
     cash_changed_reload: "O saldo mudou. Atualize o caixa e confira novamente.",
     cash_insufficient: "A retirada excede o dinheiro disponível.",
+    tab_changed_reload:
+      "A conta mudou. Atualize e confira os valores antes de tentar novamente.",
+    tab_not_open: "A comanda foi encerrada. Atualize a lista de contas.",
+    table_unavailable: "Esta mesa está ocupada ou inativa.",
+    table_occupied: "Encerre a conta da mesa antes de editar o cadastro.",
+    tab_label_in_use: "Já existe uma conta aberta com essa identificação.",
+    tab_not_empty: "Cancele os pedidos na Operação antes de cancelar a conta.",
+    table_name_in_use: "Já existe uma mesa com esse nome.",
+    quantity_invalid: "Confira os limites de quantidade dos produtos.",
+    total_limit: "O valor excede o limite permitido.",
   };
   const text = messages[e.message] || e.message;
   const d = document.querySelector("dialog[open]");
@@ -147,6 +159,7 @@ async function refreshPOS() {
     $("posTerminal").classList.toggle("hidden", !open);
     $("posMobileCart").classList.toggle("hidden", !open);
     $("posDiscountSection").classList.toggle("hidden", !canManageCatalog());
+    if (typeof refreshDining === "function") await refreshDining();
     renderPOSCategories();
     renderPOSProducts();
     renderPOSCart();
@@ -226,7 +239,7 @@ function renderPOSProducts() {
   $("posEmpty").classList.toggle("hidden", products.length > 0);
 }
 function posAdd(p) {
-  if (posAttempt) {
+  if (posAttempt || (typeof diningPending !== "undefined" && diningPending)) {
     posError(Error("Retome a confirmação desta venda antes de editar."));
     return;
   }
@@ -287,7 +300,8 @@ function renderPOSCart() {
     remove.textContent = "Remover";
     remove.className = "pos-remove";
     const change = (n) => {
-      if (posAttempt) return;
+      if (posAttempt || (typeof diningPending !== "undefined" && diningPending))
+        return;
       const p = allProducts.find((p) => p.id === i.product_id);
       if (!Number.isInteger(n) || n < 1 || n > (p?.stock_quantity || 0)) {
         qty.value = i.quantity;
@@ -301,31 +315,46 @@ function renderPOSCart() {
     plus.onclick = () => change(i.quantity + 1);
     qty.onchange = () => change(Number(qty.value));
     remove.onclick = () => {
-      if (posAttempt) return;
+      if (posAttempt || (typeof diningPending !== "undefined" && diningPending))
+        return;
       posCart = posCart.filter((v) => v !== i);
       renderPOSCart();
       posSave();
     };
-    [minus, qty, plus, remove].forEach((b) => (b.disabled = !!posAttempt));
+    [minus, qty, plus, remove].forEach(
+      (b) =>
+        (b.disabled =
+          !!posAttempt ||
+          (typeof diningPending !== "undefined" && !!diningPending)),
+    );
     controls.append(minus, qty, plus, remove);
     row.append(title, controls);
     root.append(row);
   }
   const count = posCart.reduce((s, i) => s + i.quantity, 0),
-    total = posSubtotal() - posDiscount();
+    total =
+      posAttempt?.payload.expected_remaining_cents ??
+      posSubtotal() - posDiscount();
   $("posCartCount").textContent = count;
   $("posCartEmpty").classList.toggle("hidden", !!count);
   $("posSubtotal").textContent = money(posSubtotal());
   $("posTotal").textContent = Number.isFinite(total)
     ? money(total)
     : "Confira desconto";
-  $("posPay").disabled = !count || !Number.isFinite(total) || total < 1;
+  $("posPay").disabled =
+    (!count && !posAttempt) || !Number.isFinite(total) || total < 1;
   $("posPay").textContent = posAttempt ? "Retomar confirmação" : "Receber · F4";
-  $("posHold").disabled = !count || !!posAttempt;
+  $("posHold").disabled =
+    !count ||
+    !!posAttempt ||
+    (typeof diningActive !== "undefined" && !!diningActive) ||
+    (typeof diningPending !== "undefined" && !!diningPending);
   for (const id of ["posClear", "posService", "posDiscount", "posDiscountNote"])
-    $(id).disabled = !!posAttempt;
+    $(id).disabled =
+      !!posAttempt || (typeof diningPending !== "undefined" && !!diningPending);
   $("posMobileCart").textContent =
     `Ver venda · ${count} itens · ${money(total || 0)}`;
+  if (typeof diningRenderContext === "function") diningRenderContext();
 }
 function posDialog(title) {
   let d = $("posDialog");
@@ -339,6 +368,7 @@ function posDialog(title) {
   d.innerHTML =
     '<div class="dialog-header"><h2 id="posDialogTitle"></h2><button type="button" class="icon-button" aria-label="Fechar">×</button></div><div class="dialog-body"></div><p role="alert" class="dialog-message hidden"></p>';
   d.setAttribute("aria-labelledby", "posDialogTitle");
+  d.classList.remove("dining-dialog");
   $("posDialogTitle").textContent = title;
   d.querySelector("button").onclick = () => d.close();
   d.showModal();
@@ -352,16 +382,31 @@ function posButton(label, fn) {
   b.onclick = fn;
   return b;
 }
-function posPay() {
-  if (!posCart.length) return;
+function posPay(bill = null) {
+  if (!bill && posAttempt?.endpoint === "dining-tabs")
+    bill = {
+      id: posAttempt.payload.id,
+      version: posAttempt.payload.expected_version,
+      total: posAttempt.payload.expected_remaining_cents,
+    };
+  if (!bill && !posCart.length) return;
   const total =
-    posAttempt?.payload.expected_total_cents ?? posSubtotal() - posDiscount();
+    posAttempt?.payload.expected_total_cents ??
+    posAttempt?.payload.expected_remaining_cents ??
+    bill?.total ??
+    posSubtotal() - posDiscount();
   if (!Number.isSafeInteger(total) || total < 1) return;
-  if (posDiscount() > 0 && !$("posDiscountNote").value.trim()) {
+  if (!bill && posDiscount() > 0 && !$("posDiscountNote").value.trim()) {
     posError(Error("Informe o motivo do desconto."));
     return;
   }
-  const body = posDialog(posAttempt ? "Retomar confirmação" : "Receber venda");
+  const body = posDialog(
+    posAttempt
+      ? "Retomar confirmação"
+      : bill
+        ? "Fechar conta da comanda #" + bill.id
+        : "Receber venda",
+  );
   body.innerHTML =
     '<div class="pos-payment-summary"><span>Total da venda</span><strong id="posPaymentTotal"></strong></div><form id="posPaymentForm"><div id="posPaymentRows"></div><button type="button" id="posAddPayment" class="btn-secondary">Dividir pagamento</button><label id="posTenderLabel">Dinheiro entregue (R$)<input id="posTender" inputmode="decimal" value="0,00"></label><p id="posPaymentBalance" aria-live="polite"></p><p id="posChange" aria-live="polite"></p><label><input type="checkbox" name="confirmed" required style="width:auto"> Conferi o recebimento, inclusive cartão ou Pix no equipamento/banco.</label><button id="posConfirmSale" type="submit">Confirmar venda</button><p>Comprovante não fiscal. Cartão e Pix são conferidos manualmente.</p></form>';
   $("posPaymentTotal").textContent = money(total);
@@ -468,17 +513,26 @@ function posPay() {
         }
         posAttempt = {
           key: crypto.randomUUID(),
-          payload: {
-            items: posCart.map((i) => ({
-              product_id: i.product_id,
-              quantity: i.quantity,
-            })),
-            payments,
-            expected_total_cents: total,
-            discount_cents: posDiscount(),
-            discount_note: $("posDiscountNote").value.trim(),
-            service: $("posService").value,
-          },
+          endpoint: bill ? "dining-tabs" : "pos-checkout",
+          payload: bill
+            ? {
+                action: "close",
+                id: bill.id,
+                expected_version: bill.version,
+                expected_remaining_cents: total,
+                payments,
+              }
+            : {
+                items: posCart.map((i) => ({
+                  product_id: i.product_id,
+                  quantity: i.quantity,
+                })),
+                payments,
+                expected_total_cents: total,
+                discount_cents: posDiscount(),
+                discount_note: $("posDiscountNote").value.trim(),
+                service: $("posService").value,
+              },
         };
         sessionStorage.setItem(posKey("attempt"), JSON.stringify(posAttempt));
         renderPOSCart();
@@ -487,9 +541,13 @@ function posPay() {
         r.select.disabled = r.input.disabled = true;
       }
       $("posTender").disabled = $("posAddPayment").disabled = true;
-      const result = await api("pos-checkout", posAttempt.payload, {
-        "Idempotency-Key": posAttempt.key,
-      });
+      const result = await api(
+        posAttempt.endpoint || "pos-checkout",
+        posAttempt.payload,
+        {
+          "Idempotency-Key": posAttempt.key,
+        },
+      );
       posAttempt = null;
       sessionStorage.removeItem(posKey("attempt"));
       posCart = [];
@@ -498,7 +556,10 @@ function posPay() {
       posSave();
       await refreshPOS().catch(posError);
       try {
-        await showPOSReceipt(result.id);
+        await showPOSReceipt(
+          result.id,
+          bill ? "dining-receipt" : "pos-receipt",
+        );
       } catch (e) {
         const body = posDialog("Venda #" + result.id + " registrada");
         const p = document.createElement("p");
@@ -507,7 +568,10 @@ function posPay() {
         body.append(
           p,
           posButton("Carregar comprovante", () =>
-            showPOSReceipt(result.id).catch(posError),
+            showPOSReceipt(
+              result.id,
+              bill ? "dining-receipt" : "pos-receipt",
+            ).catch(posError),
           ),
           posButton("Nova venda", () => $("posDialog").close()),
         );
@@ -525,6 +589,10 @@ function posPay() {
           "discount_manager_required",
           "checkout_invalid",
           "order_duplicate_product",
+          "tab_changed_reload",
+          "tab_not_open",
+          "tab_invalid",
+          "total_limit",
         ].includes(err.message)
       ) {
         posAttempt = null;
@@ -540,9 +608,13 @@ function posPay() {
     }
   };
 }
-async function showPOSReceipt(id) {
-  const r = await api("pos-receipt?id=" + id),
-    body = posDialog("Venda #" + id + " registrada"),
+async function showPOSReceipt(id, endpoint = "pos-receipt") {
+  const r = await api(endpoint + "?id=" + id),
+    body = posDialog(
+      (endpoint === "dining-receipt" ? "Comanda #" : "Venda #") +
+        id +
+        (r.state === "open" ? " · conta em aberto" : " registrada"),
+    ),
     receipt = document.createElement("div");
   receipt.className = "pos-receipt";
   const title = document.createElement("h3");
@@ -550,11 +622,20 @@ async function showPOSReceipt(id) {
   receipt.append(title);
   for (const line of [
     "COMPROVANTE NÃO FISCAL",
-    "Venda #" + r.id + " · " + cashDate(r.created_at),
+    (r.label ? r.label + " · Comanda #" : "Venda #") +
+      r.id +
+      " · " +
+      cashDate(r.created_at),
     "Operador: " + r.operator,
-    r.service === "kitchen" ? "Encaminhada para cozinha" : "Venda de balcão",
+    r.service === "table"
+      ? "Conta consolidada · pedidos mantêm seu preparo"
+      : r.service === "kitchen"
+        ? "Encaminhada para cozinha"
+        : "Venda de balcão",
     "Situação: " +
       ({
+        open: "Conta aberta",
+        closed: "Conta fechada",
         confirmed: "Aguardando preparo",
         preparing: "Em preparo",
         ready: "Pronto",
@@ -587,6 +668,13 @@ async function showPOSReceipt(id) {
   for (const line of [
     r.discount_cents ? "Desconto: " + money(r.discount_cents) : "",
     "TOTAL: " + money(r.total_cents),
+    ...(r.received_cents != null
+      ? [
+          "Recebido líquido: " + money(r.received_cents),
+          "Saldo atual: " + money(r.remaining_cents),
+          "Pagamentos deste fechamento:",
+        ]
+      : []),
     ...r.payments.map(
       (p) => cashMethods[p.method] + ": " + money(p.amount_cents),
     ),
@@ -637,7 +725,11 @@ function heldSales() {
     (i) =>
       `${cashDate(i.at)} · ${i.items.reduce((s, p) => s + p.quantity, 0)} itens`,
     (i) => {
-      if (posCart.length || posAttempt) {
+      if (
+        posCart.length ||
+        posAttempt ||
+        (typeof diningPending !== "undefined" && diningPending)
+      ) {
         posError(Error("Finalize ou coloque a venda atual em espera."));
         return;
       }
@@ -654,7 +746,13 @@ function heldSales() {
   );
 }
 function holdSale() {
-  if (!posCart.length || posAttempt) return;
+  if (
+    !posCart.length ||
+    posAttempt ||
+    (typeof diningPending !== "undefined" && diningPending) ||
+    (typeof diningActive !== "undefined" && diningActive)
+  )
+    return;
   const held = posRead("held", []);
   if (held.length >= 10) {
     posError(
@@ -808,6 +906,7 @@ async function loadDashboard() {
   $("dashboardCash").textContent =
     "Resumo da loja selecionada. Vendas e recebimentos são apurados separadamente.";
   $("dashboardPOS").classList.toggle("hidden", !canCreateOrders());
+  $("adminDining")?.classList.toggle("hidden", !canAccessPayments());
   for (const b of document.querySelectorAll("[data-admin-page]"))
     b.classList.toggle(
       "hidden",
@@ -827,7 +926,7 @@ $("posGateBack").onclick = chooseMode;
 $("modeLogout").onclick = $("posLogout").onclick = () => $("logout").onclick();
 $("posTheme").onchange = () => setTheme($("posTheme").value);
 $("posStore").onchange = async () => {
-  if (posAttempt) {
+  if (posAttempt || (typeof diningPending !== "undefined" && diningPending)) {
     $("posStore").value = String(currentStoreId);
     posError(
       Error("Retome a confirmação desta venda antes de trocar de loja."),
@@ -883,7 +982,10 @@ $("posSearch").onkeydown = (e) => {
 $("posReload").onclick = async () => {
   try {
     await refreshPOS();
-    if (!posAttempt) {
+    if (
+      !posAttempt &&
+      !(typeof diningPending !== "undefined" && diningPending)
+    ) {
       for (const i of posCart) {
         const p = allProducts.find((p) => p.id === i.product_id);
         if (p) {
@@ -898,7 +1000,7 @@ $("posReload").onclick = async () => {
     posError(e);
   }
 };
-$("posPay").onclick = posPay;
+$("posPay").onclick = () => posPay();
 $("posHold").onclick = holdSale;
 $("posHeld").onclick = heldSales;
 $("posCash").onclick = () => posCashDialog().catch(posError);
@@ -930,7 +1032,12 @@ $("posHelp").onclick = () => {
     "F2: buscar produto · F4: receber venda · F8: colocar em espera · Esc: fechar janela. Cartão e Pix precisam de conferência manual. Vendas em espera ficam nesta aba do navegador.";
 };
 $("posClear").onclick = () => {
-  if (posAttempt || !posCart.length) return;
+  if (
+    posAttempt ||
+    (typeof diningPending !== "undefined" && diningPending) ||
+    !posCart.length
+  )
+    return;
   posDialog("Limpar venda?").append(
     posButton("Confirmar limpeza", () => {
       posCart = [];
@@ -962,6 +1069,16 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     document.body.classList.remove("pos-cart-open");
     $("posSearch").focus();
+  }
+  if (
+    e.key === "F4" &&
+    typeof diningActive !== "undefined" &&
+    diningActive &&
+    !posAttempt
+  ) {
+    e.preventDefault();
+    if (!$("diningSend").disabled) sendDiningRound();
+    return;
   }
   if (e.key === "F4" && !$("posPay").disabled) {
     e.preventDefault();

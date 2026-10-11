@@ -76,7 +76,16 @@ const errors = {
   forbidden_refund_management:
     "Somente gerentes e administradores podem registrar devoluções.",
   forbidden_cash_management:
-    "Somente gerentes e administradores podem abrir ou fechar caixa.",
+    "Atendentes administram o próprio caixa; gerentes e administradores podem administrar qualquer caixa da loja.",
+  table_occupied: "Encerre a conta desta mesa antes de editar o cadastro.",
+  table_name_in_use: "Já existe uma mesa com esse nome.",
+  table_invalid: "Confira o nome, a quantidade de lugares e o estado da mesa.",
+  tab_label_in_use: "Já existe uma comanda aberta com esta identificação.",
+  tab_changed_reload: "A comanda mudou. Atualize a conta e confira novamente.",
+  tab_not_open: "A comanda já foi encerrada. Atualize a lista.",
+  table_unavailable: "Esta mesa está ocupada ou inativa.",
+  dining_operation_failed:
+    "Não foi possível confirmar a operação. Retome a tentativa com os mesmos dados.",
   integrated_payment_unsupported:
     "Este pedido possui pagamento integrado e não aceita registro manual nesta etapa.",
   cash_operation_failed:
@@ -427,7 +436,11 @@ function renderOrders() {
         (orderFilter === "active"
           ? activeStates.includes(o.state)
           : o.state === orderFilter)) &&
-      String(o.id).includes(search),
+      [String(o.id), o.tab_label || ""].some((v) =>
+        v
+          .toLocaleLowerCase("pt-BR")
+          .includes(search.toLocaleLowerCase("pt-BR")),
+      ),
   );
   $("orders").replaceChildren();
   for (const o of list) {
@@ -447,6 +460,12 @@ function renderOrders() {
       minute: "2-digit",
     });
     cell.append(number, time);
+    if (o.tab_label || o.notes) {
+      const note = document.createElement("div");
+      note.className = "order-time";
+      note.textContent = [o.tab_label, o.notes].filter(Boolean).join(" · ");
+      cell.append(note);
+    }
     td(row, money(o.total_cents)).className = "order-amount";
     cell = td(row, "");
     cell.append(statusBadge(o.state));

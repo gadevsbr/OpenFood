@@ -39,3 +39,5 @@
 - 2026-10-11, 0.7: PostgreSQL real PASS 117.870s; vet PASS; govulncheck zero alcançáveis e uma em módulo requerido sem chamadas; npm audit zero. Setup/ADM/caixa/PDV/vendas Chromium PASS, zero erros JS; POS valida resposta perdida exatamente uma vez e permissões. Relatórios em `docs/evidence/pos-stage/`. CI e publicação pendentes.
 
 Distribuição concluída: CI 38111222452 Linux/Windows/publish PASS; release experimental v0.7.0-alpha.1 com seis assets. Instalador, ZIP Windows, TAR Linux e ZIP de evidências baixados em dist/release-0.7.0 e SHA-256 iguais aos manifests. Gates CI/publicação anteriores: superseded por esta evidência. Fonte da implementação c184a45; documentos de encerramento em main.
+
+- 2026-10-11, 0.8: suíte PostgreSQL real PASS 125.205s, upgrades v1–v5 e backups v3–v5; TestCashJourney final PASS 20.923s com comandas e fechamento concorrente. Vet/sintaxe/diff PASS. Regressões Chromium em base isolada vazia e mesas PASS, zero erros JS; evidências `docs/evidence/dining-stage/`. Govulncheck zero alcançáveis e uma em módulo requerido sem chamada; npm audit zero. CI/publicação pendentes.

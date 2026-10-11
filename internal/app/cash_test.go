@@ -344,6 +344,91 @@ func TestCashJourney(t *testing.T) {
 	if code != 403 {
 		t.Fatal("attendant closed manager cash")
 	}
+	// Restaurant tabs reuse order snapshots and ledger entries without a second sale.
+	diningSession := mutate("/api/cash-sessions", app.CashRequest{Action: "open", Opening: 1000}, app.Token(), 200)
+	table := mutate("/api/dining-tables", map[string]any{"name": "Mesa QA", "capacity": 4, "active": true}, app.Token(), 200)
+	mutate("/api/dining-tables", map[string]any{"name": "mesa qa", "capacity": 2, "active": true}, app.Token(), 409)
+	code, _, _ = call("POST", "/api/dining-tables", map[string]any{"name": "Mesa proibida", "capacity": 2, "active": true}, cookies["attendant"], "Idempotency-Key", app.Token())
+	if code != 403 {
+		t.Fatal("attendant table management")
+	}
+	code, _, _ = call("GET", "/api/dining-tabs", nil, cookies["kitchen"])
+	if code != 403 {
+		t.Fatal("kitchen financial tab access")
+	}
+	openTab := app.DiningRequest{Action: "open", TableID: table, Label: "Mesa QA"}
+	tabKey := app.Token()
+	tab := mutate("/api/dining-tabs", openTab, tabKey, 200)
+	if mutate("/api/dining-tabs", openTab, tabKey, 200) != tab {
+		t.Fatal("tab duplicate")
+	}
+	mutate("/api/dining-tabs", app.DiningRequest{Action: "open", TableID: table, Label: "Outra identificação"}, app.Token(), 409)
+	mutate("/api/dining-tables", map[string]any{"id": table, "name": "Mesa QA", "capacity": 4, "active": false}, app.Token(), 409)
+	code, _, _ = call("POST", "/api/dining-tabs", openTab, cookies["attendant"], "X-Store-ID", fmt.Sprint(otherStore), "Idempotency-Key", app.Token())
+	if code != 403 {
+		t.Fatal("cross store tab")
+	}
+	if e = a.DB.QueryRow(ctx, "SELECT stock_quantity FROM products WHERE id=$1", product).Scan(&before); e != nil {
+		t.Fatal(e)
+	}
+	round := app.DiningRequest{Action: "add", ID: tab, Version: 1, Expected: 1999, Items: []app.Item{{ProductID: product, Quantity: 1}}, Note: "Sem cebola QA"}
+	roundKey := app.Token()
+	mutate("/api/dining-tabs", round, roundKey, 200)
+	mutate("/api/dining-tabs", round, roundKey, 200)
+	mutate("/api/dining-tabs", round, app.Token(), 409)
+	round.Version = 2
+	badRound := round
+	badRound.Expected = 1
+	mutate("/api/dining-tabs", badRound, app.Token(), 409)
+	code, _, _ = call("POST", "/api/dining-tabs", round, cookies["attendant"], "Idempotency-Key", app.Token())
+	if code != 200 {
+		t.Fatal("attendant add round")
+	}
+	var firstRound int64
+	if e = a.DB.QueryRow(ctx, "SELECT min(order_id) FROM dining_orders WHERE store_id=$1 AND tab_id=$2", store, tab).Scan(&firstRound); e != nil {
+		t.Fatal(e)
+	}
+	mutate("/api/manual-receipts", app.ReceiptRequest{OrderID: firstRound, Amount: 500, Method: "cash"}, app.Token(), 200)
+	closingTab := app.DiningRequest{Action: "close", ID: tab, Version: 3, Expected: 3498, Payments: []app.POSPayment{{Method: "cash", Amount: 2000, Tendered: 3000}, {Method: "card", Amount: 1498}}}
+	badClose := closingTab
+	badClose.Expected = 3998
+	mutate("/api/dining-tabs", badClose, app.Token(), 409)
+	badClose = closingTab
+	badClose.Payments = []app.POSPayment{{Method: "cash", Amount: 3498, Tendered: 3400}}
+	mutate("/api/dining-tabs", badClose, app.Token(), 409)
+	closeTabKey := app.Token()
+	mutate("/api/dining-tabs", closingTab, closeTabKey, 200)
+	for i := 0; i < 4; i++ {
+		go func() {
+			id, err := a.ChangeDining(ctx, store, user, closeTabKey, closingTab)
+			if err == nil && id != tab {
+				err = fmt.Errorf("tab retry id %d", id)
+			}
+			duplicateResults <- err
+		}()
+	}
+	for i := 0; i < 4; i++ {
+		if e = <-duplicateResults; e != nil {
+			t.Fatal(e)
+		}
+	}
+	if e = a.DB.QueryRow(ctx, "SELECT stock_quantity FROM products WHERE id=$1", product).Scan(&after); e != nil || after != before-2 {
+		t.Fatalf("tab stock changed at settlement: %v %v", after, e)
+	}
+	var diningPaid, rounds int
+	if e = a.DB.QueryRow(ctx, "SELECT count(*),count(*) FILTER(WHERE o.financial_state='manual_confirmed' AND o.state='confirmed') FROM dining_orders d JOIN orders o ON o.store_id=d.store_id AND o.id=d.order_id WHERE d.store_id=$1 AND d.tab_id=$2", store, tab).Scan(&rounds, &diningPaid); e != nil || rounds != 2 || diningPaid != 2 {
+		t.Fatalf("rounds paid %d/%d %v", diningPaid, rounds, e)
+	}
+	code, raw, _ = call("GET", fmt.Sprintf("/api/dining-receipt?id=%d", tab), nil, admin)
+	if code != 200 || !bytes.Contains(raw, []byte(`"remaining_cents":0`)) {
+		t.Fatalf("tab receipt %d %s", code, raw)
+	}
+	mutate("/api/cash-sessions", app.CashRequest{Action: "close", ID: diningSession, Expected: 3500, Counted: 3500}, app.Token(), 200)
+	mutate("/api/dining-tabs", closingTab, closeTabKey, 200)
+	mutate("/api/dining-tabs", openTab, app.Token(), 409)
+	mutate("/api/cash-sessions", app.CashRequest{Action: "open"}, app.Token(), 200)
+	newTab := mutate("/api/dining-tabs", openTab, app.Token(), 200)
+	mutate("/api/dining-tabs", app.DiningRequest{Action: "cancel", ID: newTab, Version: 1}, app.Token(), 200)
 	backup, e := runtime.Backup(ctx)
 	if e != nil {
 		t.Fatal(e)
@@ -356,8 +441,12 @@ func TestCashJourney(t *testing.T) {
 		t.Fatal(e)
 	}
 	var count int
-	if e = a.DB.QueryRow(ctx, "SELECT count(*) FROM manual_receipts WHERE store_id=$1", store).Scan(&count); e != nil || count != 6 {
+	if e = a.DB.QueryRow(ctx, "SELECT count(*) FROM manual_receipts WHERE store_id=$1", store).Scan(&count); e != nil || count != 10 {
 		t.Fatalf("ledger restore %d %v", count, e)
+	}
+	var restoredTabs int
+	if e = a.DB.QueryRow(ctx, "SELECT count(*) FROM dining_tabs WHERE store_id=$1", store).Scan(&restoredTabs); e != nil || restoredTabs != 2 {
+		t.Fatalf("tab restore %d %v", restoredTabs, e)
 	}
 	t.Log("PASS: receipts, partial/split payment, idempotency/concurrent ceiling, refunds across periods, cash reconciliation, permissions, cancellation and backup")
 }

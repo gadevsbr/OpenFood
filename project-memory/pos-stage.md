@@ -21,3 +21,5 @@ Validação parcial concluída: PostgreSQL real `go test ./...` PASS 107.124s, u
 Repetição final integrada em base vazia pos-20261011-b: jornadas setup/UI, ADM, consentimento/offline/foco, caixa, caixa-final, PDV e vendas PASS; zero pageerrors. PostgreSQL final PASS 117.870s, incluindo quatro retries concorrentes POS e conflito de payload. Capturas PDV/ADM desktop/mobile/escuro revisadas; contraste hover ADM e posição do cabeçalho dashboard corrigidos. Gates locais atendidos no escopo, sem certificação de leitor de tela/periféricos/fiscal/Windows limpo. CI/publicação ainda pendentes.
 
 Distribuição concluída: CI 38111222452 Linux/Windows/publish PASS; release experimental v0.7.0-alpha.1 com seis assets. Instalador, ZIP Windows, TAR Linux e ZIP de evidências baixados em dist/release-0.7.0 e SHA-256 iguais aos manifests. Gates CI/publicação anteriores: superseded por esta evidência. Fonte da implementação c184a45; documentos de encerramento em main.
+
+2026-10-11, 0.8: pendência de mesas/comandas da 0.7 superseded no escopo implementado e validado localmente em `dining-stage.md`. Demais limites da 0.7 continuam aplicáveis; publicação da 0.8 ainda pendente.

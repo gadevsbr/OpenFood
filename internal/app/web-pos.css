@@ -875,3 +875,116 @@ kbd {
   padding: 5px 10px;
   border-radius: 5px;
 }
+
+.dining-dialog {
+  max-width: 820px;
+  width: min(820px, calc(100vw - 32px));
+}
+.dining-dialog .dialog-body {
+  max-height: 75dvh;
+  overflow-y: auto;
+}
+.dining-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+.dining-table {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 9px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--subtle);
+}
+.dining-table.occupied {
+  border-color: var(--brand);
+  background: var(--surface);
+}
+.dining-table span {
+  font-size: 12px;
+}
+.dining-table strong {
+  font-size: 20px;
+}
+.dining-table:hover:not(:disabled) {
+  background: var(--subtle);
+  color: var(--ink);
+}
+.dining-tab-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 10px 0;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.dining-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px;
+  background: var(--lime);
+  color: #173b2a;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+.dining-context button {
+  font-size: 11px;
+  background: #173b2a;
+  color: #d8eea3;
+}
+.dining-cart-label {
+  background: var(--subtle);
+  border: 1px solid var(--line);
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.dining-management-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.dining-bill-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 14px;
+  background: var(--subtle);
+  border-radius: 10px;
+}
+#diningNoteLabel {
+  font-size: 11px;
+}
+#diningSend {
+  width: 100%;
+  margin-top: 10px;
+}
+@media (max-width: 700px) {
+  .dining-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dining-table {
+    padding: 12px;
+  }
+  .dining-bill-summary {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .dining-context strong {
+    flex: 1 0 100%;
+  }
+  .dining-dialog .dialog-body {
+    max-height: 78dvh;
+  }
+}

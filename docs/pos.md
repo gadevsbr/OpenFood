@@ -10,7 +10,7 @@ Comprovantes são não fiscais. É possível imprimir pelo navegador e consultar
 
 Caixa no topo mostra os saldos, sangria, suprimento e histórico com motivo/operador. Atendentes movimentam e fecham o caixa que abriram; gerente/admin administra qualquer caixa da loja e registra devoluções. Fechamento exige conferência física e motivo para diferença.
 
-F2 busca produto; F8 guarda o carrinho. Até dez carrinhos ficam em espera nesta aba, separados por usuário e loja. Fechar a aba pode apagar estes rascunhos; somente vendas confirmadas estão no banco/backup. Mesas, comandas persistentes, composição de ingredientes, taxas e periféricos físicos permanecem etapas futuras.
+F2 busca produto; F8 guarda o carrinho. Até dez carrinhos ficam em espera nesta aba, separados por usuário e loja. Fechar a aba pode apagar estes rascunhos; somente vendas confirmadas estão no banco/backup. Mesas e comandas persistentes estão em [Mesas e comandas](dining.md); composição de ingredientes, taxas e periféricos físicos permanecem etapas futuras.
 
 ADM abre um resumo real da loja, com vendas de hoje, recebimentos de hoje, pedidos em preparo e saldo a receber. Vendas e recebimentos têm critérios distintos, explicados na tela. Perfis sem consulta financeira recebem apenas informações operacionais.
 

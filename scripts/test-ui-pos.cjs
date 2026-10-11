@@ -5,7 +5,7 @@ const fs = require("fs"),
   const url = JSON.parse(
     fs.readFileSync(process.env.OPENFOOD_UI_TEST_DATA + "/runtime.json"),
   ).URL;
-  const out = "docs/evidence/pos-stage";
+  const out = process.env.OPENFOOD_POS_EVIDENCE || "docs/evidence/pos-stage";
   fs.mkdirSync(out, { recursive: true });
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
@@ -76,8 +76,15 @@ const fs = require("fs"),
     }
   });
   await p.locator("#adminToPOS").click();
-  await p.waitForFunction(()=>!document.querySelector('#posCashGate').classList.contains('hidden')||document.querySelector('#posGrid button'));
-  if(await p.locator('#posCashGate').isVisible()){await p.locator('#posOpenForm [name=opening]').fill('100,00');await p.locator('#posOpenSubmit').click();}
+  await p.waitForFunction(
+    () =>
+      !document.querySelector("#posCashGate").classList.contains("hidden") ||
+      document.querySelector("#posGrid button"),
+  );
+  if (await p.locator("#posCashGate").isVisible()) {
+    await p.locator("#posOpenForm [name=opening]").fill("100,00");
+    await p.locator("#posOpenSubmit").click();
+  }
   await p.locator("#posGrid button").first().waitFor();
   assert(await p.locator(".sidebar").isHidden());
   await shot("pos-desktop");
