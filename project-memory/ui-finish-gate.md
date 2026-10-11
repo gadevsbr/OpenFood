@@ -9,4 +9,6 @@ Decisão: PASS para a repaginação local testada; produto permanece experimenta
 - Campos opcionais de produto/cliente, consentimentos, envio do ID em edição e restrições de papel/organização corrigidos para as jornadas. Migrações v1/v2 preservam estoque/preço em testes reais.
 - Go 1.27.2: vet PASS; govulncheck sem vulnerabilidades alcançáveis, uma em módulo requerido sem chamadas identificadas. Suíte completa PASS em 110.013s e repetição final da jornada expandida PASS em 23.300s.
 
-Limites: não é certificação WCAG completa, leitor de tela, Windows limpo, reboot físico, assinatura ou homologação externa. Cadastro avançado e privacidade não certificam todos os critérios do roadmap. Pix continua Em desenvolvimento. Publicação dos pacotes depende do pipeline Windows/Linux da versão.
+Distribuição: pipeline 38104366086 Windows/Linux/publish PASS; release v0.4.0-alpha.1 publicada e checksums/digests conferidos. Gate de publicação antes pendente superseded por esta evidência.
+
+Limites: não é certificação WCAG completa, leitor de tela, Windows limpo, reboot físico, assinatura ou homologação externa. Cadastro avançado e privacidade não certificam todos os critérios do roadmap. Pix continua Em desenvolvimento.
