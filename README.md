@@ -5,7 +5,7 @@ Alpha 0.6.0-alpha.1: Windows x64 com PostgreSQL embarcado e Linux com Docker Com
 
 Catálogo: edição de produtos com proteção de estoque concorrente. Pedidos manuais com múltiplos itens e detalhes dos preços registrados na venda; horários de disponibilidade em America/Sao_Paulo.
 
-Caixa: abertura com saldo inicial, recebimentos manuais parciais em dinheiro/cartão/Pix, devolução integral de um recebimento por gerente, fechamento com contagem/diferença/motivo e histórico por operador. Não executa cobrança ou reembolso bancário. Não inclui sangrias, suprimentos ou taxas.
+Caixa: abertura com saldo inicial, recebimentos manuais parciais em dinheiro/cartão/Pix, devolução integral de um recebimento por gerente, fechamento com contagem/diferença/motivo e histórico por operador. Não executa cobrança ou reembolso bancário. Não inclui sangrias, suprimentos ou taxas. [Uso do caixa](docs/cash.md).
 
 Implementado: setup protegido, login, organizações/lojas e papéis, catálogo, pedidos manuais por unidade/porção, estoque transacional, snapshots de preços, deduplicação e fila local durável. Windows tem supervisor, tray, autostart opt-in, backup/restauração e diagnóstico.
 
