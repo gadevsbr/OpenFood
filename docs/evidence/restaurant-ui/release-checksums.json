@@ -1,0 +1,22 @@
+﻿[
+    {
+        "Artifact":  "OpenFood-0.9.0-alpha.1-ui-evidence.zip",
+        "SHA256":  "7608939baee4f3f7ca0f229da0815c3a5bf2be95fe2833911cb2194a05e6cd07",
+        "Status":  "PASS"
+    },
+    {
+        "Artifact":  "OpenFood-0.9.0-alpha.1-windows-x64-setup.exe",
+        "SHA256":  "80aec39d9e0e8cfa348c41601fbbb82c3d093cab2fc52064508084a150a94c56",
+        "Status":  "PASS"
+    },
+    {
+        "Artifact":  "OpenFood-0.9.0-alpha.1-windows-x64.zip",
+        "SHA256":  "a3880ca14016e0238028d8008c88be0c156ca236881e908d32903043b42db1f2",
+        "Status":  "PASS"
+    },
+    {
+        "Artifact":  "OpenFood-0.9.0-alpha.1-linux-x64.tar.gz",
+        "SHA256":  "4000dcb338ccecb9de7c86d53fd6a1acc51231a56544ea372873dd703b304d37",
+        "Status":  "PASS"
+    }
+]
