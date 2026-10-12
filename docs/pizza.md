@@ -1,5 +1,9 @@
 # Pizzas com múltiplos sabores
 
+![Escolha de tamanho, sabores e partes no PDV](evidence/pizza-stage/pizza-choices-desktop.png)
+
+Captura real da versão 0.12 com dados sintéticos de QA.
+
 ## Cadastro
 
 ADM → Catálogo → produto → **Tamanhos, adicionais e foto** → **Configurar sabores de pizza**.

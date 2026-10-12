@@ -5,7 +5,7 @@
 OpenFood é um sistema de ponto de venda (PDV / POS) e gestão de restaurantes, livre e de operação local. Cardápio, mesas, comandas, cozinha e administração compartilham a mesma base, sem servidor central obrigatório.
 
 [![Release experimental](https://img.shields.io/github/v/release/gadevsbr/OpenFood?include_prereleases&label=alpha)](https://github.com/gadevsbr/OpenFood/releases)
-[![Build e testes](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml/badge.svg)](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml)
+[![Build e testes](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml/badge.svg)](https://github.com/gadevsbr/OpenFood/actions/runs/38320810285)
 [![Licença AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 [**Baixar para Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.12.0-alpha.1/OpenFood-0.12.0-alpha.1-windows-x64-setup.exe) · [Instalação Windows / Linux](docs/installation.md) · [Roadmap](project-memory/roadmap.md) · [English](README.en.md)
@@ -95,7 +95,7 @@ O modo suportado atualmente é local, em loopback. O computador precisa permanec
 
 **Stack:** Go 1.27.2, PostgreSQL 17, interface web embutida e Motion mini com respeito a `prefers-reduced-motion`. Node é usado para construir animações e executar QA, não pelo usuário final.
 
-A [release 0.12](https://github.com/gadevsbr/OpenFood/releases/tag/v0.12.0-alpha.1) inclui instalador, pacotes Windows/Linux, capturas de QA e manifests SHA-256. [CI da versão](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml) e [registro de validação](project-memory/pizza-stage.md) documentam o que foi testado e os gates abertos.
+A [release 0.12](https://github.com/gadevsbr/OpenFood/releases/tag/v0.12.0-alpha.1) inclui instalador, pacotes Windows/Linux, capturas de QA e manifests SHA-256. [CI da versão](https://github.com/gadevsbr/OpenFood/actions/runs/38320810285) e [registro de validação](project-memory/pizza-stage.md) documentam o que foi testado e os gates abertos.
 
 Encontrou um problema? [Abra uma issue](https://github.com/gadevsbr/OpenFood/issues/new/choose) com a versão e os passos para reproduzir, usando dados de teste. Sugestões e contribuições são bem-vindas.
 

@@ -1,0 +1,91 @@
+{
+  "assets": [
+    {
+      "apiUrl": "https://api.github.com/repos/gadevsbr/OpenFood/releases/assets/635261235",
+      "contentType": "application/x-gtar",
+      "createdAt": "2026-10-12T23:17:00Z",
+      "digest": "sha256:b56d21b6b4a07d96d78edb76000d2f30113fd89b9ee4d049c3254ddb6fabd9de",
+      "downloadCount": 0,
+      "id": "RA_kwDOU5g9Fc4l3VEz",
+      "label": "",
+      "name": "OpenFood-0.12.0-alpha.1-linux-x64.tar.gz",
+      "size": 4697238,
+      "state": "uploaded",
+      "updatedAt": "2026-10-12T23:17:01Z",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.12.0-alpha.1/OpenFood-0.12.0-alpha.1-linux-x64.tar.gz"
+    },
+    {
+      "apiUrl": "https://api.github.com/repos/gadevsbr/OpenFood/releases/assets/635261232",
+      "contentType": "application/zip",
+      "createdAt": "2026-10-12T23:17:00Z",
+      "digest": "sha256:6bcd69ff664357f108e867fc4d3893907c590a182fba41874b7883e02d46a64d",
+      "downloadCount": 0,
+      "id": "RA_kwDOU5g9Fc4l3VEw",
+      "label": "",
+      "name": "OpenFood-0.12.0-alpha.1-ui-evidence.zip",
+      "size": 28615868,
+      "state": "uploaded",
+      "updatedAt": "2026-10-12T23:17:02Z",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.12.0-alpha.1/OpenFood-0.12.0-alpha.1-ui-evidence.zip"
+    },
+    {
+      "apiUrl": "https://api.github.com/repos/gadevsbr/OpenFood/releases/assets/635261227",
+      "contentType": "application/octet-stream",
+      "createdAt": "2026-10-12T23:17:00Z",
+      "digest": "sha256:2771cc0f44c9f01a5a364dbc6122162072bd8fe21c7f9a69ff65a0bfb1668930",
+      "downloadCount": 0,
+      "id": "RA_kwDOU5g9Fc4l3VEr",
+      "label": "",
+      "name": "OpenFood-0.12.0-alpha.1-windows-x64-setup.exe",
+      "size": 33447490,
+      "state": "uploaded",
+      "updatedAt": "2026-10-12T23:17:02Z",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.12.0-alpha.1/OpenFood-0.12.0-alpha.1-windows-x64-setup.exe"
+    },
+    {
+      "apiUrl": "https://api.github.com/repos/gadevsbr/OpenFood/releases/assets/635261228",
+      "contentType": "application/zip",
+      "createdAt": "2026-10-12T23:17:00Z",
+      "digest": "sha256:5be6a2c5e509676c7e88a1699671d9c523255f293d2a7a5ea70b903633821a76",
+      "downloadCount": 0,
+      "id": "RA_kwDOU5g9Fc4l3VEs",
+      "label": "",
+      "name": "OpenFood-0.12.0-alpha.1-windows-x64.zip",
+      "size": 56487988,
+      "state": "uploaded",
+      "updatedAt": "2026-10-12T23:17:03Z",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.12.0-alpha.1/OpenFood-0.12.0-alpha.1-windows-x64.zip"
+    },
+    {
+      "apiUrl": "https://api.github.com/repos/gadevsbr/OpenFood/releases/assets/635261233",
+      "contentType": "application/octet-stream",
+      "createdAt": "2026-10-12T23:17:00Z",
+      "digest": "sha256:f20fea7afb069f366807dc13c24030ddc5942af6630039751e72b83f58525fbc",
+      "downloadCount": 0,
+      "id": "RA_kwDOU5g9Fc4l3VEx",
+      "label": "",
+      "name": "SHA256SUMS",
+      "size": 327,
+      "state": "uploaded",
+      "updatedAt": "2026-10-12T23:17:00Z",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.12.0-alpha.1/SHA256SUMS"
+    },
+    {
+      "apiUrl": "https://api.github.com/repos/gadevsbr/OpenFood/releases/assets/635261261",
+      "contentType": "application/octet-stream",
+      "createdAt": "2026-10-12T23:17:01Z",
+      "digest": "sha256:afc6e88ca74a2659fb041a0f064dfab55d6dc14ed06568a6919751c38ebbd3df",
+      "downloadCount": 0,
+      "id": "RA_kwDOU5g9Fc4l3VFN",
+      "label": "",
+      "name": "SHA256SUMS-linux",
+      "size": 107,
+      "state": "uploaded",
+      "updatedAt": "2026-10-12T23:17:01Z",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.12.0-alpha.1/SHA256SUMS-linux"
+    }
+  ],
+  "isPrerelease": true,
+  "tagName": "v0.12.0-alpha.1",
+  "url": "https://github.com/gadevsbr/OpenFood/releases/tag/v0.12.0-alpha.1"
+}
