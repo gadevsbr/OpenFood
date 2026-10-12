@@ -36,4 +36,4 @@ QA cardápio: após as regressões PDV/mesas, `node scripts/test-ui-menu.cjs` us
 Combos no PDV/mesas: preço fixo com ajustes, soma ou maior componente; escolhas por grupo,
 estoque dos componentes e composição preservada. Clientes podem ser identificados no PDV;
 histórico por loja, consentimentos com texto/versionamento e exportação consistente.
-[Guia de combos e clientes](docs/combos-customers.md). Validação local PASS; distribuição 0.11 em conferência.
+[Guia de combos e clientes](docs/combos-customers.md). Validação local e CI Windows/Linux PASS; release experimental 0.11 publicada com checksums conferidos.

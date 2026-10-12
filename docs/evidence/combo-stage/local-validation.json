@@ -7,5 +7,5 @@
   "browser": "Chromium real, combo/clientes e regressão cardápio PASS; zero pageerrors; fresh QA runtime/combo-20261011-b",
   "vet": "PASS",
   "syntax": "PASS",
-  "distribution": "pending CI"
+  "distribution": "PASS: CI 38193987452 and downloaded artifacts verified"
 }

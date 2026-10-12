@@ -1,6 +1,6 @@
 # Combos e identificação de clientes — etapa 0.11
-Skills: Backend Architect e Privacy Engineer. Implementação em validação;
-sem declaração de conclusão das Fases 3 e 4.
+Skills: Backend Architect e Privacy Engineer. Implementada e publicada no escopo testado;
+Fases 3 e 4 continuam abertas.
 
 - Combo é uma linha comercial com product_id nulo; componentes, quantidades,
   nomes/preços/opções/observações ficam no snapshot. Migração v8 separada preserva
@@ -37,3 +37,6 @@ observações por componente visíveis e capturas finais inspecionadas. Financei
 não altera cliente/consentimento; ambas as rotas de remoção compartilham transação.
 Vet/sintaxe/diff PASS. Não certifica escopo completo de privacidade/anonimato.
 CI/publicação ainda pendentes; provas em docs/evidence/combo-stage.
+
+Distribuição final: CI [38193987452](https://github.com/gadevsbr/OpenFood/actions/runs/38193987452) Windows/Linux/publicação PASS, com PostgreSQL real, upgrades/restauração v1–v7 e ciclo instalado. Release experimental publicada com seis assets; quatro artefatos baixados, SHA-256 iguais aos dois manifests e aos digests GitHub. Pendência de distribuição superseded.
+Provas: release-ci.json, release-assets.json e release-checksums.json no diretório de evidências.
