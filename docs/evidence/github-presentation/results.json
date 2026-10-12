@@ -1,0 +1,72 @@
+{
+  "result": "PASS",
+  "relative_links_checked": 40,
+  "unique_screenshots": 5,
+  "github_markdown_rendering": [
+    "README.md",
+    "README.en.md"
+  ],
+  "release_asset_links": "PASS",
+  "release_prerelease": true,
+  "repository_metadata": {
+    "description": "PDV para restaurantes / Restaurant POS. Cardápio, mesas, comandas, cozinha, estoque e caixa local. Open source, self-hosted, Go + PostgreSQL. Windows e Linux. Alpha experimental.",
+    "homepageUrl": "https://github.com/gadevsbr/OpenFood/blob/main/docs/installation.md",
+    "repositoryTopics": [
+      {
+        "name": "brazil"
+      },
+      {
+        "name": "cash-management"
+      },
+      {
+        "name": "docker"
+      },
+      {
+        "name": "golang"
+      },
+      {
+        "name": "inventory-management"
+      },
+      {
+        "name": "linux"
+      },
+      {
+        "name": "local-first"
+      },
+      {
+        "name": "open-source"
+      },
+      {
+        "name": "order-management"
+      },
+      {
+        "name": "pdv"
+      },
+      {
+        "name": "point-of-sale"
+      },
+      {
+        "name": "pos"
+      },
+      {
+        "name": "postgresql"
+      },
+      {
+        "name": "restaurant"
+      },
+      {
+        "name": "restaurant-management"
+      },
+      {
+        "name": "restaurant-pos"
+      },
+      {
+        "name": "self-hosted"
+      },
+      {
+        "name": "windows"
+      }
+    ]
+  },
+  "ranking_measured": false
+}

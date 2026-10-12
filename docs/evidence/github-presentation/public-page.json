@@ -1,0 +1,48 @@
+{
+  "result": "PASS",
+  "readmeImages": [
+    {
+      "alt": "Release experimental",
+      "loaded": true,
+      "src": "https://camo.githubusercontent.com/046dbb5a7b4c92ff1ff953c89364448268ddaa11b9317023dd8ea59d5d0492ba/68747470733a2f2f696d672e736869656c64732e696f2f6769746875622f762f72656c656173652f67616465767362722f4f70656e466f6f643f696e636c7564655f70726572656c6561736573266c6162656c3d616c706861"
+    },
+    {
+      "alt": "Build e testes",
+      "loaded": true,
+      "src": "https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml/badge.svg"
+    },
+    {
+      "alt": "Licença AGPL-3.0",
+      "loaded": true,
+      "src": "https://camo.githubusercontent.com/e75361a6644d5c0f8c3efce74ee774f25811f1c1b9a2d7c7d3a1f05a33d790a3/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f6c6963656e73652d4147504c2d2d332e302d626c7565"
+    },
+    {
+      "alt": "PDV OpenFood: categorias de restaurante, cardápio e pedido lateral",
+      "loaded": true,
+      "src": "https://github.com/gadevsbr/OpenFood/raw/main/docs/evidence/restaurant-ui/pos-desktop.png"
+    },
+    {
+      "alt": "Tela dividida entre PDV e administração",
+      "loaded": true,
+      "src": "https://github.com/gadevsbr/OpenFood/raw/main/docs/evidence/restaurant-ui/pos-regression/mode-desktop.png"
+    },
+    {
+      "alt": "Dashboard administrativo com pedidos e indicadores da loja",
+      "loaded": true,
+      "src": "https://github.com/gadevsbr/OpenFood/raw/main/docs/evidence/restaurant-ui/pos-regression/admin-dashboard.png"
+    },
+    {
+      "alt": "Histórico do cliente com composição e preço do combo registrados na venda",
+      "loaded": true,
+      "src": "https://github.com/gadevsbr/OpenFood/raw/main/docs/evidence/combo-stage/customer-history.png"
+    },
+    {
+      "alt": "Pedido no celular com combo, observações e identificação opcional do cliente",
+      "loaded": true,
+      "src": "https://github.com/gadevsbr/OpenFood/raw/main/docs/evidence/combo-stage/combo-cart-mobile.png"
+    }
+  ],
+  "issueFormsPublished": true,
+  "issueChooserURL": "https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2Fgadevsbr%2FOpenFood%2Fissues%2Fnew%2Fchoose",
+  "issueChooserAuthenticatedUI": "not verified"
+}
