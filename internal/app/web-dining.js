@@ -477,6 +477,7 @@ function sendDiningRound() {
             expected_version: diningActive.version,
             expected_remaining_cents: posSubtotal(),
             items: posCart.map(menuPayloadItem),
+            customer_id:Number($("posCustomer").value)||0,
             note: diningNoteInput.value.trim(),
           },
         };

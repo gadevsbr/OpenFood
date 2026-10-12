@@ -37,6 +37,7 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
     .locator("#consentForm [name=customer_id]")
     .selectOption({ label: "Cliente QA revisado (customer-qa@example.org)" });
   await p.locator("#consentForm [name=purpose]").fill("qa-test");
+  await p.locator("#consentForm [name=terms_text]").fill("Termos de consentimento QA");
   await p.locator("#consentForm [name=version]").fill("1");
   await p.locator("#consentForm [name=source]").selectOption({ index: 1 });
   await p.locator("#consentForm [name=granted]").check();

@@ -2,6 +2,8 @@ const { chromium } = require("../tools/qa/node_modules/playwright");
 const fs = require("fs"),
   assert = require("assert");
 (async () => {
+  const suffix=process.env.OPENFOOD_UI_FIXTURE_SUFFIX||"";
+  const fixture=value=>value.includes("@")?value.replace("@",suffix.replace(/[^a-zA-Z0-9_-]/g,"_")+"@"):value+suffix;
   const data =
     process.env.OPENFOOD_UI_TEST_DATA || "runtime/ui-redesign-20261010-f";
   const { URL: url } = JSON.parse(fs.readFileSync(data + "/runtime.json"));
@@ -24,27 +26,27 @@ const fs = require("fs"),
   await p.locator("#tabCatalogo").click();
   await p.locator("#subtabCategorias").click();
   await p.locator("#pageAction").click();
-  await p.locator("#categoryForm [name=name]").fill("Categoria QA");
+  await p.locator("#categoryForm [name=name]").fill(fixture("Categoria QA"));
   await p.locator("#categorySubmit").click();
   await p
     .locator("#categoriesTable")
-    .getByText("Categoria QA", { exact: true })
+    .getByText(fixture("Categoria QA"), { exact: true })
     .waitFor();
   await p
     .locator("#categoryForm")
     .evaluate((f) => (f.closest("details").open = false));
   await p
     .locator("#categoriesTable tr")
-    .filter({ hasText: "Categoria QA" })
+    .filter({ hasText: fixture("Categoria QA") })
     .last()
     .getByRole("button", { name: "Editar", exact: true })
     .click();
   assert(await p.locator("#categoryForm [name=name]").isVisible());
-  await p.locator("#categoryForm [name=name]").fill("Categoria QA revisada");
+  await p.locator("#categoryForm [name=name]").fill(fixture("Categoria QA revisada"));
   await p.locator("#categorySubmit").click();
   await p
     .locator("#categoriesTable")
-    .getByText("Categoria QA revisada", { exact: true })
+    .getByText(fixture("Categoria QA revisada"), { exact: true })
     .waitFor();
   for (const id of ["subtabVariantes", "subtabAdicionais", "subtabCombos"]) {
     await p.locator("#" + id).click();
@@ -56,26 +58,27 @@ const fs = require("fs"),
   }
   await p.locator("#tabClientes").click();
   await p.locator("#pageAction").click();
-  await p.locator("#customerForm [name=name]").fill("Cliente de teste QA");
-  await p.locator("#customerForm [name=email]").fill("customer-qa@example.org");
+  await p.locator("#customerForm [name=name]").fill(fixture("Cliente de teste QA"));
+  await p.locator("#customerForm [name=email]").fill(fixture("customer-qa@example.org"));
   await p.locator("#customerSubmit").click();
   await p
     .locator("#customersTable")
-    .getByText("Cliente de teste QA", { exact: true })
+    .getByText(fixture("Cliente de teste QA"), { exact: true })
     .waitFor();
   await p
     .locator("#customerForm")
     .evaluate((f) => (f.closest("details").open = false));
   await p
-    .locator("#customersTable")
+    .locator("#customersTable tr")
+    .filter({hasText:fixture("Cliente de teste QA")})
     .getByRole("button", { name: "Editar", exact: true })
     .click();
   assert(await p.locator("#customerForm [name=name]").isVisible());
-  await p.locator("#customerForm [name=name]").fill("Cliente QA revisado");
+  await p.locator("#customerForm [name=name]").fill(fixture("Cliente QA revisado"));
   await p.locator("#customerSubmit").click();
   await p
     .locator("#customersTable")
-    .getByText("Cliente QA revisado", { exact: true })
+    .getByText(fixture("Cliente QA revisado"), { exact: true })
     .waitFor();
   await p
     .locator("#customerForm")

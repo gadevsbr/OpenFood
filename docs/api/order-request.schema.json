@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenFood OrderRequest",
+  "description": "Authenticated store-scoped POST /api/orders; X-OpenFood:1 and Idempotency-Key. Prices come from server. combo_id>0 requires product_id absent/zero; components select configured products with quantity=1; stored quantities are defined in combo configuration. Same key/payload replays; changed key payload 409. Unknown/unavailable choices rejected with rollback.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "customer_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "product_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "variant_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "addon_option_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxItems": 50,
+          "uniqueItems": true
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "configuration_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "combo_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "combo_version": {
+          "type": "string"
+        },
+        "components": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/item"
+          }
+        }
+      },
+      "required": [
+        "quantity"
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "postgres_full_seconds": 314.815,
+  "full_suite_note": "Antes da normalização LF do novo SQL v8; DDL equivalente. Repetição focal com fingerprint definitivo e restauração PASS.",
+  "postgres_combo_final_seconds": 56.11,
+  "schema_v8_checksum": "e5fd021541fefb6f4a838d00d591069f595f337da95c0f7d3ab677421e5e6e28",
+  "browser": "Chromium real, combo/clientes e regressão cardápio PASS; zero pageerrors; fresh QA runtime/combo-20261011-b",
+  "vet": "PASS",
+  "syntax": "PASS",
+  "distribution": "pending CI"
+}

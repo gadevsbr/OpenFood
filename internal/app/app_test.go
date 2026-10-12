@@ -449,7 +449,7 @@ func TestPostgresJourney(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("nullable customer list: expected 200, got %d %s", code, body)
 	}
-	code, body, _ = call("POST", "/api/consents", map[string]any{"customer_id": customerID, "purpose": "qa-contact", "version": "1", "granted": true, "source": "qa"}, cookie)
+	code, body, _ = call("POST", "/api/consents", map[string]any{"customer_id": customerID, "terms_text": "Termos QA", "purpose": "qa-contact", "version": "1", "granted": true, "source": "qa"}, cookie)
 	if code != 200 {
 		t.Fatalf("consent registration: got %d %s", code, body)
 	}
@@ -519,7 +519,7 @@ func TestPostgresUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, version := range []int{1, 2, 3, 4, 5, 6} {
+	for _, version := range []int{1, 2, 3, 4, 5, 6, 7} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 			defer cancel()
@@ -593,7 +593,7 @@ func TestPostgresUpgrade(t *testing.T) {
 					t.Fatalf("legacy v3 backup restore: %v", err)
 				}
 				var restored int
-				if err = a.DB.QueryRow(ctx, "SELECT max(version) FROM schema_migrations").Scan(&restored); err != nil || restored != 7 {
+				if err = a.DB.QueryRow(ctx, "SELECT max(version) FROM schema_migrations").Scan(&restored); err != nil || restored != 8 {
 					t.Fatalf("legacy backup not upgraded: %d %v", restored, err)
 				}
 			}

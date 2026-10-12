@@ -331,10 +331,11 @@ func (a *App) saveMenu(ctx context.Context, store, user int64, c MenuConfigurati
 }
 
 type menuSelection struct {
-	Version int64        `json:"configuration_version"`
-	Base    int64        `json:"base_price_cents"`
-	Variant *MenuVariant `json:"variant,omitempty"`
-	Addons  []MenuOption `json:"addons"`
+	Combo   *comboSnapshot `json:"combo,omitempty"`
+	Version int64          `json:"configuration_version"`
+	Base    int64          `json:"base_price_cents"`
+	Variant *MenuVariant   `json:"variant,omitempty"`
+	Addons  []MenuOption   `json:"addons"`
 }
 
 func configuredItem(ctx context.Context, tx pgx.Tx, store int64, item Item, name string, price int64) (string, int64, menuSelection, error) {
@@ -527,5 +528,5 @@ func restoreMenuStock(ctx context.Context, tx pgx.Tx, store, order int64) error 
 			return fmt.Errorf("stock_release_failed: %w", err)
 		}
 	}
-	return nil
+	return restoreComboStock(ctx, tx, store, order)
 }

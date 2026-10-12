@@ -21,15 +21,16 @@ func migrateDining(ctx context.Context, tx pgx.Tx) error {
 }
 
 type DiningRequest struct {
-	Action   string       `json:"action"`
-	ID       int64        `json:"id"`
-	TableID  int64        `json:"table_id"`
-	Label    string       `json:"label"`
-	Version  int64        `json:"expected_version"`
-	Expected int64        `json:"expected_remaining_cents"`
-	Items    []Item       `json:"items"`
-	Payments []POSPayment `json:"payments"`
-	Note     string       `json:"note"`
+	CustomerID int64        `json:"customer_id,omitempty"`
+	Action     string       `json:"action"`
+	ID         int64        `json:"id"`
+	TableID    int64        `json:"table_id"`
+	Label      string       `json:"label"`
+	Version    int64        `json:"expected_version"`
+	Expected   int64        `json:"expected_remaining_cents"`
+	Items      []Item       `json:"items"`
+	Payments   []POSPayment `json:"payments"`
+	Note       string       `json:"note"`
 }
 type DiningTab struct {
 	ID        int64  `json:"id"`
@@ -45,7 +46,7 @@ type DiningTab struct {
 }
 
 func diningFailure(w http.ResponseWriter, err error) {
-	known := map[string]bool{"cash_not_open": true, "tab_not_open": true, "tab_changed_reload": true, "table_unavailable": true, "tab_label_in_use": true, "tab_limit": true, "tab_not_empty": true, "payment_total_invalid": true, "idempotency_conflict": true, "checkout_price_changed": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "total_limit": true, "order_duplicate_product": true, "configuration_invalid": true, "configuration_changed": true, "variant_required": true, "addon_unavailable": true, "addon_limits_invalid": true, "integrated_payment_unsupported": true}
+	known := map[string]bool{"cash_not_open": true, "tab_not_open": true, "tab_changed_reload": true, "table_unavailable": true, "tab_label_in_use": true, "tab_limit": true, "tab_not_empty": true, "payment_total_invalid": true, "idempotency_conflict": true, "checkout_price_changed": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "total_limit": true, "order_duplicate_product": true, "configuration_invalid": true, "configuration_changed": true, "variant_required": true, "addon_unavailable": true, "addon_limits_invalid": true, "combo_invalid": true, "combo_unavailable": true, "combo_limits_invalid": true, "combo_quantity_invalid": true, "customer_invalid": true, "integrated_payment_unsupported": true}
 	if known[err.Error()] {
 		failure(w, 409, err.Error())
 	} else {
@@ -299,7 +300,7 @@ func (a *App) ChangeDining(ctx context.Context, store, user int64, key string, i
 			if len(input.Items) < 1 {
 				return 0, errors.New("quantity_invalid")
 			}
-			order, e := a.createOrderTx(ctx, tx, store, user, "dining:"+Hash(key), OrderRequest{Items: input.Items})
+			order, e := a.createOrderTx(ctx, tx, store, user, "dining:"+Hash(key), OrderRequest{Items: input.Items, CustomerID: input.CustomerID})
 			if e != nil {
 				return 0, e
 			}

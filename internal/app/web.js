@@ -702,6 +702,7 @@ async function renderCombos() {
         renderComboItems();
       };
       actCell.append(itemsBtn);
+      const edit=posButton("Editar",()=>{editCombo(c);$("comboForm").closest("details").open=true});edit.className="btn-secondary";actCell.append(edit);
       r.append(actCell);
       tbody.append(r);
     }
@@ -994,16 +995,20 @@ async function loadCustomers() {
       editBtn.textContent = "Editar";
       editBtn.style.fontSize = "12px";
       editBtn.style.padding = "6px 10px";
+      editBtn.disabled=!canManageUsers()||c.name==="Cliente Anonimizado";
       editBtn.onclick = () => editCustomer(c);
       actCell.append(editBtn);
+      const history=document.createElement("button");history.textContent="Histórico";history.onclick=()=>run(async()=>{const data=await api("customer-export?customer_id="+c.id),body=posDialog("Histórico · "+c.name);body.append(menuNode("p","menu-hint","Pedidos desta loja, com os valores registrados na venda."));for(const order of data.orders){const row=menuNode("section","menu-choice-group");row.append(menuNode("strong","",`Pedido #${order.id} · ${money(order.total_cents)}`),menuNode("p","",`${order.state} · ${new Date(order.created_at).toLocaleString("pt-BR")}`));for(const item of data.items.filter(i=>i.order_id===order.id))row.append(menuNode("p","",`${item.quantity}x ${item.name} · ${money(item.price_cents*Number(item.quantity))}`));body.append(row)}if(!data.orders.length)body.append(menuNode("p","","Nenhum pedido vinculado."))});actCell.append(history);
+
       let delBtn = document.createElement("button");
       delBtn.className = "btn-cancel";
-      delBtn.textContent = "Excluir";
+      delBtn.textContent = "Remover identificação";
+      delBtn.disabled=!canManageUsers()||c.name==="Cliente Anonimizado";
       delBtn.style.fontSize = "12px";
       delBtn.style.padding = "6px 10px";
       delBtn.onclick = () =>
         run(async () => {
-          if (confirm('Excluir cliente "' + c.name + '"?')) {
+          if (confirm('Remover identificação de "' + c.name + '"? O histórico financeiro será preservado.')) {
             await apiDelete("customers?id=" + c.id);
             await loadCustomers();
           }
@@ -1154,6 +1159,7 @@ $("#consentForm").onsubmit = (e) => {
     granted: d.get("granted") === "on",
     source: d.get("source"),
     evidence: evidence,
+    terms_text:d.get("terms_text"),
   };
   run(async () => {
     await api("consents", payload);
@@ -1190,7 +1196,7 @@ async function lgpdExport(customerId) {
 async function lgpdDelete(customerId) {
   if (
     !confirm(
-      "ATENÇÃO: Esta ação é irreversível. Se o cliente tiver pedidos ativos, os dados serão anonimizados (mantidos para conformidade fiscal). Continuar?",
+      "Remover identificação, contatos e observações deste cliente? O histórico financeiro será preservado. Backups anteriores podem conter dados antigos. Esta ação não pode ser desfeita.",
     )
   )
     return;
@@ -1205,7 +1211,7 @@ async function lgpdDelete(customerId) {
     }
     let result = await res.json();
     if (result.anonymized) {
-      msg("Cliente anonimizado. Pedidos mantidos para conformidade fiscal.");
+      msg("Identificação e contatos removidos; histórico financeiro preservado.");
     } else {
       msg("Cliente excluído permanentemente.");
     }

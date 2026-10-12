@@ -26,12 +26,13 @@ type POSPayment struct {
 	Tendered int64  `json:"tendered_cents"`
 }
 type CheckoutRequest struct {
-	Items    []Item       `json:"items"`
-	Payments []POSPayment `json:"payments"`
-	Expected int64        `json:"expected_total_cents"`
-	Discount int64        `json:"discount_cents"`
-	Note     string       `json:"discount_note"`
-	Service  string       `json:"service"`
+	CustomerID int64        `json:"customer_id,omitempty"`
+	Items      []Item       `json:"items"`
+	Payments   []POSPayment `json:"payments"`
+	Expected   int64        `json:"expected_total_cents"`
+	Discount   int64        `json:"discount_cents"`
+	Note       string       `json:"discount_note"`
+	Service    string       `json:"service"`
 }
 
 func (a *App) posCheckout(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
@@ -54,7 +55,7 @@ func (a *App) posCheckout(w http.ResponseWriter, r *http.Request, store int64, u
 	}
 	id, e := a.Checkout(r.Context(), store, user.ID, r.Header.Get("Idempotency-Key"), input)
 	if e != nil {
-		known := map[string]bool{"cash_not_open": true, "checkout_price_changed": true, "payment_total_invalid": true, "checkout_invalid": true, "discount_invalid": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "idempotency_conflict": true, "order_duplicate_product": true, "configuration_invalid": true, "configuration_changed": true, "variant_required": true, "addon_unavailable": true, "addon_limits_invalid": true}
+		known := map[string]bool{"cash_not_open": true, "checkout_price_changed": true, "payment_total_invalid": true, "checkout_invalid": true, "discount_invalid": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "idempotency_conflict": true, "order_duplicate_product": true, "configuration_invalid": true, "configuration_changed": true, "variant_required": true, "addon_unavailable": true, "addon_limits_invalid": true, "combo_invalid": true, "combo_unavailable": true, "combo_limits_invalid": true, "combo_quantity_invalid": true, "customer_invalid": true}
 		if known[e.Error()] {
 			failure(w, 409, e.Error())
 		} else {
@@ -97,7 +98,7 @@ func (a *App) Checkout(ctx context.Context, store, user int64, key string, input
 		return 0, e
 	}
 	// Order, stock and all receipts share one transaction. No partial sale survives a failure.
-	id, e = a.createOrderTx(ctx, tx, store, user, "pos:"+Hash(key), OrderRequest{Items: input.Items})
+	id, e = a.createOrderTx(ctx, tx, store, user, "pos:"+Hash(key), OrderRequest{Items: input.Items, CustomerID: input.CustomerID})
 	if e != nil {
 		return 0, e
 	}

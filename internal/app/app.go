@@ -49,6 +49,9 @@ var diningSchema string
 //go:embed menu-schema.sql
 var menuSchema string
 
+//go:embed combo-schema.sql
+var comboSchema string
+
 //go:embed web-dining.js
 var webDining []byte
 
@@ -73,7 +76,7 @@ var webUX []byte
 //go:embed food/*.jpg
 var foodImages embed.FS
 
-const Version = "0.10.0-alpha.1"
+const Version = "0.11.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -292,6 +295,9 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 		if e = migrateMenu(ctx, tx); e != nil {
+			return e
+		}
+		if e = migrateCombos(ctx, tx); e != nil {
 			return e
 		}
 		return tx.Commit(ctx)
@@ -622,7 +628,7 @@ func (a *App) Migrate(ctx context.Context) error {
 			if e != nil {
 				return e
 			}
-		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) && (n != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema)) {
+		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) && (n != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema)) && (n != 8 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema)) {
 			return errors.New("migration_incompatible")
 		}
 	}
@@ -649,11 +655,16 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 	}
+	if n < 8 {
+		if e = migrateCombos(ctx, tx); e != nil {
+			return e
+		}
+	}
 	return tx.Commit(ctx)
 }
 
 func ValidateSchema(version int, checksum string) error {
-	if version != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema) {
+	if version != 8 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema) {
 		return errors.New("migration_incompatible")
 	}
 	return nil
@@ -994,6 +1005,36 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			a.comboItemsHandler(w, r, targetStore, user)
+		case "/api/customer-lookup":
+			if !user.CanAccessStore(targetStore) || !user.CanCreateOrders() {
+				failure(w, 403, "forbidden_customers_access")
+				return
+			}
+			if r.Method != "GET" {
+				failure(w, 405, "method_not_allowed")
+				return
+			}
+			rows, err := a.DB.Query(r.Context(), "SELECT id,name,COALESCE(phone,'') FROM customers WHERE store_id=$1 AND anonymized_at IS NULL AND ($2='' OR name ILIKE '%'||$2||'%' OR phone ILIKE '%'||$2||'%') AND ($3::bigint=0 OR id=$3) ORDER BY name,id LIMIT 100", targetStore, strings.TrimSpace(r.URL.Query().Get("q")), ParseInt(r.URL.Query().Get("id")))
+			if err != nil {
+				failure(w, 500, "customers_failed")
+				return
+			}
+			defer rows.Close()
+			result := []map[string]any{}
+			for rows.Next() {
+				var id int64
+				var name, phone string
+				if err = rows.Scan(&id, &name, &phone); err != nil {
+					failure(w, 500, "customers_failed")
+					return
+				}
+				result = append(result, map[string]any{"id": id, "name": name, "phone": phone})
+			}
+			if rows.Err() != nil {
+				failure(w, 500, "customers_failed")
+				return
+			}
+			jsonResponse(w, 200, result)
 		case "/api/customers":
 			if !user.CanAccessStore(targetStore) {
 				failure(w, 403, "forbidden_cross_store_access")
@@ -2154,12 +2195,12 @@ func (a *App) productAddonGroupsHandler(w http.ResponseWriter, r *http.Request, 
 
 // Combos handler
 func (a *App) combosHandler(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
-	if !user.CanManageCatalog() {
+	if r.Method != "GET" && !user.CanManageCatalog() {
 		failure(w, 403, "forbidden_catalog_management_required")
 		return
 	}
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), "SELECT id,name,description,price_cents,pricing_policy,active,display_order,created_at FROM combos WHERE store_id=$1 ORDER BY display_order, id", store)
+		rows, e := a.DB.Query(r.Context(), "SELECT id,name,COALESCE(description,''),price_cents,pricing_policy,active,display_order,created_at FROM combos WHERE store_id=$1 ORDER BY display_order, id", store)
 		if e != nil {
 			failure(w, 500, "combos_failed")
 			return
@@ -2191,7 +2232,7 @@ func (a *App) combosHandler(w http.ResponseWriter, r *http.Request, store int64,
 		jsonResponse(w, 200, result)
 		return
 	}
-	if r.Method == "POST" {
+	if r.Method == "POST" || r.Method == "PATCH" {
 		var input struct {
 			Name          string `json:"name"`
 			Description   string `json:"description"`
@@ -2212,12 +2253,34 @@ func (a *App) combosHandler(w http.ResponseWriter, r *http.Request, store int64,
 			failure(w, 400, "pricing_policy_invalid")
 			return
 		}
-		if input.PriceCents < 0 {
+		if input.PriceCents < 0 || input.PriceCents > 1000000000 {
 			failure(w, 400, "price_invalid")
 			return
 		}
+		tx, e := a.DB.Begin(r.Context())
+		if e != nil {
+			failure(w, 500, "combo_failed")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		if _, e = tx.Exec(r.Context(), "SELECT id FROM stores WHERE id=$1 FOR UPDATE", store); e != nil {
+			failure(w, 500, "combo_failed")
+			return
+		}
 		var id int64
-		e := a.DB.QueryRow(r.Context(), "INSERT INTO combos(store_id,name,description,price_cents,pricing_policy,active,display_order) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id", store, input.Name, input.Description, input.PriceCents, input.PricingPolicy, input.Active, input.DisplayOrder).Scan(&id)
+		if r.Method == "PATCH" {
+			id = ParseInt(r.URL.Query().Get("id"))
+			e = tx.QueryRow(r.Context(), "UPDATE combos SET name=$3,description=$4,price_cents=$5,pricing_policy=$6,active=$7,display_order=$8 WHERE store_id=$1 AND id=$2 RETURNING id", store, id, input.Name, input.Description, input.PriceCents, input.PricingPolicy, input.Active, input.DisplayOrder).Scan(&id)
+		} else {
+			e = tx.QueryRow(r.Context(), "INSERT INTO combos(store_id,name,description,price_cents,pricing_policy,active,display_order) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id", store, input.Name, input.Description, input.PriceCents, input.PricingPolicy, input.Active, input.DisplayOrder).Scan(&id)
+		}
+		if e == nil {
+			_, e = tx.Exec(r.Context(), "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,'combo_configuration',$3)", store, user.ID, id)
+		}
+		if e == nil {
+			e = tx.Commit(r.Context())
+		}
+
 		if e != nil {
 			failure(w, 500, "combo_failed")
 			return
@@ -2230,25 +2293,43 @@ func (a *App) combosHandler(w http.ResponseWriter, r *http.Request, store int64,
 
 // Combo items handler
 func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
-	if !user.CanManageCatalog() {
+	if r.Method != "GET" && !user.CanManageCatalog() {
 		failure(w, 403, "forbidden_catalog_management_required")
 		return
+	}
+	tx, e := a.DB.Begin(r.Context())
+	if e != nil {
+		failure(w, 500, "combo_items_failed")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	if r.Method != "GET" {
+		if _, e = tx.Exec(r.Context(), "SELECT id FROM stores WHERE id=$1 FOR UPDATE", store); e != nil {
+			failure(w, 500, "combo_items_failed")
+			return
+		}
 	}
 	comboID := ParseInt(r.URL.Query().Get("combo_id"))
 	if comboID <= 0 {
 		failure(w, 400, "combo_id_required")
 		return
 	}
+	var existsCombo bool
+	if e = tx.QueryRow(r.Context(), "SELECT true FROM combos WHERE store_id=$1 AND id=$2", store, comboID).Scan(&existsCombo); e != nil {
+		failure(w, 404, "combo_not_found")
+		return
+	}
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), `SELECT ci.product_id,p.name,ci.quantity,ci.is_optional,ci.group_name,ci.min_selections,ci.max_selections,ci.display_order 
-			FROM combo_items ci JOIN products p ON p.store_id=ci.store_id AND p.id=ci.product_id 
-			WHERE ci.store_id=$1 AND ci.combo_id=$2 ORDER BY ci.display_order`, store, comboID)
+		rows, e := tx.Query(r.Context(), `SELECT ci.product_id,p.name,ci.quantity,ci.is_optional,COALESCE(ci.group_name,''),ci.min_selections,ci.max_selections,ci.display_order
+			FROM combo_items ci JOIN products p ON p.store_id=ci.store_id AND p.id=ci.product_id
+			WHERE ci.store_id=$1 AND ci.combo_id=$2 ORDER BY ci.display_order,ci.product_id`, store, comboID)
 		if e != nil {
 			failure(w, 500, "combo_items_failed")
 			return
 		}
 		defer rows.Close()
 		result := []map[string]any{}
+		definitions := []comboDefinition{}
 		for rows.Next() {
 			var productID int64
 			var name string
@@ -2261,6 +2342,7 @@ func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store in
 				failure(w, 500, "combo_items_scan_failed")
 				return
 			}
+			definitions = append(definitions, comboDefinition{productID, quantity, isOptional, groupName, minSel, maxSel})
 			result = append(result, map[string]any{
 				"product_id":     productID,
 				"name":           name,
@@ -2271,6 +2353,17 @@ func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store in
 				"max_selections": maxSel,
 				"display_order":  displayOrder,
 			})
+		}
+		var name, policy string
+		var price int64
+		var active bool
+		if e = tx.QueryRow(r.Context(), "SELECT name,price_cents,pricing_policy,active FROM combos WHERE store_id=$1 AND id=$2", store, comboID).Scan(&name, &price, &policy, &active); e != nil {
+			failure(w, 500, "combo_items_failed")
+			return
+		}
+		version := comboDefinitionVersion(name, policy, price, active, definitions)
+		for _, item := range result {
+			item["combo_version"] = version
 		}
 		jsonResponse(w, 200, result)
 		return
@@ -2289,7 +2382,7 @@ func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store in
 			failure(w, 400, "combo_item_invalid")
 			return
 		}
-		if input.Quantity <= 0 {
+		if input.Quantity <= 0 || input.Quantity > 100000 || input.Quantity != float64(int64(input.Quantity)) {
 			failure(w, 400, "quantity_invalid")
 			return
 		}
@@ -2299,13 +2392,21 @@ func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store in
 		}
 		// Verify product exists and belongs to store
 		var exists bool
-		e := a.DB.QueryRow(r.Context(), "SELECT true FROM products WHERE store_id=$1 AND id=$2", store, input.ProductID).Scan(&exists)
+		e := tx.QueryRow(r.Context(), "SELECT true FROM products WHERE store_id=$1 AND id=$2", store, input.ProductID).Scan(&exists)
 		if e != nil || !exists {
 			failure(w, 400, "product_not_found")
 			return
 		}
-		_, e = a.DB.Exec(r.Context(), "INSERT INTO combo_items(combo_id,store_id,product_id,quantity,is_optional,group_name,min_selections,max_selections,display_order) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (combo_id,product_id) DO UPDATE SET quantity=$4,is_optional=$5,group_name=$6,min_selections=$7,max_selections=$8,display_order=$9", comboID, store, input.ProductID, input.Quantity, input.IsOptional, input.GroupName, input.MinSelections, input.MaxSelections, input.DisplayOrder)
+		_, e = tx.Exec(r.Context(), "INSERT INTO combo_items(combo_id,store_id,product_id,quantity,is_optional,group_name,min_selections,max_selections,display_order) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (combo_id,product_id) DO UPDATE SET quantity=$4,is_optional=$5,group_name=$6,min_selections=$7,max_selections=$8,display_order=$9", comboID, store, input.ProductID, input.Quantity, input.IsOptional, input.GroupName, input.MinSelections, input.MaxSelections, input.DisplayOrder)
 		if e != nil {
+			failure(w, 500, "combo_item_failed")
+			return
+		}
+		if _, e = tx.Exec(r.Context(), "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,'combo_components',$3)", store, user.ID, comboID); e != nil {
+			failure(w, 500, "combo_item_failed")
+			return
+		}
+		if e = tx.Commit(r.Context()); e != nil {
 			failure(w, 500, "combo_item_failed")
 			return
 		}
@@ -2318,9 +2419,17 @@ func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store in
 			failure(w, 400, "product_id_required")
 			return
 		}
-		_, e := a.DB.Exec(r.Context(), "DELETE FROM combo_items WHERE store_id=$1 AND combo_id=$2 AND product_id=$3", store, comboID, productID)
+		_, e := tx.Exec(r.Context(), "DELETE FROM combo_items WHERE store_id=$1 AND combo_id=$2 AND product_id=$3", store, comboID, productID)
 		if e != nil {
 			failure(w, 500, "combo_item_delete_failed")
+			return
+		}
+		if _, e = tx.Exec(r.Context(), "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,'combo_components',$3)", store, user.ID, comboID); e != nil {
+			failure(w, 500, "combo_item_failed")
+			return
+		}
+		if e = tx.Commit(r.Context()); e != nil {
+			failure(w, 500, "combo_item_failed")
 			return
 		}
 		jsonResponse(w, 200, map[string]bool{"ok": true})
@@ -2330,6 +2439,9 @@ func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store in
 }
 
 type Item struct {
+	ComboVersion         string  `json:"combo_version,omitempty"`
+	ComboID              int64   `json:"combo_id,omitempty"`
+	Components           []Item  `json:"components,omitempty"`
 	ProductID            int64   `json:"product_id"`
 	Quantity             int64   `json:"quantity"`
 	VariantID            int64   `json:"variant_id,omitempty"`
@@ -2338,7 +2450,8 @@ type Item struct {
 	ConfigurationVersion int64   `json:"configuration_version,omitempty"`
 }
 type OrderRequest struct {
-	Items []Item `json:"items"`
+	Items      []Item `json:"items"`
+	CustomerID int64  `json:"customer_id,omitempty"`
 }
 
 func (a *App) CreateOrder(ctx context.Context, store, user int64, key string, input OrderRequest) (int64, error) {
@@ -2396,6 +2509,9 @@ func (a *App) createOrderTx(ctx context.Context, tx pgx.Tx, store, user int64, k
 	seen := map[string]bool{}
 	quantities := map[int64]int64{}
 	for _, item := range input.Items {
+		if item.ComboID > 0 {
+			continue
+		}
 		if item.Quantity < 1 || item.Quantity > 100000 {
 			return 0, errors.New("quantity_invalid")
 		}
@@ -2412,6 +2528,30 @@ func (a *App) createOrderTx(ctx context.Context, tx pgx.Tx, store, user int64, k
 		seen[identity] = true
 		if item.Quantity < 1 || item.Quantity > 100000 {
 			return 0, errors.New("quantity_invalid")
+		}
+		if item.ComboID > 0 {
+			name, price, selection, err := configuredCombo(ctx, tx, store, item)
+			if err != nil {
+				return 0, err
+			}
+			total += price * item.Quantity
+			if total > 1000000000000 {
+				return 0, errors.New("total_limit")
+			}
+			item.ProductID = 0
+			for _, component := range selection.Combo.Components {
+				if component.Notes != "" {
+					if item.Notes != "" {
+						item.Notes += "; "
+					}
+					item.Notes += component.Name + ": " + component.Notes
+				}
+			}
+			snapshots = append(snapshots, snapshot{item, name, price, "unidade", selection})
+			continue
+		}
+		if item.ComboID < 0 || len(item.Components) > 0 {
+			return 0, errors.New("configuration_invalid")
 		}
 		var name string
 		var price int64
@@ -2445,13 +2585,49 @@ func (a *App) createOrderTx(ctx context.Context, tx pgx.Tx, store, user int64, k
 		}
 		snapshots = append(snapshots, snapshot{item, name, price, unit, selection})
 	}
+	consumed := map[int64]int64{}
+	for _, line := range snapshots {
+		if line.Selection.Combo != nil {
+			for _, component := range line.Selection.Combo.Components {
+				consumed[component.ProductID] += component.Quantity * line.Quantity
+			}
+		} else {
+			consumed[line.ProductID] += line.Quantity
+		}
+	}
+	for product, quantity := range consumed {
+		var min, max float64
+		if e = tx.QueryRow(ctx, "SELECT COALESCE(min_order_quantity,1),COALESCE(max_order_quantity,0) FROM products WHERE store_id=$1 AND id=$2", store, product).Scan(&min, &max); e != nil {
+			return 0, e
+		}
+		if quantity > 100000 || float64(quantity) < min || (max > 0 && float64(quantity) > max) {
+			return 0, errors.New("quantity_invalid")
+		}
+	}
+	if input.CustomerID < 0 {
+		return 0, errors.New("customer_invalid")
+	}
+	var customerName, customerPhone, customerEmail string
+	if input.CustomerID > 0 {
+		if e = tx.QueryRow(ctx, "SELECT name,COALESCE(phone,''),COALESCE(email,'') FROM customers WHERE store_id=$1 AND id=$2 AND anonymized_at IS NULL FOR UPDATE", store, input.CustomerID).Scan(&customerName, &customerPhone, &customerEmail); e != nil {
+			return 0, errors.New("customer_invalid")
+		}
+		if customerName == "Cliente Anonimizado" {
+			return 0, errors.New("customer_invalid")
+		}
+	}
 	e = tx.QueryRow(ctx, "INSERT INTO orders(store_id,idempotency_key,request_hash,total_cents,state) VALUES($1,$2,$3,$4,'confirmed') RETURNING id", store, key, digest, total).Scan(&id)
 	if e != nil {
 		return 0, e
 	}
+	if input.CustomerID > 0 {
+		if _, e = tx.Exec(ctx, "UPDATE orders SET customer_id=$3,customer_name=$4,customer_phone=NULLIF($5,''),customer_email=NULLIF($6,'') WHERE store_id=$1 AND id=$2", store, id, input.CustomerID, customerName, customerPhone, customerEmail); e != nil {
+			return 0, e
+		}
+	}
 	for _, s := range snapshots {
 		var lineID int64
-		if e = tx.QueryRow(ctx, "INSERT INTO order_items(order_id,store_id,product_id,name,price_cents,quantity,unit,variant_id,notes,selection) VALUES($1,$2,$3,$4,$5,$6,$7,NULLIF($8,0),$9,$10) RETURNING id", id, store, s.ProductID, s.Name, s.Price, s.Quantity, s.Unit, s.VariantID, strings.TrimSpace(s.Notes), selectionJSON(s.Selection)).Scan(&lineID); e != nil {
+		if e = tx.QueryRow(ctx, "INSERT INTO order_items(order_id,store_id,product_id,name,price_cents,quantity,unit,variant_id,notes,selection) VALUES($1,$2,NULLIF($3,0),$4,$5,$6,$7,NULLIF($8,0),$9,$10) RETURNING id", id, store, s.ProductID, s.Name, s.Price, s.Quantity, s.Unit, s.VariantID, strings.TrimSpace(s.Notes), selectionJSON(s.Selection)).Scan(&lineID); e != nil {
 			return 0, e
 		}
 		for _, option := range s.Selection.Addons {
@@ -2507,7 +2683,7 @@ func (a *App) orders(w http.ResponseWriter, r *http.Request, store int64, user *
 			failure(w, 404, "order_not_found")
 			return
 		}
-		rows, err := a.DB.Query(r.Context(), "SELECT product_id,name,price_cents,quantity,unit,COALESCE(notes,''),selection FROM order_items WHERE store_id=$1 AND order_id=$2 ORDER BY id", store, id)
+		rows, err := a.DB.Query(r.Context(), "SELECT COALESCE(product_id,0),name,price_cents,quantity,unit,COALESCE(notes,''),selection FROM order_items WHERE store_id=$1 AND order_id=$2 ORDER BY id", store, id)
 		if err != nil {
 			failure(w, 500, "orders_failed")
 			return
@@ -2710,6 +2886,10 @@ func (a *App) restore(w http.ResponseWriter, r *http.Request) {
 
 // Customers handler
 func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
+	if r.Method != "GET" && !user.CanManageUsers() {
+		failure(w, 403, "forbidden_customer_management")
+		return
+	}
 	if !user.CanViewFinancials() && !user.CanManageUsers() {
 		failure(w, 403, "forbidden_customers_access")
 		return
@@ -2818,6 +2998,14 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 			return
 		}
 		defer tx.Rollback(r.Context())
+		if _, e = tx.Exec(r.Context(), "SELECT id FROM stores WHERE id=$1 FOR UPDATE", store); e != nil {
+			failure(w, 500, "customer_update_failed")
+			return
+		}
+		if e = tx.QueryRow(r.Context(), "SELECT true FROM customers WHERE store_id=$1 AND id=$2 AND anonymized_at IS NULL FOR UPDATE", store, input.ID).Scan(&exists); e != nil {
+			failure(w, 404, "customer_not_found")
+			return
+		}
 
 		query := "UPDATE customers SET updated_at=now()"
 		args := []any{}
@@ -2890,31 +3078,13 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 		return
 	}
 	if r.Method == "DELETE" {
-		idStr := r.URL.Query().Get("id")
-		if idStr == "" {
-			failure(w, 400, "customer_id_required")
-			return
-		}
-		id := ParseInt(idStr)
-		if id <= 0 {
-			failure(w, 400, "customer_id_invalid")
-			return
-		}
-		// Check for orders referencing this customer
-		var orderCount int
-		e := a.DB.QueryRow(r.Context(), "SELECT count(*) FROM orders WHERE store_id=$1 AND customer_id=$2", store, id).Scan(&orderCount)
-		if e == nil && orderCount > 0 {
-			failure(w, 409, "customer_has_orders")
-			return
-		}
-		_, e = a.DB.Exec(r.Context(), "DELETE FROM customers WHERE store_id=$1 AND id=$2", store, id)
-		if e != nil {
-			failure(w, 500, "customer_delete_failed")
-			return
-		}
-		jsonResponse(w, 200, map[string]bool{"ok": true})
+		q := r.URL.Query()
+		q.Set("customer_id", q.Get("id"))
+		r.URL.RawQuery = q.Encode()
+		a.customerDeleteHandler(w, r, store, user)
 		return
 	}
+
 	failure(w, 405, "method_not_allowed")
 }
 
@@ -2925,15 +3095,8 @@ func (a *App) consentsHandler(w http.ResponseWriter, r *http.Request, store int6
 		return
 	}
 	if r.Method == "GET" {
-		customerID := ParseInt(r.URL.Query().Get("customer_id"))
-		query := "SELECT id,customer_id,purpose,version,granted,granted_at,revoked_at,source,evidence FROM consents WHERE store_id=$1"
-		args := []any{store}
-		if customerID > 0 {
-			query += " AND customer_id=$2"
-			args = append(args, customerID)
-		}
-		query += " ORDER BY id DESC"
-		rows, e := a.DB.Query(r.Context(), query, args...)
+		id := ParseInt(r.URL.Query().Get("customer_id"))
+		rows, e := a.DB.Query(r.Context(), "SELECT id,customer_id,purpose,version,granted,granted_at,revoked_at,source,evidence,terms_text FROM consents WHERE store_id=$1 AND ($2::bigint=0 OR customer_id=$2) ORDER BY id DESC", store, id)
 		if e != nil {
 			failure(w, 500, "consents_failed")
 			return
@@ -2941,30 +3104,44 @@ func (a *App) consentsHandler(w http.ResponseWriter, r *http.Request, store int6
 		defer rows.Close()
 		result := []map[string]any{}
 		for rows.Next() {
-			var id, custID int64
-			var purpose, version, source string
+			var id, customer int64
+			var purpose, version, source, terms string
 			var granted bool
-			var grantedAt, revokedAt *time.Time
-			var evidence []byte
-			if rows.Scan(&id, &custID, &purpose, &version, &granted, &grantedAt, &revokedAt, &source, &evidence) != nil {
-				failure(w, 500, "consents_scan_failed")
+			var at, revoked *time.Time
+			var evidence json.RawMessage
+			if e = rows.Scan(&id, &customer, &purpose, &version, &granted, &at, &revoked, &source, &evidence, &terms); e != nil {
+				failure(w, 500, "consents_failed")
 				return
 			}
-			result = append(result, map[string]any{
-				"id":          id,
-				"customer_id": custID,
-				"purpose":     purpose,
-				"version":     version,
-				"granted":     granted,
-				"granted_at":  grantedAt,
-				"revoked_at":  revokedAt,
-				"source":      source,
-				"evidence":    evidence,
-			})
+			result = append(result, map[string]any{"id": id, "customer_id": customer, "purpose": purpose, "version": version, "granted": granted, "granted_at": at, "revoked_at": revoked, "source": source, "evidence": evidence, "terms_text": terms})
+		}
+		if rows.Err() != nil {
+			failure(w, 500, "consents_failed")
+			return
 		}
 		jsonResponse(w, 200, result)
 		return
 	}
+	if !user.CanManageUsers() {
+		failure(w, 403, "forbidden_consent_management")
+		return
+	}
+	if r.Method != "POST" && r.Method != "PATCH" {
+		failure(w, 405, "method_not_allowed")
+		return
+	}
+	tx, e := a.DB.Begin(r.Context())
+	if e != nil {
+		failure(w, 500, "consent_failed")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	if _, e = tx.Exec(r.Context(), "SELECT id FROM stores WHERE id=$1 FOR UPDATE", store); e != nil {
+		failure(w, 500, "consent_failed")
+		return
+	}
+	var entity int64
+	var action string
 	if r.Method == "POST" {
 		var input struct {
 			CustomerID int64  `json:"customer_id"`
@@ -2973,57 +3150,58 @@ func (a *App) consentsHandler(w http.ResponseWriter, r *http.Request, store int6
 			Granted    bool   `json:"granted"`
 			Source     string `json:"source"`
 			Evidence   any    `json:"evidence"`
+			Terms      string `json:"terms_text"`
 		}
-		if decode(w, r, &input) != nil || input.CustomerID <= 0 || len(input.Purpose) < 1 || len(input.Version) < 1 || len(input.Source) < 1 {
+		if decode(w, r, &input) != nil || input.CustomerID < 1 || len(strings.TrimSpace(input.Purpose)) < 1 || len(input.Purpose) > 100 || len(strings.TrimSpace(input.Version)) < 1 || len(input.Version) > 20 || len(strings.TrimSpace(input.Source)) < 1 || len(input.Source) > 100 || (input.Granted && len(strings.TrimSpace(input.Terms)) < 1) || len(input.Terms) > 4000 {
 			failure(w, 400, "consent_invalid")
 			return
 		}
-		// Verify customer exists and belongs to store
 		var exists bool
-		e := a.DB.QueryRow(r.Context(), "SELECT true FROM customers WHERE store_id=$1 AND id=$2", store, input.CustomerID).Scan(&exists)
-		if e != nil || !exists {
+		if e = tx.QueryRow(r.Context(), "SELECT true FROM customers WHERE store_id=$1 AND id=$2 AND anonymized_at IS NULL FOR UPDATE", store, input.CustomerID).Scan(&exists); e != nil {
 			failure(w, 404, "customer_not_found")
 			return
 		}
-		evidenceJSON, _ := json.Marshal(input.Evidence)
-		var grantedAt interface{}
+		evidence, _ := json.Marshal(input.Evidence)
+		if len(evidence) > 8000 {
+			failure(w, 400, "consent_invalid")
+			return
+		}
+		var grantedAt any
 		if input.Granted {
 			grantedAt = time.Now()
 		}
-		_, e = a.DB.Exec(r.Context(), `INSERT INTO consents(store_id,customer_id,purpose,version,granted,granted_at,source,evidence) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (store_id,customer_id,purpose,version) DO UPDATE SET granted=$5,granted_at=$6,source=$7,evidence=$8,revoked_at=NULL`,
-			store, input.CustomerID, input.Purpose, input.Version, input.Granted, grantedAt, input.Source, evidenceJSON)
-		if e != nil {
-			failure(w, 500, "consent_failed")
+		e = tx.QueryRow(r.Context(), `INSERT INTO consents(store_id,customer_id,purpose,version,granted,granted_at,source,evidence,terms_text) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (store_id,customer_id,purpose,version) DO NOTHING RETURNING id`, store, input.CustomerID, strings.TrimSpace(input.Purpose), strings.TrimSpace(input.Version), input.Granted, grantedAt, strings.TrimSpace(input.Source), evidence, strings.TrimSpace(input.Terms)).Scan(&entity)
+		if errors.Is(e, pgx.ErrNoRows) {
+			failure(w, 409, "consent_version_exists")
 			return
 		}
-		jsonResponse(w, 200, map[string]bool{"ok": true})
-		return
-	}
-	if r.Method == "PATCH" {
-		// Revoke consent
+		action = "consent_registered"
+	} else {
 		var input struct {
 			ID int64 `json:"id"`
 		}
-		if decode(w, r, &input) != nil || input.ID <= 0 {
+		if decode(w, r, &input) != nil || input.ID < 1 {
 			failure(w, 400, "consent_revoke_invalid")
 			return
 		}
-		// Verify consent belongs to store
-		var exists bool
-		e := a.DB.QueryRow(r.Context(), "SELECT true FROM consents WHERE store_id=$1 AND id=$2", store, input.ID).Scan(&exists)
-		if e != nil || !exists {
+		e = tx.QueryRow(r.Context(), "UPDATE consents SET granted=false,revoked_at=COALESCE(revoked_at,now()) WHERE store_id=$1 AND id=$2 RETURNING id", store, input.ID).Scan(&entity)
+		if errors.Is(e, pgx.ErrNoRows) {
 			failure(w, 404, "consent_not_found")
 			return
 		}
-		_, e = a.DB.Exec(r.Context(), "UPDATE consents SET revoked_at=now() WHERE store_id=$1 AND id=$2", store, input.ID)
-		if e != nil {
-			failure(w, 500, "consent_revoke_failed")
-			return
-		}
-		jsonResponse(w, 200, map[string]bool{"ok": true})
+		action = "consent_revoked"
+	}
+	if e == nil {
+		_, e = tx.Exec(r.Context(), "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,$3,$4)", store, user.ID, action, entity)
+	}
+	if e == nil {
+		e = tx.Commit(r.Context())
+	}
+	if e != nil {
+		failure(w, 500, "consent_failed")
 		return
 	}
-	failure(w, 405, "method_not_allowed")
+	jsonResponse(w, 200, map[string]any{"ok": true, "id": entity})
 }
 
 // Customer data export (LGPD - Right to data portability)
@@ -3036,140 +3214,47 @@ func (a *App) customerExportHandler(w http.ResponseWriter, r *http.Request, stor
 		failure(w, 405, "method_not_allowed")
 		return
 	}
-	customerID := ParseInt(r.URL.Query().Get("customer_id"))
-	if customerID <= 0 {
+	id := ParseInt(r.URL.Query().Get("customer_id"))
+	if id < 1 {
 		failure(w, 400, "customer_id_required")
 		return
 	}
-
-	// Verify customer belongs to store
-	var customerName string
-	e := a.DB.QueryRow(r.Context(), "SELECT name FROM customers WHERE store_id=$1 AND id=$2", store, customerID).Scan(&customerName)
+	tx, e := a.DB.BeginTx(r.Context(), pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if e != nil {
-		failure(w, 404, "customer_not_found")
+		failure(w, 500, "customer_export_failed")
 		return
 	}
-
-	// Collect all data related to customer
-	ctx := r.Context()
-	export := map[string]any{
-		"customer": map[string]any{},
-		"orders":   []map[string]any{},
-		"consents": []map[string]any{},
-		"payments": []map[string]any{},
+	defer tx.Rollback(r.Context())
+	result := map[string]json.RawMessage{}
+	queries := map[string]string{
+		"customer": `SELECT to_jsonb(c) - 'store_id' FROM customers c WHERE store_id=$1 AND id=$2`,
+		"orders":   `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT id,total_cents,state,financial_state,delivery_type,delivery_fee_cents,notes,created_at,confirmed_at FROM orders WHERE store_id=$1 AND customer_id=$2) x`,
+		"items":    `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT i.id,i.order_id,i.product_id,i.name,i.price_cents,i.quantity,i.unit,i.notes,i.selection FROM order_items i JOIN orders o ON o.store_id=i.store_id AND o.id=i.order_id WHERE o.store_id=$1 AND o.customer_id=$2) x`,
+		"consents": `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT id,purpose,version,granted,granted_at,revoked_at,source,evidence,terms_text FROM consents WHERE store_id=$1 AND customer_id=$2) x`,
+		"payments": `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT p.id,p.order_id,p.provider,p.amount_cents,p.currency,p.status,p.confirmed_at,p.refunded_amount_cents,p.created_at FROM payments p JOIN orders o ON o.store_id=p.store_id AND o.id=p.order_id WHERE o.store_id=$1 AND o.customer_id=$2) x`,
+		"receipts": `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT m.id,m.order_id,m.method,m.amount_cents,m.created_at FROM manual_receipts m JOIN orders o ON o.store_id=m.store_id AND o.id=m.order_id WHERE o.store_id=$1 AND o.customer_id=$2) x`,
 	}
-
-	// Customer data
-	var customer struct {
-		ID                 int64
-		Name               string
-		Phone              *string
-		Email              *string
-		Document           *string
-		Notes              *string
-		MarketingConsent   bool
-		MarketingConsentAt *time.Time
-		CreatedAt          time.Time
-		UpdatedAt          time.Time
-	}
-	a.DB.QueryRow(ctx, "SELECT id,name,phone,email,document,notes,marketing_consent,marketing_consent_at,created_at,updated_at FROM customers WHERE store_id=$1 AND id=$2", store, customerID).Scan(
-		&customer.ID, &customer.Name, &customer.Phone, &customer.Email, &customer.Document, &customer.Notes, &customer.MarketingConsent, &customer.MarketingConsentAt, &customer.CreatedAt, &customer.UpdatedAt)
-	export["customer"] = customer
-
-	// Orders
-	rows, e := a.DB.Query(ctx, "SELECT id,total_cents,state,financial_state,delivery_type,delivery_fee_cents,notes,created_at,confirmed_at FROM orders WHERE store_id=$1 AND customer_id=$2 ORDER BY id DESC", store, customerID)
-	if e == nil {
-		defer rows.Close()
-		orders := []map[string]any{}
-		for rows.Next() {
-			var id, total int64
-			var state, financial, deliveryType string
-			var deliveryFee int64
-			var notes string
-			var createdAt, confirmedAt *time.Time
-			rows.Scan(&id, &total, &state, &financial, &deliveryType, &deliveryFee, &notes, &createdAt, &confirmedAt)
-			orders = append(orders, map[string]any{
-				"id": id, "total_cents": total, "state": state, "financial_state": financial,
-				"delivery_type": deliveryType, "delivery_fee_cents": deliveryFee, "notes": notes,
-				"created_at": createdAt, "confirmed_at": confirmedAt,
-			})
-		}
-		export["orders"] = orders
-	}
-
-	// Order items for each order
-	for _, order := range export["orders"].([]map[string]any) {
-		orderID := order["id"].(int64)
-		itemRows, e := a.DB.Query(ctx, "SELECT oi.product_id,p.name,oi.name,oi.price_cents,oi.quantity,oi.unit,COALESCE(oi.notes,'') FROM order_items oi JOIN products p ON p.store_id=oi.store_id AND p.id=oi.product_id WHERE oi.store_id=$1 AND oi.order_id=$2", store, orderID)
-		if e == nil {
-			items := []map[string]any{}
-			defer itemRows.Close()
-			for itemRows.Next() {
-				var productID int64
-				var prodName, itemName string
-				var priceCents int64
-				var quantity float64
-				var unit, notes string
-				itemRows.Scan(&productID, &prodName, &itemName, &priceCents, &quantity, &unit, &notes)
-				items = append(items, map[string]any{
-					"product_id": productID, "product_name": prodName, "name": itemName,
-					"price_cents": priceCents, "quantity": quantity, "unit": unit, "notes": notes,
-				})
+	for name, query := range queries {
+		var raw []byte
+		if e = tx.QueryRow(r.Context(), query, store, id).Scan(&raw); e != nil {
+			if name == "customer" && errors.Is(e, pgx.ErrNoRows) {
+				failure(w, 404, "customer_not_found")
+			} else {
+				failure(w, 500, "customer_export_failed")
 			}
-			order["items"] = items
+			return
 		}
+		result[name] = raw
 	}
-
-	// Consents
-	consentRows, e := a.DB.Query(ctx, "SELECT id,purpose,version,granted,granted_at,revoked_at,source,evidence FROM consents WHERE store_id=$1 AND customer_id=$2 ORDER BY id DESC", store, customerID)
-	if e == nil {
-		consents := []map[string]any{}
-		defer consentRows.Close()
-		for consentRows.Next() {
-			var id int64
-			var purpose, version, source string
-			var granted bool
-			var grantedAt, revokedAt *time.Time
-			var evidence []byte
-			consentRows.Scan(&id, &purpose, &version, &granted, &grantedAt, &revokedAt, &source, &evidence)
-			consents = append(consents, map[string]any{
-				"id": id, "purpose": purpose, "version": version, "granted": granted,
-				"granted_at": grantedAt, "revoked_at": revokedAt, "source": source, "evidence": evidence,
-			})
-		}
-		export["consents"] = consents
+	if e = tx.Commit(r.Context()); e != nil {
+		failure(w, 500, "customer_export_failed")
+		return
 	}
-
-	// Payments
-	paymentRows, e := a.DB.Query(ctx, "SELECT id,provider,external_id,amount_cents,currency,status,qr_code,pix_copy_paste,expires_at,confirmed_at,refunded_amount_cents,created_at FROM payments WHERE store_id=$1 AND order_id IN (SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2)", store, customerID)
-	if e == nil {
-		payments := []map[string]any{}
-		defer paymentRows.Close()
-		for paymentRows.Next() {
-			var id int64
-			var provider, externalID, currency, status string
-			var amountCents int64
-			var qrCode, pixCopyPaste string
-			var expiresAt, confirmedAt *time.Time
-			var refundedAmount int64
-			var createdAt time.Time
-			paymentRows.Scan(&id, &provider, &externalID, &amountCents, &currency, &status, &qrCode, &pixCopyPaste, &expiresAt, &confirmedAt, &refundedAmount, &createdAt)
-			payments = append(payments, map[string]any{
-				"id": id, "provider": provider, "external_id": externalID, "amount_cents": amountCents,
-				"currency": currency, "status": status, "qr_code": qrCode, "pix_copy_paste": pixCopyPaste,
-				"expires_at": expiresAt, "confirmed_at": confirmedAt, "refunded_amount_cents": refundedAmount,
-				"created_at": createdAt,
-			})
-		}
-		export["payments"] = payments
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=customer-export-%d-%s.json", customerID, time.Now().Format("20060102")))
-	json.NewEncoder(w).Encode(export)
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=customer-%d.json", id))
+	jsonResponse(w, 200, result)
 }
 
-// Customer data deletion (LGPD - Right to erasure)
 func (a *App) customerDeleteHandler(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
 	if !user.CanManageUsers() {
 		failure(w, 403, "forbidden_deletion_access")
@@ -3179,81 +3264,49 @@ func (a *App) customerDeleteHandler(w http.ResponseWriter, r *http.Request, stor
 		failure(w, 405, "method_not_allowed")
 		return
 	}
-	customerID := ParseInt(r.URL.Query().Get("customer_id"))
-	if customerID <= 0 {
+	id := ParseInt(r.URL.Query().Get("customer_id"))
+	if id < 1 {
 		failure(w, 400, "customer_id_required")
 		return
 	}
-
-	// Check if customer has orders that need to be retained for fiscal reasons
-	var orderCount int
-	e := a.DB.QueryRow(r.Context(), "SELECT count(*) FROM orders WHERE store_id=$1 AND customer_id=$2 AND state NOT IN ('cancelled')", store, customerID).Scan(&orderCount)
-	if e == nil && orderCount > 0 {
-		// Anonymize instead of delete - keep orders for fiscal compliance but remove PII
-		tx, e := a.DB.Begin(r.Context())
-		if e != nil {
-			failure(w, 500, "database_unavailable")
-			return
-		}
-		defer tx.Rollback(r.Context())
-
-		// Anonymize customer data
-		_, e = tx.Exec(r.Context(), `UPDATE customers SET 
-			name='Cliente Anonimizado', 
-			phone=NULL, 
-			email=NULL, 
-			document=NULL, 
-			notes='Dados anonimizados por solicitação LGPD', 
-			marketing_consent=false, 
-			marketing_consent_at=NULL,
-			updated_at=now()
-		WHERE store_id=$1 AND id=$2`, store, customerID)
-		if e != nil {
-			failure(w, 500, "anonymization_failed")
-			return
-		}
-
-		// Revoke all consents
-		_, e = tx.Exec(r.Context(), "UPDATE consents SET revoked_at=now() WHERE store_id=$1 AND customer_id=$2", store, customerID)
-		if e != nil {
-			failure(w, 500, "consent_revocation_failed")
-			return
-		}
-
-		// Anonymize order customer data
-		_, e = tx.Exec(r.Context(), `UPDATE orders SET 
-			customer_name='Cliente Anonimizado',
-			customer_phone=NULL,
-			customer_email=NULL
-		WHERE store_id=$1 AND customer_id=$2`, store, customerID)
-		if e != nil {
-			failure(w, 500, "order_anonymization_failed")
-			return
-		}
-
-		e = tx.Commit(r.Context())
-		if e != nil {
-			failure(w, 500, "anonymization_failed")
-			return
-		}
-		jsonResponse(w, 200, map[string]any{"ok": true, "anonymized": true, "message": "Dados do cliente anonimizados. Pedidos mantidos para conformidade fiscal."})
-		return
-	}
-
-	// No active orders - full deletion allowed
-	_, e = a.DB.Exec(r.Context(), "DELETE FROM customers WHERE store_id=$1 AND id=$2", store, customerID)
+	tx, e := a.DB.Begin(r.Context())
 	if e != nil {
-		failure(w, 500, "customer_delete_failed")
+		failure(w, 500, "anonymization_failed")
 		return
 	}
-	jsonResponse(w, 200, map[string]any{"ok": true, "deleted": true})
+	defer tx.Rollback(r.Context())
+	if _, e = tx.Exec(r.Context(), "SELECT id FROM stores WHERE id=$1 FOR UPDATE", store); e != nil {
+		failure(w, 500, "anonymization_failed")
+		return
+	}
+	var exists bool
+	if e = tx.QueryRow(r.Context(), "SELECT true FROM customers WHERE store_id=$1 AND id=$2 FOR UPDATE", store, id).Scan(&exists); e != nil {
+		failure(w, 404, "customer_not_found")
+		return
+	}
+	for _, query := range []string{
+		`UPDATE customers SET name='Cliente Anonimizado',phone=NULL,email=NULL,document=NULL,notes=NULL,marketing_consent=false,marketing_consent_at=NULL,anonymized_at=COALESCE(anonymized_at,now()),updated_at=now() WHERE store_id=$1 AND id=$2`,
+		`UPDATE consents SET granted=false,revoked_at=COALESCE(revoked_at,now()),source='anonymized',evidence=NULL WHERE store_id=$1 AND customer_id=$2`,
+		`UPDATE order_items SET notes=NULL,selection=jsonb_set(selection,'{combo,components}',COALESCE((SELECT jsonb_agg(x - 'notes') FROM jsonb_array_elements(selection#>'{combo,components}') x),'[]')) WHERE store_id=$1 AND order_id IN (SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2) AND selection ? 'combo'`,
+		`UPDATE order_items SET notes=NULL WHERE store_id=$1 AND order_id IN (SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2)`,
+		`UPDATE orders SET customer_name='Cliente Anonimizado',customer_phone=NULL,customer_email=NULL,notes=NULL WHERE store_id=$1 AND customer_id=$2`,
+	} {
+		if _, e = tx.Exec(r.Context(), query, store, id); e != nil {
+			failure(w, 500, "anonymization_failed")
+			return
+		}
+	}
+	if _, e = tx.Exec(r.Context(), "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,'customer_anonymized',$3)", store, user.ID, id); e != nil {
+		failure(w, 500, "anonymization_failed")
+		return
+	}
+	if e = tx.Commit(r.Context()); e != nil {
+		failure(w, 500, "anonymization_failed")
+		return
+	}
+	jsonResponse(w, 200, map[string]any{"ok": true, "anonymized": true, "message": "Identificação, contatos e observações removidos. Histórico financeiro preservado."})
 }
 
-// =============================================================================
-// Payment Connectors Implementation
-// =============================================================================
-
-// BasePaymentConnector provides common functionality for payment connectors
 type BasePaymentConnector struct {
 	Config     PaymentConfig
 	HTTPClient *http.Client

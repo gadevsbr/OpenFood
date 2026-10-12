@@ -1,0 +1,70 @@
+?   	openfood/cmd/openfood	[no test files]
+=== RUN   TestTransitions
+--- PASS: TestTransitions (0.00s)
+=== RUN   TestPostgresJourney
+MIGRATE: Fresh DB detected (ErrNoRows), n=0, checksum=
+MIGRATE: schema exec OK
+MIGRATE: insert version OK
+    app_test.go:168: store=1 org=1
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+    app_test.go:508: PASS: orgs, stores, RBAC setup, me endpoint, cross-store isolation, concurrent stock, dedup, snapshots, role-based permissions, immediate session revocation on deactivate, transitions, expired lease recovery, backup/restore, session invalidation, database reopen
+--- PASS: TestPostgresJourney (36.11s)
+=== RUN   TestPostgresUpgrade
+=== RUN   TestPostgresUpgrade/1
+MIGRATE: Existing DB detected, version=1, checksum=f7a217c4d8fc2995d2b9fdabb9b040fd6ef72dfbae0b386796acfe7e6eaff2e0
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+=== RUN   TestPostgresUpgrade/2
+MIGRATE: Existing DB detected, version=2, checksum=b4084f4e112145b760bf8e714b1422966defe5553128b74eead9f62d398dbec5
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+=== RUN   TestPostgresUpgrade/3
+MIGRATE: Existing DB detected, version=3, checksum=a2b1dc80e1f16b7aa0f0c8736e930b4bb132fc8d85632e30436f0d31205acdd9
+MIGRATE: Existing DB detected, version=3, checksum=a2b1dc80e1f16b7aa0f0c8736e930b4bb132fc8d85632e30436f0d31205acdd9
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+=== RUN   TestPostgresUpgrade/4
+MIGRATE: Existing DB detected, version=4, checksum=0f3bb36d5c177012f25f3fff818f9375477f62789c56421cbc7845ed06791286
+MIGRATE: Existing DB detected, version=4, checksum=0f3bb36d5c177012f25f3fff818f9375477f62789c56421cbc7845ed06791286
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+=== RUN   TestPostgresUpgrade/5
+MIGRATE: Existing DB detected, version=5, checksum=28d9c805f29c22b6703616c985d4af59dbfb434fb82d1d5b64a2c5436cbb3163
+MIGRATE: Existing DB detected, version=5, checksum=28d9c805f29c22b6703616c985d4af59dbfb434fb82d1d5b64a2c5436cbb3163
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+=== RUN   TestPostgresUpgrade/6
+MIGRATE: Existing DB detected, version=6, checksum=f7b45c33b71e1f4e51c1ad60f1af43fdbcb908f8ac2c7b7c8e2edaf9c9baf3a1
+MIGRATE: Existing DB detected, version=6, checksum=f7b45c33b71e1f4e51c1ad60f1af43fdbcb908f8ac2c7b7c8e2edaf9c9baf3a1
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+=== RUN   TestPostgresUpgrade/7
+MIGRATE: Existing DB detected, version=7, checksum=49297fed682ac0983bb860abfb89d757881c679a2b21c53b39e59c8bb9883ea8
+MIGRATE: Existing DB detected, version=7, checksum=49297fed682ac0983bb860abfb89d757881c679a2b21c53b39e59c8bb9883ea8
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+--- PASS: TestPostgresUpgrade (197.44s)
+    --- PASS: TestPostgresUpgrade/1 (18.93s)
+    --- PASS: TestPostgresUpgrade/2 (34.06s)
+    --- PASS: TestPostgresUpgrade/3 (31.08s)
+    --- PASS: TestPostgresUpgrade/4 (26.89s)
+    --- PASS: TestPostgresUpgrade/5 (29.53s)
+    --- PASS: TestPostgresUpgrade/6 (28.50s)
+    --- PASS: TestPostgresUpgrade/7 (28.45s)
+=== RUN   TestCashJourney
+MIGRATE: Fresh DB detected (ErrNoRows), n=0, checksum=
+MIGRATE: schema exec OK
+MIGRATE: insert version OK
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+    cash_test.go:451: PASS: receipts, partial/split payment, idempotency/concurrent ceiling, refunds across periods, cash reconciliation, permissions, cancellation and backup
+--- PASS: TestCashJourney (27.89s)
+=== RUN   TestComboCustomerJourney
+MIGRATE: Fresh DB detected (ErrNoRows), n=0, checksum=
+MIGRATE: schema exec OK
+MIGRATE: insert version OK
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+    combo_test.go:302: PASS: combo price, component stock, snapshots, retries, optional groups, last-unit concurrency, customer isolation, export, anonymization and financial history
+--- PASS: TestComboCustomerJourney (25.23s)
+=== RUN   TestMenuJourney
+MIGRATE: Fresh DB detected (ErrNoRows), n=0, checksum=
+MIGRATE: schema exec OK
+MIGRATE: insert version OK
+MIGRATE: Existing DB detected, version=8, checksum=70881fcb5d9d9b06a0bafc81f88991b283024dc7e849934bcb39fbadbadc0507
+--- PASS: TestMenuJourney (25.76s)
+PASS
+ok  	openfood/internal/app	314.815s
+?   	openfood/internal/runtime	[no test files]

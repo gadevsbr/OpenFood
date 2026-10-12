@@ -14,11 +14,14 @@ function posRead(s, f) {
   }
 }
 function posSave() {
+  const customer=$("posCustomer").selectedOptions[0];
+  $("posCustomerSection").querySelector("summary").textContent=customer&&customer.value!=="0"?"Cliente: "+customer.textContent.split(" · ")[0]:"Identificar cliente (opcional)";
   sessionStorage.setItem(
     posKey("cart"),
     JSON.stringify({
       items: posCart,
       service: $("posService").value,
+      customer_id:Number($("posCustomer").value)||0,
       discount: $("posDiscount").value,
       note: $("posDiscountNote").value,
     }),
@@ -37,6 +40,8 @@ function resetModes() {
   if (typeof resetDiningContext === "function") resetDiningContext();
   appMode = null;
   posCart = [];
+  $("posCustomer").value="0";
+  $("posCustomerSearch").value="";
   posAttempt = null;
   posLoadedStore = null;
   document.body.classList.remove("pos-cart-open");
@@ -127,19 +132,27 @@ async function refreshPOS() {
   posBusy = true;
   const store = currentStoreId;
   try {
-    const [products, cash, summary] = await Promise.all([
+    const [products, cash, summary, combos, customers] = await Promise.all([
       api("products"),
       api("cash-sessions"),
       api("pos-summary"),
+      api("combos"),
+      api("customer-lookup"),
     ]);
     if (appMode !== "pos" || store !== currentStoreId) return;
     allProducts = products;
+    allCombos = combos;
+    const selectedCustomer=$("posCustomer").value!=="0"?$("posCustomer").value:String(posRead("cart",{}).customer_id||0);
+    if(selectedCustomer!=="0"&&!customers.some(c=>String(c.id)===selectedCustomer))customers.push(...await api("customer-lookup?id="+encodeURIComponent(selectedCustomer)));
+    $("posCustomer").replaceChildren(new Option("Consumidor sem identificação","0"),...customers.map(c=>new Option(c.name+(c.phone?" · "+c.phone:""),c.id)));
+    $("posCustomer").value=selectedCustomer||"0";
     cashData = cash;
     posSummaryData = summary;
     if (posLoadedStore !== store) {
       const d = posRead("cart", { items: [], service: "kitchen" });
       posCart = d.items;
       $("posService").value = d.service;
+      $("posCustomer").value=String(d.customer_id||0);
       $("posDiscount").value = d.discount || "0,00";
       $("posDiscountNote").value = d.note || "";
       posAttempt = posRead("attempt", null);
@@ -262,7 +275,9 @@ function renderPOSProducts() {
     b.onclick = () => menuChoose(p).catch(posError);
     root.append(b);
   }
-  $("posEmpty").classList.toggle("hidden", products.length > 0);
+  const comboCount=renderPOSCombos(root,q);
+  $("posResultCount").textContent=`${products.length+comboCount} itens`;
+  $("posEmpty").classList.toggle("hidden", products.length+comboCount > 0);
 }
 function posAdd(p) {
   if (posAttempt || (typeof diningPending !== "undefined" && diningPending)) {
@@ -270,7 +285,7 @@ function posAdd(p) {
     return;
   }
   let i = posCart.find((i) => i.product_id === p.id && !i.variant_id && !i.addon_option_ids?.length && !i.notes);
-  if (posCart.filter(v=>v.product_id===p.id).reduce((sum,v)=>sum+v.quantity,0)+1 > p.stock_quantity) {
+  if ((menuCartUsage(posCart).products.get(p.id)||0)+1 > p.stock_quantity) {
     posError(Error("stock_insufficient"));
     return;
   }
@@ -297,6 +312,8 @@ function posDiscount() {
   }
 }
 function renderPOSCart() {
+  const selectedCustomer=$("posCustomer").selectedOptions[0];
+  $("posCustomerSection").querySelector("summary").textContent=selectedCustomer&&selectedCustomer.value!=="0"?"Cliente: "+selectedCustomer.textContent.split(" · ")[0]:"Identificar cliente (opcional)";
   const root = $("posCartLines");
   root.replaceChildren();
   for (const i of posCart) {
@@ -331,7 +348,8 @@ function renderPOSCart() {
         return;
       const p = allProducts.find((p) => p.id === i.product_id);
       const others=posCart.filter(v=>v!==i);
-      if (!Number.isInteger(n) || n < 1 || n+others.filter(v=>v.product_id===i.product_id).reduce((sum,v)=>sum+v.quantity,0) > (p?.stock_quantity || 0) ||
+      if (i.combo_id) { if(Number.isInteger(n)&&n>0&&n<=100000&&menuFitsCart([...others,{...i,quantity:n}])){i.quantity=n;renderPOSCart();posSave()}else qty.value=i.quantity;return }
+      if (!menuFitsCart([...others,{...i,quantity:n}]) || !Number.isInteger(n) || n < 1 || n+others.filter(v=>v.product_id===i.product_id).reduce((sum,v)=>sum+v.quantity,0) > (p?.stock_quantity || 0) ||
           (i.variant_stock!=null && n+others.filter(v=>v.variant_id===i.variant_id).reduce((sum,v)=>sum+v.quantity,0)>i.variant_stock) ||
           Object.entries(i.addon_stocks||{}).some(([id,stock])=>n+others.filter(v=>v.addon_option_ids?.includes(Number(id))).reduce((sum,v)=>sum+v.quantity,0)>stock)) {
         qty.value = i.quantity;
@@ -360,11 +378,12 @@ function renderPOSCart() {
     controls.append(minus, qty, plus, remove);
     row.append(title, controls);
     if (i.notes) { const note=document.createElement("p");note.className="menu-item-note";note.textContent=i.notes;row.append(note); }
+    for(const component of i.components||[]){if(component.notes){const note=document.createElement("p");note.className="menu-item-note";note.textContent=component.name+": "+component.notes;row.append(note)}}
     const customize = document.createElement("button");
     customize.className="pos-remove";
     customize.textContent="Personalizar";
     customize.disabled=!!posAttempt || (typeof diningPending!=="undefined" && !!diningPending);
-    customize.onclick=()=>menuChoose(allProducts.find(p=>p.id===i.product_id),i).catch(posError);
+    customize.onclick=()=> (i.combo_id?comboChoose(allCombos.find(c=>c.id===i.combo_id),i):menuChoose(allProducts.find(p=>p.id===i.product_id),i)).catch(posError);
     row.append(customize);
     root.append(row);
   }
@@ -386,7 +405,7 @@ function renderPOSCart() {
     !!posAttempt ||
     (typeof diningActive !== "undefined" && !!diningActive) ||
     (typeof diningPending !== "undefined" && !!diningPending);
-  for (const id of ["posClear", "posService", "posDiscount", "posDiscountNote"])
+  for (const id of ["posClear", "posService", "posDiscount", "posDiscountNote", "posCustomer", "posCustomerSearch"])
     $(id).disabled =
       !!posAttempt || (typeof diningPending !== "undefined" && !!diningPending);
   $("posMobileCart").textContent =
@@ -561,6 +580,7 @@ function posPay(bill = null) {
               }
             : {
                 items: posCart.map(menuPayloadItem),
+                customer_id:Number($("posCustomer").value)||0,
                 payments,
                 expected_total_cents: total,
                 discount_cents: posDiscount(),
@@ -585,6 +605,8 @@ function posPay(bill = null) {
       posAttempt = null;
       sessionStorage.removeItem(posKey("attempt"));
       posCart = [];
+  $("posCustomer").value="0";
+  $("posCustomerSearch").value="";
       $("posDiscount").value = "0";
       $("posDiscountNote").value = "";
       posSave();
@@ -770,6 +792,7 @@ function heldSales() {
       }
       posCart = i.items;
       $("posService").value = i.service;
+      $("posCustomer").value=String(i.customer_id||0);
       sessionStorage.setItem(
         posKey("held"),
         JSON.stringify(held.filter((v) => v !== i)),
@@ -797,11 +820,14 @@ function holdSale() {
   }
   held.push({
     items: posCart,
+    customer_id:Number($("posCustomer").value)||0,
     service: $("posService").value,
     at: new Date().toISOString(),
   });
   sessionStorage.setItem(posKey("held"), JSON.stringify(held));
   posCart = [];
+  $("posCustomer").value="0";
+  $("posCustomerSearch").value="";
   $("posDiscount").value = "0";
   $("posDiscountNote").value = "";
   renderPOSCart();
@@ -1076,6 +1102,8 @@ $("posClear").onclick = () => {
   posDialog("Limpar venda?").append(
     posButton("Confirmar limpeza", () => {
       posCart = [];
+  $("posCustomer").value="0";
+  $("posCustomerSearch").value="";
       $("posDiscount").value = "0";
       $("posDiscountNote").value = "";
       renderPOSCart();
@@ -1124,3 +1152,7 @@ document.addEventListener("keydown", (e) => {
     holdSale();
   }
 });
+
+$("posCustomer").onchange=()=>{posSave();$("posCustomerSection").open=false};
+let customerLookupTimer;
+$("posCustomerSearch").oninput=()=>{clearTimeout(customerLookupTimer);customerLookupTimer=setTimeout(async()=>{try{const store=currentStoreId,q=$("posCustomerSearch").value,selected=$("posCustomer").selectedOptions[0]?.cloneNode(true),customers=await api("customer-lookup?q="+encodeURIComponent(q));if(store!==currentStoreId||q!==$("posCustomerSearch").value)return;$("posCustomer").replaceChildren(new Option("Consumidor sem identificação","0"),...customers.map(c=>new Option(c.name+(c.phone?" · "+c.phone:""),c.id)));if(selected&&selected.value!=="0"){if(!customers.some(c=>String(c.id)===selected.value))$("posCustomer").append(selected);$("posCustomer").value=selected.value}}catch(e){posError(e)}},250)};

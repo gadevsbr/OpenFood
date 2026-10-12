@@ -2,6 +2,32 @@
 
 Este roadmap consolida todos os requisitos estabelecidos na especificação original do OpenFood, divididos em fases evolutivas com entregas e critérios de aceite verificáveis por testes automatizados e evidências reais.
 
+## Foco atual — catálogo e clientes/privacidade
+Autorizado pelo usuário em 2026-10-11. Responsável: implementação OpenFood.
+Horizonte: próximas entregas incrementais, sem prazo de calendário prometido.
+Skill de decisão: Product Manager (Agency Agents).
+
+1. **Catálogo restaurante:** integrar combos ao PDV e às mesas, com composição,
+   preço no servidor, estoque dos componentes e snapshot na cozinha/comprovante.
+   Depois, sabores de pizza e regras explícitas de preço; edição de adicionais
+   compartilhados. Horários já existem em America/Sao_Paulo: revisar UX e cobertura,
+   completar horários por loja/categorias sem recriar o mecanismo anterior.
+2. **Clientes e privacidade:** revisar cadastro, consentimentos, revogação,
+   exportação e anonimização já existentes. Completar vínculo no atendimento,
+   histórico por loja, evidência/versionamento de consentimentos e política de
+   retenção explícita. Não presumir prazo fiscal nem apagar dados automaticamente
+   sem política definida; preservar registros financeiros e eliminar identificadores
+   pessoais conforme o escopo aprovado.
+
+Aceite por entrega: jornada PostgreSQL real, isolamento/permissões, concorrência,
+backup/restauração e Chromium desktop/mobile; release experimental com checksums.
+Metas verificáveis: preço/estoque corretos sem duplicação em retries; nenhuma
+exposição entre lojas; revogação efetiva e exportação/anonimização consistentes.
+Peso/mercados continua no roadmap, após o escopo prioritário de restaurante.
+Integrações Pix, WhatsApp, iFood e novas frentes de entrega ficam para depois.
+Recomendação anterior de avançar diretamente para Pix após combos: **superseded**
+pelo foco explícito nos itens 1 e 2. Nenhuma funcionalidade nova declarada pronta.
+
 ---
 
 ## Fase 1: Fundação do Núcleo e Distribuição Local (Concluída — v0.1.0-alpha.1)
@@ -36,7 +62,7 @@ Este roadmap consolida todos os requisitos estabelecidos na especificação orig
 ---
 
 ## Fase 3: Catálogo Avançado (Restaurantes e Mercados)
-2026-10-11: etapa 0.10 valida variantes/tamanhos, adicionais, observações e fotos no PDV/mesas. [Evidências e limites](menu-stage.md). Critérios completos da fase ainda abertos.
+2026-10-11: etapa 0.10 valida variantes/tamanhos, adicionais, observações e fotos no PDV/mesas. [Evidências e limites](menu-stage.md). Etapa 0.11 valida combos operacionais; sabores de pizza e adicionais compartilhados continuam pendentes. [Escopo](combo-customer-stage.md). Critérios completos da fase ainda abertos.
 
 - [ ] **Categorias e Disponibilidade**:
   - Categorização hierárquica, horários de venda por loja e disponibilidade atômica (produto esgotado).
@@ -54,6 +80,7 @@ Este roadmap consolida todos os requisitos estabelecidos na especificação orig
 ---
 
 ## Fase 4: Clientes, Consentimentos e Privacidade (LGPD-first)
+2026-10-11: etapa 0.11 valida vínculo no PDV/rodadas, histórico por loja, texto/versionamento de consentimentos, exportação e remoção manual de identificação. Retenção automática, campos livres e remoções após restaurar backups seguem abertos. [Evidências e limites](combo-customer-stage.md).
 - [ ] **Cadastro de Clientes e Consentimentos**:
   - Identificação de cliente por telefone/e-mail sem compartilhamento automático entre lojas independentes.
   - Registro formal de consentimentos: finalidade específica, origem, data/hora, versão do texto dos termos e evidência.

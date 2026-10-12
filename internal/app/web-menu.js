@@ -1,11 +1,11 @@
 function menuPayloadItem(i) {
-  return { product_id: i.product_id, quantity: i.quantity, variant_id: i.variant_id || 0, addon_option_ids: i.addon_option_ids || [], notes: i.notes || "", configuration_version: i.configuration_version || 0 };
+  return { combo_id: i.combo_id || 0, combo_version: i.combo_version || "", components: i.components?.map(menuPayloadItem) || [], product_id: i.product_id || 0, quantity: i.quantity, variant_id: i.variant_id || 0, addon_option_ids: i.addon_option_ids || [], notes: i.notes || "", configuration_version: i.configuration_version || 0 };
 }
 const menuErrors = { configuration_changed: "O cardápio mudou. Atualize e personalize novamente o item.", configuration_stock_changed: "O estoque mudou durante a edição. Reabra o cadastro para conferir.", configuration_shared_group: "Este grupo está vinculado a outros produtos. Edite-o pelo cadastro de adicionais.", configuration_invalid: "Confira os tamanhos, os adicionais e os limites de escolha.", variant_required: "Escolha um tamanho disponível.", addon_unavailable: "Um adicional ficou indisponível. Confira a seleção.", addon_limits_invalid: "Confira as escolhas obrigatórias e os limites de adicionais.", configuration_save_failed: "Não foi possível salvar. Confira nomes repetidos e reabra o cadastro.", photo_invalid: "Use uma foto JPEG ou PNG de até 4096 pixels e 12 megapixels.", photo_too_large: "A foto deve ter até 2 MB. Reduza a imagem e tente novamente." };
 function menuError(err) {
   return menuErrors[err.message] || err.message;
 }
-Object.assign(menuErrors,{stock_insufficient:"A quantidade excede o estoque disponível. Confira os itens do pedido.",product_unavailable:"Este produto ficou indisponível. Atualize o cardápio.",configuration_read_failed:"Não foi possível carregar as opções. Tente novamente.",photo_save_failed:"Não foi possível salvar a foto. Tente novamente."});
+Object.assign(menuErrors, { stock_insufficient: "A quantidade excede o estoque disponível. Confira os itens do pedido.", product_unavailable: "Este produto ficou indisponível. Atualize o cardápio.", configuration_read_failed: "Não foi possível carregar as opções. Tente novamente.", photo_save_failed: "Não foi possível salvar a foto. Tente novamente." });
 window.menuErrors = menuErrors;
 function menuNode(tag, cls, text) {
   const el = document.createElement(tag);
@@ -37,7 +37,7 @@ function menuCheck(root, label, value, name) {
   return input;
 }
 function menuLineKey(i) {
-  return JSON.stringify([i.product_id, i.variant_id || 0, [...i.addon_option_ids || []].sort((a, b) => a - b), i.notes || ""]);
+  return JSON.stringify([i.combo_id || 0, i.components?.map(menuPayloadItem) || [], i.product_id, i.variant_id || 0, [...i.addon_option_ids || []].sort((a, b) => a - b), i.notes || ""]);
 }
 let menuOpening = false;
 async function menuChoose(product, existing) {
@@ -141,6 +141,7 @@ async function menuChoose(product, existing) {
       const other = posCart.filter((i) => i !== existing), used = other.filter((i) => i.product_id === product.id).reduce((s, i) => s + i.quantity, 0);
       if (!Number.isInteger(quantity) || quantity < 1 || quantity + used > product.stock_quantity || variant && quantity + other.filter((i) => i.variant_id === variant.id).reduce((s, i) => s + i.quantity, 0) > variant.stock_quantity || selected.some((o) => quantity + other.filter((i) => i.addon_option_ids?.includes(o.option.id)).reduce((s, i) => s + i.quantity, 0) > o.option.stock_quantity)) throw Error("stock_insufficient");
       const item = { product_id: product.id, quantity, variant_id: variant?.id || 0, addon_option_ids: selected.map((o) => o.option.id), notes: notes.value.trim(), configuration_version: config.version, variant_stock: variant?.stock_quantity, addon_stocks: Object.fromEntries(selected.map((o) => [o.option.id, o.option.stock_quantity])), price_cents: calculation(), name: product.name + (variant ? " · " + variant.name : "") + selected.map((o) => " + " + o.option.name).join("") };
+      if (!menuFitsCart([...other, item])) throw Error("stock_insufficient");
       const match = other.find((i) => menuLineKey(i) === menuLineKey(item) && i.configuration_version === item.configuration_version && i.price_cents === item.price_cents);
       if (match) match.quantity += quantity;
       else other.push(item);
@@ -328,4 +329,157 @@ async function menuEditor(product) {
     }
   };
   if (!dialog.open) dialog.showModal();
+}
+Object.assign(menuErrors, { combo_invalid: "Confira a composição do combo.", combo_unavailable: "Este combo ficou indisponível.", combo_limits_invalid: "Confira as escolhas obrigatórias do combo.", combo_quantity_invalid: "Combos aceitam componentes por unidade ou porção inteira.", customer_invalid: "Este cliente não está disponível nesta loja." });
+function renderPOSCombos(root, q) {
+  const combos = allCombos.filter((c) => c.active && !posCategory && [c.name, c.description].some((v) => String(v || "").toLocaleLowerCase("pt-BR").includes(q)));
+  for (const c of combos) {
+    const b = menuNode("button", "pos-product");
+    b.dataset.comboId = c.id;
+    b.append(menuNode("strong", "product-name", c.name), menuNode("span", "product-description", c.description || "Monte seu combo"), menuNode("span", "product-price", c.pricing_policy === "fixed" ? money(c.price_cents) : "Preço pela composição"), menuNode("span", "product-meta", "Combo · escolher itens"));
+    b.onclick = () => comboChoose(c).catch(posError);
+    root.append(b);
+  }
+  return combos.length;
+}
+async function comboChoose(combo, existing) {
+  if (posAttempt || typeof diningPending !== "undefined" && diningPending) return;
+  const store = currentStoreId;
+  const defs = await api("combo-items?combo_id=" + combo.id);
+  const configs = await Promise.all(defs.map((d) => api("product-configuration?product_id=" + d.product_id)));
+  if (store !== currentStoreId || appMode !== "pos") return;
+  if (!defs.length) throw Error("combo_invalid");
+  const body = posDialog(combo.name);
+  body.classList.add("menu-configurator");
+  const form = menuNode("form", "menu-choice-form"), content = menuNode("div", "menu-choice-content");
+  form.id = "comboChoiceForm";
+  form.append(content);
+  content.append(menuNode("p", "menu-hint", combo.pricing_policy === "fixed" ? "Preço fixo; ajustes de tamanhos e adicionais são somados." : combo.pricing_policy === "sum" ? "Preço igual à soma dos componentes escolhidos." : "Preço igual ao componente de maior valor, considerando a quantidade."));
+  const fields = [];
+  defs.forEach((d, index) => {
+    const product = allProducts.find((p) => p.id === d.product_id);
+    if (!product) throw Error("product_unavailable");
+    const cfg = configs[index], old = existing?.components?.find((i) => i.product_id === d.product_id), f = menuNode("fieldset", "menu-choice-group");
+    f.append(menuNode("legend", "", `${d.quantity}x ${product.name}`));
+    const enabled = menuCheck(f, d.is_optional ? `${d.group_name || "Opções"} · escolha de ${d.min_selections} a ${d.max_selections}` : "Incluído no combo", !d.is_optional || !!old, "component");
+    enabled.disabled = !d.is_optional;
+    const variants = cfg.variants.filter((v) => v.active), groups = cfg.groups.filter((g) => g.active);
+    let variant;
+    if (variants.length) {
+      const label = menuNode("label", "", "Tamanho ou variante");
+      variant = document.createElement("select");
+      variant.append(new Option("Selecione um tamanho", ""));
+      for (const v of variants) variant.append(new Option(`${v.name} · ajuste ${money(v.price_adjustment_cents)}`, v.id));
+      variant.value = String(old?.variant_id || "");
+      label.append(variant);
+      f.append(label);
+    }
+    const options = [];
+    for (const g of groups) {
+      f.append(menuNode("p", "menu-hint", `${g.name} · ${g.required ? "obrigatório" : "opcional"} · de ${Math.max(g.min_selections, g.required ? 1 : 0)} a ${g.max_selections}`));
+      for (const o of g.options.filter((o2) => o2.active)) {
+        const input = menuCheck(f, `${o.name} · + ${money(o.price_cents)}`, old?.addon_option_ids?.includes(o.id), "addon");
+        options.push({ input, option: o, group: g });
+      }
+    }
+    const noteLabel2 = menuNode("label", "", "Observação do componente"), notes2 = document.createElement("textarea");
+    notes2.maxLength = 500;
+    notes2.rows = 2;
+    notes2.value = old?.notes || "";
+    noteLabel2.append(notes2);
+    f.append(noteLabel2);
+    content.append(f);
+    fields.push({ d, product, cfg, enabled, variants, variant, groups, options, notes: notes2 });
+  });
+  const qty = menuField(content, "Quantidade de combos", existing?.quantity || 1, "quantity", "number");
+  qty.min = 1;
+  const noteLabel = menuNode("label", "", "Observação do combo"), notes = document.createElement("textarea");
+  notes.maxLength = 500;
+  notes.rows = 2;
+  notes.value = existing?.notes || "";
+  noteLabel.append(notes);
+  content.append(noteLabel);
+  const total = menuNode("strong", "menu-choice-total"), error = menuNode("p", "pos-inline-error hidden"), submit = menuNode("button", "", existing ? "Salvar combo" : "Adicionar combo ao pedido"), actions = menuNode("div", "menu-choice-actions");
+  error.setAttribute("role", "alert");
+  submit.type = "submit";
+  actions.append(total, error, submit);
+  form.append(actions);
+  body.append(form);
+  const calculate = () => {
+    const values = fields.filter((f) => f.enabled.checked).map((f) => ({ base: f.product.price_cents * f.d.quantity, price: (f.product.price_cents + (f.variants.find((v) => String(v.id) === f.variant?.value)?.price_adjustment_cents || 0) + f.options.filter((o) => o.input.checked).reduce((sum, o) => sum + o.option.price_cents, 0)) * f.d.quantity }));
+    return combo.pricing_policy === "fixed" ? combo.price_cents + values.reduce((sum, v) => sum + v.price - v.base, 0) : combo.pricing_policy === "highest" ? Math.max(0, ...values.map((v) => v.price)) : values.reduce((sum, v) => sum + v.price, 0);
+  };
+  form.oninput = () => {
+    total.textContent = "Total: " + money(calculate() * Number(qty.value || 1));
+    error.classList.add("hidden");
+  };
+  form.oninput();
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    try {
+      const quantity = Number(qty.value);
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1e5) throw Error("quantity_invalid");
+      const components = [], groups = /* @__PURE__ */ new Map();
+      for (const f of fields) {
+        if (f.d.is_optional) {
+          const g = groups.get(f.d.group_name) || { min: f.d.min_selections, max: f.d.max_selections, count: 0 };
+          if (f.enabled.checked) g.count++;
+          groups.set(f.d.group_name, g);
+        }
+        if (!f.enabled.checked) continue;
+        const v = f.variants.find((v2) => String(v2.id) === f.variant?.value), selected = f.options.filter((o) => o.input.checked);
+        if (f.variants.length && !v) throw Error("variant_required");
+        for (const g of f.groups) {
+          const n = selected.filter((o) => o.group.id === g.id).length;
+          if (n < Math.max(g.min_selections, g.required ? 1 : 0) || n > g.max_selections) throw Error("addon_limits_invalid");
+        }
+        const used = quantity * f.d.quantity;
+        if (!Number.isInteger(f.d.quantity) || f.d.quantity < 1 || used > f.product.stock_quantity || v && used > v.stock_quantity || selected.some((o) => used > o.option.stock_quantity)) throw Error("stock_insufficient");
+        components.push({ product_id: f.product.id, quantity: 1, variant_id: v?.id || 0, addon_option_ids: selected.map((o) => o.option.id), configuration_version: f.cfg.version, variant_stock: v?.stock_quantity, addon_stocks: Object.fromEntries(selected.map((o) => [o.option.id, o.option.stock_quantity])), notes: f.notes.value.trim(), name: f.product.name + (v ? " · " + v.name : "") + selected.map((o) => " + " + o.option.name).join(""), component_quantity: f.d.quantity });
+      }
+      for (const g of groups.values()) if (g.count < g.min || g.count > g.max) throw Error("combo_limits_invalid");
+      if (!components.length) throw Error("combo_invalid");
+      const item = { combo_id: combo.id, combo_version: defs[0].combo_version, quantity, components, notes: notes.value.trim(), price_cents: calculate(), name: combo.name + " · " + components.map((i) => `${i.component_quantity}x ${i.name}`).join(" + ") };
+      const others = posCart.filter((i) => i !== existing);
+      if (!menuFitsCart([...others, item])) throw Error("stock_insufficient");
+      const match = others.find((i) => menuLineKey(i) === menuLineKey(item) && i.price_cents === item.price_cents);
+      if (match) match.quantity += quantity;
+      else others.push(item);
+      posCart = others;
+      posSave();
+      renderPOSCart();
+      $("posDialog").close();
+    } catch (err) {
+      error.textContent = menuError(err);
+      error.classList.remove("hidden");
+    }
+  };
+}
+Object.assign(menuErrors, { consent_version_exists: "Esta finalidade e versão já foram registradas. Use uma nova versão para um novo consentimento." });
+function menuCartUsage(cart) {
+  const products = /* @__PURE__ */ new Map(), variants = /* @__PURE__ */ new Map(), addons = /* @__PURE__ */ new Map();
+  const add = (map, id, q) => map.set(id, (map.get(id) || 0) + q);
+  for (const item of cart) {
+    const lines = item.combo_id ? item.components.map((c) => ({ ...c, quantity: item.quantity * c.component_quantity })) : [item];
+    for (const i of lines) {
+      add(products, i.product_id, i.quantity);
+      if (i.variant_id) add(variants, i.variant_id, i.quantity);
+      for (const id of i.addon_option_ids || []) add(addons, id, i.quantity);
+    }
+  }
+  return { products, variants, addons };
+}
+function menuFitsCart(cart) {
+  const used = menuCartUsage(cart);
+  for (const [id, qty] of used.products) {
+    const p = allProducts.find((p2) => p2.id === id);
+    if (!p || qty > p.stock_quantity || qty > 1e5) return false;
+  }
+  for (const item of cart) {
+    for (const i of item.combo_id ? item.components : [item]) {
+      if (i.variant_stock != null && used.variants.get(i.variant_id) > i.variant_stock) return false;
+      for (const [id, qty] of Object.entries(i.addon_stocks || {})) if (used.addons.get(Number(id)) > qty) return false;
+    }
+  }
+  return true;
 }

@@ -1,7 +1,7 @@
 # OpenFood
 Software livre para operação local de lojas, sem servidor central obrigatório.
 
-Alpha 0.10.0-alpha.1: Windows x64 com PostgreSQL embarcado e Linux com Docker Compose. [Instalação e atualização](docs/installation.md), [plano](project-memory/plan.md), [decisões](project-memory/decisions.md) e [validação](project-memory/validation.md).
+Alpha 0.11.0-alpha.1: Windows x64 com PostgreSQL embarcado e Linux com Docker Compose. [Instalação e atualização](docs/installation.md), [plano](project-memory/plan.md), [decisões](project-memory/decisions.md) e [validação](project-memory/validation.md).
 
 Interface de restaurante com categorias visuais, cardápio descritivo e pedido lateral; inspiração de navegação iFood, identidade OpenFood. [Prévia do PDV](docs/evidence/restaurant-ui/pos-desktop.png) e [escopo validado](project-memory/restaurant-ui-stage.md).
 
@@ -17,7 +17,7 @@ Após login, escolha **PDV | ADM** em duas metades. PDV para restaurante tem pro
 
 Painel repaginado: fila por etapa, busca e filtros, cadastro contextual, navegação lateral, temas claro/escuro/sistema e layout mobile. [Contrato visual](project-memory/ui-contract.md) e [evidências](docs/evidence/ui-redesign/results.json). Fontes, CSS, JavaScript e ícones são locais, embutidos no executável.
 
-Não representa o produto completo dos requisitos. Existem cadastros de categorias, variantes, adicionais, combos, clientes e consentimentos; ter código não comprova todos os critérios do roadmap. O PDV com variantes/adicionais foi validado na etapa 0.10; combos, sabores de pizza, pedidos por peso e conectores externos permanecem pendentes. Pix integrado aparece como em desenvolvimento; WhatsApp, iFood e IA não estão conectados. Não há dados fictícios no produto ou telemetria obrigatória. Capturas de QA usam dados de teste identificados.
+Não representa o produto completo dos requisitos. Existem cadastros de categorias, variantes, adicionais, combos, clientes e consentimentos; ter código não comprova todos os critérios do roadmap. O PDV com variantes/adicionais foi validado na etapa 0.10; Combos foram validados localmente na etapa 0.11; sabores de pizza, pedidos por peso e conectores externos permanecem pendentes. Pix integrado aparece como em desenvolvimento; WhatsApp, iFood e IA não estão conectados. Não há dados fictícios no produto ou telemetria obrigatória. Capturas de QA usam dados de teste identificados.
 
 QA de navegador: `npm.cmd install --prefix tools/qa playwright@1.63.0`, `npx.cmd --prefix tools/qa playwright install chromium`; executar `node scripts/test-ui-redesign.cjs`, `node scripts/test-ui-admin.cjs` e `node scripts/test-ui-final.cjs` com `OPENFOOD_UI_TEST_DATA` apontando para uma instalação de teste isolada, iniciada com `OPENFOOD_TEST_HEADLESS=1`. A primeira suíte exige instalação vazia; as demais usam seus dados. Nunca apontar para dados de trabalho.
 
@@ -32,3 +32,8 @@ Animações: Motion mini 14.1.0, bundle local e reduced-motion; reconstruir com 
 QA mesas/comandas: `node scripts/test-ui-dining.cjs` usa os fixtures do PDV/caixa e exige instalação de teste isolada.
 
 QA cardápio: após as regressões PDV/mesas, `node scripts/test-ui-menu.cjs` usa os mesmos dados isolados e registra evidências em `docs/evidence/menu-stage/`.
+
+Combos no PDV/mesas: preço fixo com ajustes, soma ou maior componente; escolhas por grupo,
+estoque dos componentes e composição preservada. Clientes podem ser identificados no PDV;
+histórico por loja, consentimentos com texto/versionamento e exportação consistente.
+[Guia de combos e clientes](docs/combos-customers.md). Validação local PASS; distribuição 0.11 em conferência.

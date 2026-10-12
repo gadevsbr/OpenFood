@@ -533,6 +533,8 @@
               Selecione um produto ou leia o código de barras para começar.
             </div>
             <div class="pos-ticket-footer">
+              <details id="posCustomerSection"><summary>Identificar cliente (opcional)</summary><label>Cliente (opcional)<input id="posCustomerSearch" type="search" placeholder="Buscar por nome ou telefone" maxlength="120" /></label>
+              <label>Identificação da venda<select id="posCustomer"><option value="0">Consumidor sem identificação</option></select></label></details>
               <label
                 >Atendimento<select id="posService">
                   <option value="counter">Balcão · concluir na venda</option>
@@ -1726,7 +1728,7 @@
                       "
                     >
                       <input type="checkbox" name="marketing_consent" />
-                      Autoriza marketing</label
+                      Preferência antiga de marketing</label
                     >
                   </div>
                   <button type="submit" id="customerSubmit">
@@ -1813,11 +1815,12 @@
                     </label>
                   </div>
                   <label
-                    >Evidência (JSON opcional)<textarea
+                    >Texto dos termos aceitos<textarea name="terms_text" maxlength="4000" rows="3" required placeholder="Texto apresentado ao cliente para esta finalidade e versão"></textarea></label>
+                  <label>Evidência (JSON opcional)<textarea
                       name="evidence"
                       maxlength="2000"
                       rows="3"
-                      placeholder='{"ip":"192.168.1.1","user_agent":"...","form_id":"newsletter_signup"}'
+                      placeholder='{"referencia":"registro de atendimento"}'
                     ></textarea>
                   </label>
                   <div
@@ -1864,7 +1867,7 @@
               <button id="lgpdExportBtn">Exportar dados (JSON)</button>
             </section>
             <section style="margin-top: 24px">
-              <h2>Exclusão/Anonimização de dados (Art. 18 LGPD)</h2>
+              <h2>Remover identificação do cliente</h2>
               <p class="notice">
                 <strong>Atenção:</strong> Se o cliente tiver pedidos não
                 cancelados, os dados serão anonimizados (mantidos para
