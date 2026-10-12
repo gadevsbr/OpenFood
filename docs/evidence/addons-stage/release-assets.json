@@ -1,0 +1,44 @@
+{
+  "url": "https://github.com/gadevsbr/OpenFood/releases/tag/v0.13.0-alpha.1",
+  "tag": "v0.13.0-alpha.1",
+  "prerelease": true,
+  "published_at": "2026-10-12T23:55:31Z",
+  "assets": [
+    {
+      "name": "OpenFood-0.13.0-alpha.1-linux-x64.tar.gz",
+      "bytes": 4716052,
+      "digest": "sha256:86249b20f3de20c25530a126811702fa31d78c29f33deb04e6d499c6ac50464b",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/OpenFood-0.13.0-alpha.1-linux-x64.tar.gz"
+    },
+    {
+      "name": "OpenFood-0.13.0-alpha.1-ui-evidence.zip",
+      "bytes": 29883575,
+      "digest": "sha256:281c7a2ad090dbf351d19d1b23ace822fe8ad4cffa1036ac9e778f491934783e",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/OpenFood-0.13.0-alpha.1-ui-evidence.zip"
+    },
+    {
+      "name": "OpenFood-0.13.0-alpha.1-windows-x64-setup.exe",
+      "bytes": 33455010,
+      "digest": "sha256:005b48d931d482037fe32b8dad90b3d0f1ab99213466ec336aa5ea24c080899a",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/OpenFood-0.13.0-alpha.1-windows-x64-setup.exe"
+    },
+    {
+      "name": "OpenFood-0.13.0-alpha.1-windows-x64.zip",
+      "bytes": 56502881,
+      "digest": "sha256:22cc88fcebd2d285dabb39f0b135fb621cf34aa29bca43cf57736036ef489ef2",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/OpenFood-0.13.0-alpha.1-windows-x64.zip"
+    },
+    {
+      "name": "SHA256SUMS",
+      "bytes": 327,
+      "digest": "sha256:b7856a3e36e313fab0e5f7c81987dc407a0300c58e35ae2710b1cdeaeba9502b",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/SHA256SUMS"
+    },
+    {
+      "name": "SHA256SUMS-linux",
+      "bytes": 107,
+      "digest": "sha256:44de9538164d68d6acf79ac72f2c28a852ded8b9ea64fd508ca8b4911d125319",
+      "url": "https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/SHA256SUMS-linux"
+    }
+  ]
+}
