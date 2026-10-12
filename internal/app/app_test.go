@@ -519,7 +519,7 @@ func TestPostgresUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, version := range []int{1, 2, 3, 4, 5, 6, 7} {
+	for _, version := range []int{1, 2, 3, 4, 5, 6, 7, 8} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 			defer cancel()
@@ -593,7 +593,7 @@ func TestPostgresUpgrade(t *testing.T) {
 					t.Fatalf("legacy v3 backup restore: %v", err)
 				}
 				var restored int
-				if err = a.DB.QueryRow(ctx, "SELECT max(version) FROM schema_migrations").Scan(&restored); err != nil || restored != 8 {
+				if err = a.DB.QueryRow(ctx, "SELECT max(version) FROM schema_migrations").Scan(&restored); err != nil || restored != 9 {
 					t.Fatalf("legacy backup not upgraded: %d %v", restored, err)
 				}
 			}

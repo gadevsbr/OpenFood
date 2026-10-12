@@ -8,16 +8,17 @@ OpenFood is an open-source, local-first restaurant POS and management system for
 [![Build and tests](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml/badge.svg)](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml)
 [![AGPL-3.0 license](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-[**Download for Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.11.0-alpha.1/OpenFood-0.11.0-alpha.1-windows-x64-setup.exe) · [Português](README.md) · [Installation guide (Portuguese)](docs/installation.md) · [Roadmap (Portuguese)](project-memory/roadmap.md)
+[**Download for Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.12.0-alpha.1/OpenFood-0.12.0-alpha.1-windows-x64-setup.exe) · [Português](README.md) · [Installation guide (Portuguese)](docs/installation.md) · [Roadmap (Portuguese)](project-memory/roadmap.md)
 
 ![OpenFood restaurant POS with categories, menu and order panel](docs/evidence/restaurant-ui/pos-desktop.png)
 
-> **Experimental alpha · 0.11.0-alpha.1.** Browser/PostgreSQL journeys and Windows/Linux CI have passed within the documented scope. Clean-machine installation, physical peripherals and fiscal operation still have open validation gates. Screenshots use synthetic QA data; this overview shows the visual direction introduced in version 0.9.
+> **Experimental alpha · 0.12.0-alpha.1.** Browser/PostgreSQL journeys and Windows/Linux CI have passed within the documented scope. Clean-machine installation, physical peripherals and fiscal operation still have open validation gates. Screenshots use synthetic QA data; this overview shows the visual direction introduced in version 0.9.
 
 ## Features
 
 - Separate **PDV (POS) / ADM** workspaces, with a required cash opening before sales.
 - Restaurant categories, local photos, sizes/variants, add-on limits, item notes and availability schedules.
+- Up to four pizza flavors, weighted portions and highest-price or weighted-average pricing; common size adjustments and add-ons. [Pizza guide (Portuguese)](docs/pizza.md).
 - Configurable combo groups, fixed price with adjustments, component sum or highest-component pricing.
 - Persistent tables/tabs, preparation rounds, kitchen queue and non-fiscal receipts.
 - Manual partial/split payments, change, manager discounts, cash withdrawals/deposits and cash closing with discrepancies.
@@ -29,7 +30,7 @@ OpenFood is an open-source, local-first restaurant POS and management system for
 
 ### Windows 10/11 x64
 
-Download the [0.11 installer](https://github.com/gadevsbr/OpenFood/releases/download/v0.11.0-alpha.1/OpenFood-0.11.0-alpha.1-windows-x64-setup.exe) and verify [SHA256SUMS](https://github.com/gadevsbr/OpenFood/releases/download/v0.11.0-alpha.1/SHA256SUMS). Install per user, open OpenFood from the Start menu, then create your store, email and a password of at least 12 characters. There are no default credentials. Go, Node and Docker are not required.
+Download the [0.12 installer](https://github.com/gadevsbr/OpenFood/releases/download/v0.12.0-alpha.1/OpenFood-0.12.0-alpha.1-windows-x64-setup.exe) and verify [SHA256SUMS](https://github.com/gadevsbr/OpenFood/releases/download/v0.12.0-alpha.1/SHA256SUMS). Install per user, open OpenFood from the Start menu, then create your store, email and a password of at least 12 characters. There are no default credentials. Go, Node and Docker are not required.
 
 ### Linux with Docker Compose
 
@@ -50,7 +51,7 @@ Open **http://127.0.0.1:18880** and supply the setup token. The `database` volum
 
 ## Current limits
 
-Supported networking is loopback only. The computer must remain running. Cash, card and Pix payments are manual records; no bank charges or external refunds are executed. Integrated Pix, TEF, fiscal invoicing, WhatsApp, iFood and AI are not connected. Pizza flavors, sales by weight, fees, automatic retention and handling removed identification after restoring old backups remain on the roadmap. Existing privacy controls do not constitute legal-compliance certification.
+Supported networking is loopback only. The computer must remain running. Cash, card and Pix payments are manual records; no bank charges or external refunds are executed. Integrated Pix, TEF, fiscal invoicing, WhatsApp, iFood and AI are not connected. Sales by weight, fees, automatic retention and handling removed identification after restoring old backups remain on the roadmap. Existing privacy controls do not constitute legal-compliance certification.
 
 Fonts, icons and UI scripts are embedded locally; there is no mandatory telemetry. Optional external providers may charge their own fees.
 
@@ -58,7 +59,7 @@ Fonts, icons and UI scripts are embedded locally; there is no mandatory telemetr
 
 Built with **Go 1.27.2, PostgreSQL 17 and an embedded web interface**. Motion mini animations respect reduced-motion preferences. Read [contribution guidelines](CONTRIBUTING.md), [development and QA](docs/development.md) and [security policy](SECURITY.md). Project guides are currently in Portuguese.
 
-[Release 0.11](https://github.com/gadevsbr/OpenFood/releases/tag/v0.11.0-alpha.1) includes Windows/Linux packages, QA evidence and SHA-256 manifests. See [the CI run](https://github.com/gadevsbr/OpenFood/actions/runs/38193987452) and [validation scope](project-memory/combo-customer-stage.md).
+[Release 0.12](https://github.com/gadevsbr/OpenFood/releases/tag/v0.12.0-alpha.1) includes Windows/Linux packages, QA evidence and SHA-256 manifests. See [the CI run](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml) and [validation scope](project-memory/pizza-stage.md).
 
 [Report a bug or suggest a feature](https://github.com/gadevsbr/OpenFood/issues/new/choose) using synthetic data and reproducible steps.
 

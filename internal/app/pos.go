@@ -55,7 +55,7 @@ func (a *App) posCheckout(w http.ResponseWriter, r *http.Request, store int64, u
 	}
 	id, e := a.Checkout(r.Context(), store, user.ID, r.Header.Get("Idempotency-Key"), input)
 	if e != nil {
-		known := map[string]bool{"cash_not_open": true, "checkout_price_changed": true, "payment_total_invalid": true, "checkout_invalid": true, "discount_invalid": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "idempotency_conflict": true, "order_duplicate_product": true, "configuration_invalid": true, "configuration_changed": true, "variant_required": true, "addon_unavailable": true, "addon_limits_invalid": true, "combo_invalid": true, "combo_unavailable": true, "combo_limits_invalid": true, "combo_quantity_invalid": true, "customer_invalid": true}
+		known := map[string]bool{"cash_not_open": true, "checkout_price_changed": true, "payment_total_invalid": true, "checkout_invalid": true, "discount_invalid": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "idempotency_conflict": true, "order_duplicate_product": true, "configuration_invalid": true, "configuration_changed": true, "variant_required": true, "addon_unavailable": true, "addon_limits_invalid": true, "pizza_selection_invalid": true, "combo_invalid": true, "combo_unavailable": true, "combo_limits_invalid": true, "combo_quantity_invalid": true, "customer_invalid": true}
 		if known[e.Error()] {
 			failure(w, 409, e.Error())
 		} else {

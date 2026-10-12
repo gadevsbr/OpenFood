@@ -1,0 +1,17 @@
+{
+  "result": "PASS",
+  "data": "synthetic QA only",
+  "version": "0.12.0-alpha.1",
+  "checks": [
+    "configuration via administration UI",
+    "active flavors and limits",
+    "half-cent rounding and weighted thirds",
+    "variants and add-ons",
+    "desktop/mobile/dark",
+    "cart edit and reload",
+    "manual checkout with server pricing",
+    "receipt snapshot and stock",
+    "pizza choices inside a combo"
+  ],
+  "javascript_errors": []
+}

@@ -46,7 +46,7 @@ type DiningTab struct {
 }
 
 func diningFailure(w http.ResponseWriter, err error) {
-	known := map[string]bool{"cash_not_open": true, "tab_not_open": true, "tab_changed_reload": true, "table_unavailable": true, "tab_label_in_use": true, "tab_limit": true, "tab_not_empty": true, "payment_total_invalid": true, "idempotency_conflict": true, "checkout_price_changed": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "total_limit": true, "order_duplicate_product": true, "configuration_invalid": true, "configuration_changed": true, "variant_required": true, "addon_unavailable": true, "addon_limits_invalid": true, "combo_invalid": true, "combo_unavailable": true, "combo_limits_invalid": true, "combo_quantity_invalid": true, "customer_invalid": true, "integrated_payment_unsupported": true}
+	known := map[string]bool{"cash_not_open": true, "tab_not_open": true, "tab_changed_reload": true, "table_unavailable": true, "tab_label_in_use": true, "tab_limit": true, "tab_not_empty": true, "payment_total_invalid": true, "idempotency_conflict": true, "checkout_price_changed": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "total_limit": true, "order_duplicate_product": true, "configuration_invalid": true, "configuration_changed": true, "variant_required": true, "addon_unavailable": true, "addon_limits_invalid": true, "pizza_selection_invalid": true, "combo_invalid": true, "combo_unavailable": true, "combo_limits_invalid": true, "combo_quantity_invalid": true, "customer_invalid": true, "integrated_payment_unsupported": true}
 	if known[err.Error()] {
 		failure(w, 409, err.Error())
 	} else {

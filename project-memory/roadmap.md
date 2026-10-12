@@ -62,6 +62,7 @@ pelo foco explícito nos itens 1 e 2. Nenhuma funcionalidade nova declarada pron
 ---
 
 ## Fase 3: Catálogo Avançado (Restaurantes e Mercados)
+2026-10-12: etapa 0.12 integra sabores de pizza e preço maior/média ponderada no servidor; PostgreSQL/Chromium PASS no escopo local, CI/distribuição pendentes. [Escopo e limites](pizza-stage.md). Adicionais compartilhados e horários por loja/categoria continuam próximos; Fase 3 não concluída.
 2026-10-11: etapa 0.10 valida variantes/tamanhos, adicionais, observações e fotos no PDV/mesas. [Evidências e limites](menu-stage.md). Etapa 0.11 valida combos operacionais; sabores de pizza e adicionais compartilhados continuam pendentes. [Escopo](combo-customer-stage.md). Critérios completos da fase ainda abertos.
 
 - [ ] **Categorias e Disponibilidade**:

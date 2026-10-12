@@ -32,5 +32,6 @@ Grupos compartilhados são protegidos no editor contextual; ele não altera outr
 produtos silenciosamente. Fotos reais são separadas das ilustrações das categorias.
 
 Escopo: unidade/porção, uma variante e seleção única de cada adicional por item.
-Combos, sabores de pizza, peso, estoque por ingrediente e impressora física ficam
-para outras etapas. Comprovante não fiscal; pagamentos continuam manuais.
+Combos e sabores de pizza têm guias próprios: [combos](combos-customers.md) e
+[pizzas](pizza.md). Peso, estoque por ingrediente e impressora física ficam para
+outras etapas. Comprovante não fiscal; pagamentos continuam manuais.

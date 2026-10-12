@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-12",
+  "environment": "Windows development host, PostgreSQL 17.11, isolated synthetic fixtures",
+  "full_suite": {"result": "PASS", "seconds": 240.080, "historical_schema_versions": [1,2,3,4,5,6,7,8]},
+  "final_pizza_journey": {"result": "PASS", "seconds": 21.39, "checks": ["integer rounding and weighted portions", "server total validation and rollback", "configuration snapshots", "whole-pizza stocks and cancellation", "store isolation and permissions", "idempotent retries", "tab rounds", "pizza in combos", "product unit changed", "backup and restore", "concurrent last pizza"]},
+  "vet": "PASS",
+  "javascript_syntax": "PASS",
+  "python_syntax": "PASS",
+  "govulncheck": {"reachable": 0, "required_module_without_calls": 1},
+  "npm_audit": {"vulnerabilities": 0},
+  "limits": "No certification of clean Windows, physical peripherals, fiscal operation or full roadmap. CI and release tracked separately."
+}

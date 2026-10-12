@@ -66,6 +66,25 @@ assert summary["sessions"][0]["cash_cents"] == -1000
 assert summary["sessions"][1]["cash_cents"] == 1000
 assert summary["sessions"][1]["difference_cents"] == -10
 
+# Pizza must use the same integer pricing/snapshot path in Linux Compose.
+pizza = api("products", {"name": "QA Pizza", "price_cents": 3001, "stock_quantity": 3, "active": True, "unit": "unidade"})
+configured = api("pizza-configuration?product_id=" + str(pizza["id"]), {
+    "product_id": pizza["id"], "version": 1,
+    "pizza": {"enabled": True, "pricing_policy": "weighted_average", "max_flavors": 2,
+              "flavors": [{"id": "", "name": "Calabresa QA", "price_cents": 3001, "active": True},
+                          {"id": "", "name": "Queijo QA", "price_cents": 4002, "active": True}]}})
+pizza_payload = {"items": [{"product_id": pizza["id"], "quantity": 1, "configuration_version": configured["version"],
+                            "flavors": [{"flavor_id": configured["pizza"]["flavors"][0]["id"], "parts": 2},
+                                        {"flavor_id": configured["pizza"]["flavors"][1]["id"], "parts": 1}]}]}
+pizza_headers = {"Idempotency-Key": "linux-compose-pizza-order"}
+pizza_order = api("orders", pizza_payload, pizza_headers)
+assert api("orders", pizza_payload, pizza_headers)["id"] == pizza_order["id"]
+assert next(x for x in api("orders") if x["id"] == pizza_order["id"])["total_cents"] == 3335
+assert next(x for x in api("products") if x["id"] == pizza["id"])["stock_quantity"] == 2
+assert api("orders?id=" + str(pizza_order["id"]))[0]["selection"]["pizza"]["total_parts"] == 3
+api("order-state", {"id": pizza_order["id"], "state": "cancelled"})
+assert next(x for x in api("products") if x["id"] == pizza["id"])["stock_quantity"] == 3
+
 with tempfile.TemporaryDirectory() as tmp:
     dump = Path(tmp) / "openfood.dump"
     with dump.open("wb") as file:
@@ -80,7 +99,10 @@ with tempfile.TemporaryDirectory() as tmp:
     jar.clear()
     api("login", {"email": "linux-qa@example.org", "password": password})
     restored = api("orders")
-    assert restored[0]["state"] == "completed" and restored[0]["total_cents"] == 2468
+    original = next(x for x in restored if x["id"] == order["id"])
+    assert original["state"] == "completed" and original["total_cents"] == 2468
+    assert api("pizza-configuration?product_id=" + str(pizza["id"]))["pizza"]["enabled"]
+    assert api("orders?id=" + str(pizza_order["id"]))[0]["selection"]["pizza"]["price_cents"] == 3335
 assert len(api("cash-sessions")["receipts"]) == 4
-assert api("orders")[0]["financial_state"] == "refunded"
+assert next(x for x in api("orders") if x["id"] == order["id"])["financial_state"] == "refunded"
 print("PASS: manual receipts, split payments, cash closing/refunds across periods and real Compose setup, authentication, catalog, transactional stock, idempotency, order states, pg_dump/pg_restore, restart")

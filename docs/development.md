@@ -39,6 +39,7 @@ Ordem das jornadas incrementais:
 6. `node scripts/test-ui-dining.cjs`: mesas/comandas, após PDV/caixa.
 7. `node scripts/test-ui-menu.cjs`: cardápio configurável, após PDV/mesas.
 8. `node scripts/test-ui-combos.cjs`: combos/clientes, após cardápio.
+9. `node scripts/test-ui-pizza.cjs`: sabores, partes, preço, carrinho e pizza em combos; usa os fixtures iniciais e cadastra seus próprios produtos.
 
 `OPENFOOD_UI_EVIDENCE` permite direcionar evidências da jornada inicial para a pasta da etapa. Capturas e relatórios só podem ser versionados após sanitização. Consulte os registros de cada etapa em `project-memory` para o escopo validado.
 

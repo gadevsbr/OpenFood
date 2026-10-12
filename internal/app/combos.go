@@ -45,7 +45,7 @@ func configuredCombo(ctx context.Context, tx pgx.Tx, store int64, item Item) (st
 	fail := func(code string) (string, int64, menuSelection, error) {
 		return "", 0, menuSelection{}, errors.New(code)
 	}
-	if item.ProductID != 0 || item.VariantID != 0 || len(item.Addons) > 0 || item.Quantity < 1 || item.Quantity > 100000 || len(item.Components) > 50 || utf8.RuneCountInString(item.Notes) > 500 {
+	if item.ProductID != 0 || item.VariantID != 0 || len(item.Flavors) > 0 || len(item.Addons) > 0 || item.Quantity < 1 || item.Quantity > 100000 || len(item.Components) > 50 || utf8.RuneCountInString(item.Notes) > 500 {
 		return fail("combo_invalid")
 	}
 	c := comboSnapshot{ID: item.ComboID, Components: []comboComponentSnapshot{}}

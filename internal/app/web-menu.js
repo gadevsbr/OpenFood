@@ -1,5 +1,5 @@
 function menuPayloadItem(i) {
-  return { combo_id: i.combo_id || 0, combo_version: i.combo_version || "", components: i.components?.map(menuPayloadItem) || [], product_id: i.product_id || 0, quantity: i.quantity, variant_id: i.variant_id || 0, addon_option_ids: i.addon_option_ids || [], notes: i.notes || "", configuration_version: i.configuration_version || 0 };
+  return { flavors: i.flavors || [], combo_id: i.combo_id || 0, combo_version: i.combo_version || "", components: i.components?.map(menuPayloadItem) || [], product_id: i.product_id || 0, quantity: i.quantity, variant_id: i.variant_id || 0, addon_option_ids: i.addon_option_ids || [], notes: i.notes || "", configuration_version: i.configuration_version || 0 };
 }
 const menuErrors = { configuration_changed: "O cardápio mudou. Atualize e personalize novamente o item.", configuration_stock_changed: "O estoque mudou durante a edição. Reabra o cadastro para conferir.", configuration_shared_group: "Este grupo está vinculado a outros produtos. Edite-o pelo cadastro de adicionais.", configuration_invalid: "Confira os tamanhos, os adicionais e os limites de escolha.", variant_required: "Escolha um tamanho disponível.", addon_unavailable: "Um adicional ficou indisponível. Confira a seleção.", addon_limits_invalid: "Confira as escolhas obrigatórias e os limites de adicionais.", configuration_save_failed: "Não foi possível salvar. Confira nomes repetidos e reabra o cadastro.", photo_invalid: "Use uma foto JPEG ou PNG de até 4096 pixels e 12 megapixels.", photo_too_large: "A foto deve ter até 2 MB. Reduza a imagem e tente novamente." };
 function menuError(err) {
@@ -37,7 +37,7 @@ function menuCheck(root, label, value, name) {
   return input;
 }
 function menuLineKey(i) {
-  return JSON.stringify([i.combo_id || 0, i.components?.map(menuPayloadItem) || [], i.product_id, i.variant_id || 0, [...i.addon_option_ids || []].sort((a, b) => a - b), i.notes || ""]);
+  return JSON.stringify([i.combo_id || 0, i.components?.map(menuPayloadItem) || [], i.product_id, i.flavors || [], i.variant_id || 0, [...i.addon_option_ids || []].sort((a, b) => a - b), i.notes || ""]);
 }
 let menuOpening = false;
 async function menuChoose(product, existing) {
@@ -57,7 +57,7 @@ async function menuChoose(product, existing) {
   }
   if (currentStoreId !== store || appMode !== "pos") return;
   const variants = config.variants.filter((v) => v.active), groups = config.groups.filter((g) => g.active);
-  if (!variants.length && !groups.length && !existing) {
+  if (!variants.length && !groups.length && !config.pizza.enabled && !existing) {
     posAdd({ ...product, configuration_version: config.version });
     return;
   }
@@ -83,7 +83,7 @@ async function menuChoose(product, existing) {
     select.required = true;
     select.append(new Option("Selecione um tamanho", ""));
     for (const v of variants) {
-      const o = new Option(`${v.name} · ${money(product.price_cents + v.price_adjustment_cents)} · ${v.stock_quantity} disponíveis`, v.id);
+      const o = new Option(`${v.name} · ${config.pizza.enabled ? "ajuste " + money(v.price_adjustment_cents) : money(product.price_cents + v.price_adjustment_cents)} · ${v.stock_quantity} disponíveis`, v.id);
       o.disabled = v.stock_quantity < 1 || product.price_cents + v.price_adjustment_cents < 0;
       select.append(o);
     }
@@ -92,6 +92,7 @@ async function menuChoose(product, existing) {
     content.append(label2);
     variantSelect = select;
   }
+  const pizza = pizzaChoices(content, config.pizza, existing);
   const optionInputs = [];
   for (const g of groups) {
     const field = menuNode("fieldset", "menu-choice-group"), legend = menuNode("legend", "", g.name);
@@ -122,7 +123,7 @@ async function menuChoose(product, existing) {
   actions.append(total, error, submit);
   form.append(actions);
   body.append(form);
-  const calculation = () => product.price_cents + (variants.find((v) => String(v.id) === variantSelect?.value)?.price_adjustment_cents || 0) + optionInputs.filter((o) => o.input.checked).reduce((s, o) => s + o.option.price_cents, 0);
+  const calculation = () => pizza.price(product.price_cents) + (variants.find((v) => String(v.id) === variantSelect?.value)?.price_adjustment_cents || 0) + optionInputs.filter((o) => o.input.checked).reduce((s, o) => s + o.option.price_cents, 0);
   const update = () => {
     total.textContent = "Total do item: " + money(calculation() * Number(qty.value || 1));
     error.classList.add("hidden");
@@ -132,6 +133,7 @@ async function menuChoose(product, existing) {
   form.onsubmit = (e) => {
     e.preventDefault();
     try {
+      const flavors = pizza.read();
       const variant = variants.find((v) => String(v.id) === variantSelect?.value), selected = optionInputs.filter((o) => o.input.checked), quantity = Number(qty.value);
       if (variants.length && !variant) throw Error("variant_required");
       for (const g of groups) {
@@ -140,7 +142,7 @@ async function menuChoose(product, existing) {
       }
       const other = posCart.filter((i) => i !== existing), used = other.filter((i) => i.product_id === product.id).reduce((s, i) => s + i.quantity, 0);
       if (!Number.isInteger(quantity) || quantity < 1 || quantity + used > product.stock_quantity || variant && quantity + other.filter((i) => i.variant_id === variant.id).reduce((s, i) => s + i.quantity, 0) > variant.stock_quantity || selected.some((o) => quantity + other.filter((i) => i.addon_option_ids?.includes(o.option.id)).reduce((s, i) => s + i.quantity, 0) > o.option.stock_quantity)) throw Error("stock_insufficient");
-      const item = { product_id: product.id, quantity, variant_id: variant?.id || 0, addon_option_ids: selected.map((o) => o.option.id), notes: notes.value.trim(), configuration_version: config.version, variant_stock: variant?.stock_quantity, addon_stocks: Object.fromEntries(selected.map((o) => [o.option.id, o.option.stock_quantity])), price_cents: calculation(), name: product.name + (variant ? " · " + variant.name : "") + selected.map((o) => " + " + o.option.name).join("") };
+      const item = { flavors, product_id: product.id, quantity, variant_id: variant?.id || 0, addon_option_ids: selected.map((o) => o.option.id), notes: notes.value.trim(), configuration_version: config.version, variant_stock: variant?.stock_quantity, addon_stocks: Object.fromEntries(selected.map((o) => [o.option.id, o.option.stock_quantity])), price_cents: calculation(), name: product.name + pizza.name() + (variant ? " · " + variant.name : "") + selected.map((o) => " + " + o.option.name).join("") };
       if (!menuFitsCart([...other, item])) throw Error("stock_insufficient");
       const match = other.find((i) => menuLineKey(i) === menuLineKey(item) && i.configuration_version === item.configuration_version && i.price_cents === item.price_cents);
       if (match) match.quantity += quantity;
@@ -235,6 +237,9 @@ async function menuEditor(product) {
   const form = menuNode("form", "menu-admin-form");
   form.id = "menuAdminForm";
   root.append(form);
+  const pizzaSection=menuNode("section","menu-photo-editor");
+  pizzaSection.append(menuNode("h3","","Sabores de pizza"),menuNode("p","menu-hint",config.pizza.enabled?"Escolha de sabores ativa neste produto.":"Ative sabores e defina a regra de preço para pizzas por unidade."),posButton("Configurar sabores de pizza",()=>pizzaEditor(product).catch(e=>msg(menuError(e)))));
+  root.append(pizzaSection);
   form.append(menuNode("h3", "", "Tamanhos e variantes"), menuNode("p", "menu-hint", "O preço é o valor base mais o ajuste do tamanho. A venda baixa o estoque do produto e do tamanho."));
   const variantRoot = menuNode("div", "menu-admin-variants");
   form.append(variantRoot);
@@ -374,6 +379,7 @@ async function comboChoose(combo, existing) {
       label.append(variant);
       f.append(label);
     }
+    const pizza=pizzaChoices(f,cfg.pizza,old);
     const options = [];
     for (const g of groups) {
       f.append(menuNode("p", "menu-hint", `${g.name} · ${g.required ? "obrigatório" : "opcional"} · de ${Math.max(g.min_selections, g.required ? 1 : 0)} a ${g.max_selections}`));
@@ -389,7 +395,7 @@ async function comboChoose(combo, existing) {
     noteLabel2.append(notes2);
     f.append(noteLabel2);
     content.append(f);
-    fields.push({ d, product, cfg, enabled, variants, variant, groups, options, notes: notes2 });
+    fields.push({ pizza, d, product, cfg, enabled, variants, variant, groups, options, notes: notes2 });
   });
   const qty = menuField(content, "Quantidade de combos", existing?.quantity || 1, "quantity", "number");
   qty.min = 1;
@@ -406,7 +412,7 @@ async function comboChoose(combo, existing) {
   form.append(actions);
   body.append(form);
   const calculate = () => {
-    const values = fields.filter((f) => f.enabled.checked).map((f) => ({ base: f.product.price_cents * f.d.quantity, price: (f.product.price_cents + (f.variants.find((v) => String(v.id) === f.variant?.value)?.price_adjustment_cents || 0) + f.options.filter((o) => o.input.checked).reduce((sum, o) => sum + o.option.price_cents, 0)) * f.d.quantity }));
+    const values = fields.filter((f) => f.enabled.checked).map((f) => ({ base: f.product.price_cents * f.d.quantity, price: (f.pizza.price(f.product.price_cents) + (f.variants.find((v) => String(v.id) === f.variant?.value)?.price_adjustment_cents || 0) + f.options.filter((o) => o.input.checked).reduce((sum, o) => sum + o.option.price_cents, 0)) * f.d.quantity }));
     return combo.pricing_policy === "fixed" ? combo.price_cents + values.reduce((sum, v) => sum + v.price - v.base, 0) : combo.pricing_policy === "highest" ? Math.max(0, ...values.map((v) => v.price)) : values.reduce((sum, v) => sum + v.price, 0);
   };
   form.oninput = () => {
@@ -435,7 +441,7 @@ async function comboChoose(combo, existing) {
         }
         const used = quantity * f.d.quantity;
         if (!Number.isInteger(f.d.quantity) || f.d.quantity < 1 || used > f.product.stock_quantity || v && used > v.stock_quantity || selected.some((o) => used > o.option.stock_quantity)) throw Error("stock_insufficient");
-        components.push({ product_id: f.product.id, quantity: 1, variant_id: v?.id || 0, addon_option_ids: selected.map((o) => o.option.id), configuration_version: f.cfg.version, variant_stock: v?.stock_quantity, addon_stocks: Object.fromEntries(selected.map((o) => [o.option.id, o.option.stock_quantity])), notes: f.notes.value.trim(), name: f.product.name + (v ? " · " + v.name : "") + selected.map((o) => " + " + o.option.name).join(""), component_quantity: f.d.quantity });
+        components.push({ flavors:f.pizza.read(), product_id: f.product.id, quantity: 1, variant_id: v?.id || 0, addon_option_ids: selected.map((o) => o.option.id), configuration_version: f.cfg.version, variant_stock: v?.stock_quantity, addon_stocks: Object.fromEntries(selected.map((o) => [o.option.id, o.option.stock_quantity])), notes: f.notes.value.trim(), name: f.product.name + f.pizza.name() + (v ? " · " + v.name : "") + selected.map((o) => " + " + o.option.name).join(""), component_quantity: f.d.quantity });
       }
       for (const g of groups.values()) if (g.count < g.min || g.count > g.max) throw Error("combo_limits_invalid");
       if (!components.length) throw Error("combo_invalid");

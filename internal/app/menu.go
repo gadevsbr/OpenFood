@@ -56,10 +56,11 @@ type MenuGroup struct {
 	Options  []MenuOption `json:"options"`
 }
 type MenuConfiguration struct {
-	ProductID int64         `json:"product_id"`
-	Version   int64         `json:"version"`
-	Variants  []MenuVariant `json:"variants"`
-	Groups    []MenuGroup   `json:"groups"`
+	Pizza     PizzaConfiguration `json:"pizza"`
+	ProductID int64              `json:"product_id"`
+	Version   int64              `json:"version"`
+	Variants  []MenuVariant      `json:"variants"`
+	Groups    []MenuGroup        `json:"groups"`
 }
 type menuQuery interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
@@ -68,7 +69,11 @@ type menuQuery interface {
 
 func readMenu(ctx context.Context, q menuQuery, store, product int64) (MenuConfiguration, error) {
 	c := MenuConfiguration{ProductID: product, Variants: []MenuVariant{}, Groups: []MenuGroup{}}
-	if err := q.QueryRow(ctx, "SELECT configuration_version FROM products WHERE store_id=$1 AND id=$2", store, product).Scan(&c.Version); err != nil {
+	var pizzaRaw []byte
+	if err := q.QueryRow(ctx, "SELECT configuration_version,pizza_configuration FROM products WHERE store_id=$1 AND id=$2", store, product).Scan(&c.Version, &pizzaRaw); err != nil {
+		return c, err
+	}
+	if err := json.Unmarshal(pizzaRaw, &c.Pizza); err != nil {
 		return c, err
 	}
 	rows, err := q.Query(ctx, "SELECT id,name,price_adjustment_cents,stock_quantity,active FROM product_variants WHERE store_id=$1 AND product_id=$2 ORDER BY display_order,id", store, product)
@@ -166,7 +171,9 @@ func (a *App) menuConfiguration(w http.ResponseWriter, r *http.Request, store in
 		return
 	}
 	if err := a.saveMenu(r.Context(), store, user.ID, c); err != nil {
-		if strings.HasPrefix(err.Error(), "configuration_") {
+		if err.Error() == "pizza_configuration_invalid" {
+			failure(w, 400, err.Error())
+		} else if strings.HasPrefix(err.Error(), "configuration_") {
 			failure(w, 409, err.Error())
 		} else if err.Error() == "product_not_found" {
 			failure(w, 404, "product_not_found")
@@ -226,6 +233,13 @@ func (a *App) saveMenu(ctx context.Context, store, user int64, c MenuConfigurati
 			return errors.New("configuration_invalid")
 		}
 		seenNames[key] = true
+		if old.Pizza.Enabled && v.Active {
+			for _, f := range old.Pizza.Flavors {
+				if f.Active && f.Price+v.Adjustment < 0 {
+					return errors.New("pizza_configuration_invalid")
+				}
+			}
+		}
 		if v.ID > 0 {
 			prev, ok := oldV[v.ID]
 			if !ok || seenIDs[v.ID] || v.ExpectedStock == nil || *v.ExpectedStock != prev.Stock {
@@ -331,6 +345,7 @@ func (a *App) saveMenu(ctx context.Context, store, user int64, c MenuConfigurati
 }
 
 type menuSelection struct {
+	Pizza   *PizzaSnapshot `json:"pizza,omitempty"`
 	Combo   *comboSnapshot `json:"combo,omitempty"`
 	Version int64          `json:"configuration_version"`
 	Base    int64          `json:"base_price_cents"`
@@ -351,6 +366,25 @@ func configuredItem(ctx context.Context, tx pgx.Tx, store int64, item Item, name
 		return name, price, selection, errors.New("configuration_changed")
 	}
 	selection.Version = c.Version
+	if c.Pizza.Enabled {
+		var unit string
+		var weight bool
+		if err = tx.QueryRow(ctx, "SELECT unit,is_weight_based FROM products WHERE store_id=$1 AND id=$2", store, item.ProductID).Scan(&unit, &weight); err != nil {
+			return name, price, selection, err
+		}
+		if unit != "unidade" || weight {
+			return name, price, selection, errors.New("product_unavailable")
+		}
+	}
+	selection.Pizza, err = pizzaPrice(c.Pizza, item.Flavors)
+	if err != nil {
+		return name, price, selection, err
+	}
+	if selection.Pizza != nil {
+		price = selection.Pizza.Price
+		selection.Base = price
+		name += pizzaName(selection.Pizza)
+	}
 	activeVariants := 0
 	found := false
 	for _, v := range c.Variants {
@@ -427,6 +461,8 @@ func itemIdentity(item Item) string {
 	item.ConfigurationVersion = 0
 	item.Notes = strings.TrimSpace(item.Notes)
 	item.Addons = append([]int64(nil), item.Addons...)
+	item.Flavors = append([]PizzaPart(nil), item.Flavors...)
+	sort.Slice(item.Flavors, func(i, j int) bool { return item.Flavors[i].ID < item.Flavors[j].ID })
 	sort.Slice(item.Addons, func(i, j int) bool { return item.Addons[i] < item.Addons[j] })
 	b, _ := json.Marshal(item)
 	return string(b)

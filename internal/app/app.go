@@ -52,11 +52,17 @@ var menuSchema string
 //go:embed combo-schema.sql
 var comboSchema string
 
+//go:embed pizza-schema.sql
+var pizzaSchema string
+
 //go:embed web-dining.js
 var webDining []byte
 
 //go:embed web-menu.js
 var webMenu []byte
+
+//go:embed web-pizza.js
+var webPizza []byte
 
 //go:embed pos-schema.sql
 var posSchema string
@@ -76,7 +82,7 @@ var webUX []byte
 //go:embed food/*.jpg
 var foodImages embed.FS
 
-const Version = "0.11.0-alpha.1"
+const Version = "0.12.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -298,6 +304,9 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 		if e = migrateCombos(ctx, tx); e != nil {
+			return e
+		}
+		if e = migratePizza(ctx, tx); e != nil {
 			return e
 		}
 		return tx.Commit(ctx)
@@ -628,7 +637,7 @@ func (a *App) Migrate(ctx context.Context) error {
 			if e != nil {
 				return e
 			}
-		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) && (n != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema)) && (n != 8 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema)) {
+		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) && (n != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema)) && (n != 8 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema)) && (n != 9 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema)) {
 			return errors.New("migration_incompatible")
 		}
 	}
@@ -660,11 +669,16 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 	}
+	if n < 9 {
+		if e = migratePizza(ctx, tx); e != nil {
+			return e
+		}
+	}
 	return tx.Commit(ctx)
 }
 
 func ValidateSchema(version int, checksum string) error {
-	if version != 8 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema) {
+	if version != 9 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema) {
 		return errors.New("migration_incompatible")
 	}
 	return nil
@@ -802,6 +816,8 @@ func (a *App) Handler() http.Handler {
 				}
 			}
 			switch r.URL.Path {
+			case "/assets/web-pizza.js":
+				asset, contentType = webPizza, "text/javascript; charset=utf-8"
 			case "/assets/web-menu.js":
 				asset, contentType = webMenu, "text/javascript; charset=utf-8"
 			case "/assets/web-dining.js":
@@ -959,6 +975,8 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			a.products(w, r, targetStore, user)
+		case "/api/pizza-configuration":
+			a.pizzaConfiguration(w, r, targetStore, user)
 		case "/api/product-configuration":
 			a.menuConfiguration(w, r, targetStore, user)
 		case "/api/product-photo":
@@ -1513,7 +1531,7 @@ func (a *App) usersHandler(w http.ResponseWriter, r *http.Request, u *SessionUse
 
 func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), `SELECT id,name,COALESCE(description,''),price_cents,stock_quantity,unit,COALESCE(sku,''),COALESCE(barcode,''),active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id,configuration_version,EXISTS(SELECT 1 FROM product_photos ph WHERE ph.store_id=products.store_id AND ph.product_id=products.id),EXISTS(SELECT 1 FROM product_variants v WHERE v.store_id=products.store_id AND v.product_id=products.id AND v.active) OR EXISTS(SELECT 1 FROM product_addon_groups pg JOIN addon_groups g ON g.id=pg.group_id AND g.store_id=pg.store_id WHERE pg.store_id=products.store_id AND pg.product_id=products.id AND g.active) FROM products WHERE store_id=$1 ORDER BY display_order, id`, store)
+		rows, e := a.DB.Query(r.Context(), `SELECT id,name,COALESCE(description,''),price_cents,stock_quantity,unit,COALESCE(sku,''),COALESCE(barcode,''),active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id,configuration_version,EXISTS(SELECT 1 FROM product_photos ph WHERE ph.store_id=products.store_id AND ph.product_id=products.id),EXISTS(SELECT 1 FROM product_variants v WHERE v.store_id=products.store_id AND v.product_id=products.id AND v.active) OR EXISTS(SELECT 1 FROM product_addon_groups pg JOIN addon_groups g ON g.id=pg.group_id AND g.store_id=pg.store_id WHERE pg.store_id=products.store_id AND pg.product_id=products.id AND g.active) OR (pizza_configuration->>'enabled')::boolean FROM products WHERE store_id=$1 ORDER BY display_order, id`, store)
 		if e != nil {
 			failure(w, 500, "catalog_failed")
 			return
@@ -2439,15 +2457,16 @@ func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store in
 }
 
 type Item struct {
-	ComboVersion         string  `json:"combo_version,omitempty"`
-	ComboID              int64   `json:"combo_id,omitempty"`
-	Components           []Item  `json:"components,omitempty"`
-	ProductID            int64   `json:"product_id"`
-	Quantity             int64   `json:"quantity"`
-	VariantID            int64   `json:"variant_id,omitempty"`
-	Addons               []int64 `json:"addon_option_ids,omitempty"`
-	Notes                string  `json:"notes,omitempty"`
-	ConfigurationVersion int64   `json:"configuration_version,omitempty"`
+	Flavors              []PizzaPart `json:"flavors,omitempty"`
+	ComboVersion         string      `json:"combo_version,omitempty"`
+	ComboID              int64       `json:"combo_id,omitempty"`
+	Components           []Item      `json:"components,omitempty"`
+	ProductID            int64       `json:"product_id"`
+	Quantity             int64       `json:"quantity"`
+	VariantID            int64       `json:"variant_id,omitempty"`
+	Addons               []int64     `json:"addon_option_ids,omitempty"`
+	Notes                string      `json:"notes,omitempty"`
+	ConfigurationVersion int64       `json:"configuration_version,omitempty"`
 }
 type OrderRequest struct {
 	Items      []Item `json:"items"`
