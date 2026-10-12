@@ -1,8 +1,13 @@
-# Contribuição
-Leia AGENTS.md e project-memory. Use Go 1.26.8. Rode `go test ./...`; para testes reais Windows, defina OPENFOOD_TEST_PG_BIN para binários PostgreSQL 17. Testes ignorados não são validação de banco.
+# Contribuir com o OpenFood
 
-Antes de mudar esquema, crie migração nova, nunca edite a aplicada. Ensaiar upgrade em backup restaurado e registrar evidência. Não comite .env, dumps, sessões, logs ou segredos. Regras de domínio são compartilhadas entre Windows/Linux. Licença do código original: AGPL-3.0-only.
+Antes de alterar código, leia [AGENTS.md](AGENTS.md), [README.md](README.md) e todos os arquivos de `project-memory`.
 
-Instalador/lifecycle: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-windows.ps1` usa somente o pacote e ferramentas nativas Windows em dados de teste isolados. Não use dados de produção.
+- Use Go 1.27.2. Execute `go test ./...` e `go vet ./...`. Integração real exige PostgreSQL 17 e `OPENFOOD_TEST_PG_BIN`; testes ignorados não validam banco.
+- Consulte [Desenvolvimento e QA](docs/development.md) para builds, jornadas de navegador e testes do instalador. Use dados isolados, nunca dados de operação.
+- Preserve as regras de domínio compartilhadas entre Windows/Linux. Mudanças de esquema exigem migração nova e ensaio de upgrade em backup restaurado.
+- Registre escopo, decisões e evidências em `project-memory`; decisões substituídas ficam como `superseded`.
+- Não comite `.env`, dumps, sessões, logs, segredos ou dados pessoais. Capturas devem usar dados sintéticos identificados.
 
-UI: `npm.cmd install --prefix tools/qa playwright@1.63.0`; `node tools/qa/node_modules/playwright/cli.js install chromium`; inicie o binário com OPENFOOD_DATA_DIR em diretório vazio de teste e `--background`, defina OPENFOOD_UI_TEST_DATA para a mesma pasta e execute `node scripts/test-ui.cjs`. Dados QA e ferramentas ficam ignorados pelo Git; capturas e relatórios podem ser versionados após sanitização. Node não é necessário ao usuário do aplicativo.
+Para bugs, informe versão, sistema operacional, passos para reproduzir e comportamento esperado. Para sugestões, descreva a necessidade de operação e consulte o [roadmap](project-memory/roadmap.md). [Abrir issue](https://github.com/gadevsbr/OpenFood/issues/new/choose).
+
+Pull requests devem explicar o problema, a mudança e a validação executada, incluindo limites. Não declare pronto sem teste ou evidência. O código original é licenciado sob [AGPL-3.0-only](LICENSE).

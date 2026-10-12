@@ -1,39 +1,103 @@
-# OpenFood
-Software livre para operação local de lojas, sem servidor central obrigatório.
+# OpenFood · PDV para restaurantes
 
-Alpha 0.11.0-alpha.1: Windows x64 com PostgreSQL embarcado e Linux com Docker Compose. [Instalação e atualização](docs/installation.md), [plano](project-memory/plan.md), [decisões](project-memory/decisions.md) e [validação](project-memory/validation.md).
+**Do pedido ao fechamento do caixa, no seu próprio computador.**
 
-Interface de restaurante com categorias visuais, cardápio descritivo e pedido lateral; inspiração de navegação iFood, identidade OpenFood. [Prévia do PDV](docs/evidence/restaurant-ui/pos-desktop.png) e [escopo validado](project-memory/restaurant-ui-stage.md).
+OpenFood é um sistema de ponto de venda (PDV / POS) e gestão de restaurantes, livre e de operação local. Cardápio, mesas, comandas, cozinha e administração compartilham a mesma base, sem servidor central obrigatório.
 
-Restaurante no PDV: tamanhos/variantes, adicionais obrigatórios e limites, observação por item e fotos locais. Servidor confere preços e três estoques; cozinha, comanda e comprovante preservam as escolhas. [Guia do cardápio](docs/menu.md).
+[![Release experimental](https://img.shields.io/github/v/release/gadevsbr/OpenFood?include_prereleases&label=alpha)](https://github.com/gadevsbr/OpenFood/releases)
+[![Build e testes](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml/badge.svg)](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml)
+[![Licença AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-Catálogo: edição de produtos com proteção de estoque concorrente. Pedidos manuais com múltiplos itens e detalhes dos preços registrados na venda; horários de disponibilidade em America/Sao_Paulo.
+[**Baixar para Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.11.0-alpha.1/OpenFood-0.11.0-alpha.1-windows-x64-setup.exe) · [Instalação Windows / Linux](docs/installation.md) · [Roadmap](project-memory/roadmap.md) · [English](README.en.md)
 
-Caixa: abertura com saldo inicial, recebimentos manuais parciais em dinheiro/cartão/Pix, devolução integral de um recebimento por gerente, fechamento com contagem/diferença/motivo e histórico por operador. Não executa cobrança ou reembolso bancário. Inclui sangrias e suprimentos com motivo/operador; taxas permanecem pendentes. [Uso do caixa](docs/cash.md).
+![PDV OpenFood: categorias de restaurante, cardápio e pedido lateral](docs/evidence/restaurant-ui/pos-desktop.png)
 
-Implementado: setup protegido, login, organizações/lojas e papéis, catálogo, pedidos manuais por unidade/porção, estoque transacional, snapshots de preços, deduplicação e fila local durável. Windows tem supervisor, tray, autostart opt-in, backup/restauração e diagnóstico.
+> **Alpha experimental · 0.11.0-alpha.1.** Há testes com PostgreSQL e navegador, além de CI Windows/Linux. Instalação em ambiente limpo, periféricos e operação fiscal ainda têm validações pendentes. As capturas são reais, com dados sintéticos de QA; as telas gerais mostram a direção visual introduzida na versão 0.9.
 
-Após login, escolha **PDV | ADM** em duas metades. PDV para restaurante tem produtos/categorias, carrinho, preparo ou balcão, pagamento dividido, troco, desconto gerencial, comprovante não fiscal, carrinhos em espera e caixa obrigatório. ADM abre o dashboard da loja e mantém os cadastros. [Uso do PDV](docs/pos.md). Mesas e comandas persistentes agrupam rodadas de preparo e recebem o saldo sem duplicar vendas; [guia de atendimento](docs/dining.md).
+## Um espaço para atender. Outro para administrar.
 
-Painel repaginado: fila por etapa, busca e filtros, cadastro contextual, navegação lateral, temas claro/escuro/sistema e layout mobile. [Contrato visual](project-memory/ui-contract.md) e [evidências](docs/evidence/ui-redesign/results.json). Fontes, CSS, JavaScript e ícones são locais, embutidos no executável.
+Ao entrar, escolha **PDV | ADM**. O PDV concentra produtos, categorias e pedido; exige abertura do caixa antes da venda. Um botão no topo permite acessar o dashboard administrativo conforme as permissões do usuário.
 
-Não representa o produto completo dos requisitos. Existem cadastros de categorias, variantes, adicionais, combos, clientes e consentimentos; ter código não comprova todos os critérios do roadmap. O PDV com variantes/adicionais foi validado na etapa 0.10; Combos foram validados localmente na etapa 0.11; sabores de pizza, pedidos por peso e conectores externos permanecem pendentes. Pix integrado aparece como em desenvolvimento; WhatsApp, iFood e IA não estão conectados. Não há dados fictícios no produto ou telemetria obrigatória. Capturas de QA usam dados de teste identificados.
+| Escolha do modo | Dashboard administrativo |
+| --- | --- |
+| ![Tela dividida entre PDV e administração](docs/evidence/restaurant-ui/pos-regression/mode-desktop.png) | ![Dashboard administrativo com pedidos e indicadores da loja](docs/evidence/restaurant-ui/pos-regression/admin-dashboard.png) |
 
-QA de navegador: `npm.cmd install --prefix tools/qa playwright@1.63.0`, `npx.cmd --prefix tools/qa playwright install chromium`; executar `node scripts/test-ui-redesign.cjs`, `node scripts/test-ui-admin.cjs` e `node scripts/test-ui-final.cjs` com `OPENFOOD_UI_TEST_DATA` apontando para uma instalação de teste isolada, iniciada com `OPENFOOD_TEST_HEADLESS=1`. A primeira suíte exige instalação vazia; as demais usam seus dados. Nunca apontar para dados de trabalho.
+## O que você pode fazer hoje
 
-QA desta etapa: executar a jornada inicial com `OPENFOOD_UI_EVIDENCE=docs/evidence/sales-stage`, seguida de `node scripts/test-ui-sales.cjs`, no mesmo diretório isolado informado por `OPENFOOD_UI_TEST_DATA`. A jornada de vendas exige os fixtures da primeira suíte.
+| Área | Recursos disponíveis |
+| --- | --- |
+| **Atendimento** | PDV, carrinhos em espera, mesas e comandas persistentes, rodadas de preparo e comprovantes não fiscais. |
+| **Cardápio** | Categorias, fotos locais, tamanhos e variantes, adicionais com limites, observações por item e horários de disponibilidade. |
+| **Combos** | Escolhas por grupo, preço fixo com ajustes, soma ou maior componente; composição registrada no pedido e estoque dos componentes. |
+| **Caixa** | Abertura, sangria, suprimento, pagamentos manuais parciais/divididos, troco, desconto gerencial, devolução de recebimento e fechamento com diferença justificada. |
+| **Cozinha** | Fila de preparo por etapa, com escolhas e observações dos itens. |
+| **Clientes** | Identificação opcional no pedido, histórico por loja, consentimentos com texto/versionamento, exportação e remoção manual auditada de identificação. |
+| **Administração** | Organizações, lojas, usuários e permissões por papel; catálogo e pedidos com isolamento por loja. |
+| **Dados locais** | PostgreSQL, estoque transacional, preços registrados em centavos, proteção contra pedidos duplicados; backup/restauração pela interface no Windows e via Compose no Linux. |
 
-QA de caixa: em instalação isolada vazia, executar `scripts/test-ui-redesign.cjs` com `OPENFOOD_UI_EVIDENCE=docs/evidence/cash-stage` e depois `node scripts/test-ui-cash.cjs`; ambos usam `OPENFOOD_UI_TEST_DATA`. Testes reais Go exigem `OPENFOOD_TEST_PG_BIN`.
+<details>
+<summary><strong>Ver o histórico do cliente e o pedido com combo no celular</strong></summary>
 
-Licença AGPL-3.0-only. O software não exige assinatura comercial; provedores externos opcionais têm seus próprios custos.
+![Histórico do cliente com composição e preço do combo registrados na venda](docs/evidence/combo-stage/customer-history.png)
 
-Animações: Motion mini 14.1.0, bundle local e reduced-motion; reconstruir com `npm.cmd ci --prefix frontend` e `npm.cmd run build --prefix frontend`. QA PDV: após os fixtures de caixa e caixa-final, executar `node scripts/test-ui-pos.cjs`.
+<img src="docs/evidence/combo-stage/combo-cart-mobile.png" alt="Pedido no celular com combo, observações e identificação opcional do cliente" width="390">
 
-QA mesas/comandas: `node scripts/test-ui-dining.cjs` usa os fixtures do PDV/caixa e exige instalação de teste isolada.
+Capturas da etapa 0.11, com produtos e clientes de teste.
 
-QA cardápio: após as regressões PDV/mesas, `node scripts/test-ui-menu.cjs` usa os mesmos dados isolados e registra evidências em `docs/evidence/menu-stage/`.
+</details>
 
-Combos no PDV/mesas: preço fixo com ajustes, soma ou maior componente; escolhas por grupo,
-estoque dos componentes e composição preservada. Clientes podem ser identificados no PDV;
-histórico por loja, consentimentos com texto/versionamento e exportação consistente.
-[Guia de combos e clientes](docs/combos-customers.md). Validação local e CI Windows/Linux PASS; release experimental 0.11 publicada com checksums conferidos.
+**Pagamentos são registros manuais:** dinheiro, cartão e Pix não acionam bancos, adquirentes ou reembolsos externos. Sabores de pizza, venda por peso, taxas, retenção automática e tratamento de remoções após restaurar backups antigos seguem no roadmap. Pix integrado, TEF, emissão fiscal, WhatsApp, iFood e IA não estão conectados. Os controles de privacidade existentes não constituem certificação de conformidade legal.
+
+## Começar a usar
+
+### Windows 10/11 · x64
+
+1. Baixe o [instalador da versão 0.11](https://github.com/gadevsbr/OpenFood/releases/download/v0.11.0-alpha.1/OpenFood-0.11.0-alpha.1-windows-x64-setup.exe) e confira o [SHA256SUMS](https://github.com/gadevsbr/OpenFood/releases/download/v0.11.0-alpha.1/SHA256SUMS).
+2. Instale e abra **OpenFood** pelo menu Iniciar. O PostgreSQL está incluído; o painel abre no navegador após a inicialização.
+3. Crie sua loja, e-mail e senha com pelo menos 12 caracteres. Não há login ou senha padrão.
+4. Cadastre seu cardápio pela **ADM**; entre no **PDV** e abra o caixa para vender.
+
+A instalação é por usuário e não exige Go, Node ou Docker. Atualizações e desinstalação preservam os dados por padrão. Consulte o [guia de instalação, backup e atualização](docs/installation.md) antes de atualizar.
+
+### Linux · Docker Compose
+
+Com Docker Engine e Compose instalados:
+
+```sh
+git clone https://github.com/gadevsbr/OpenFood.git
+cd OpenFood
+cp .env.example .env
+```
+
+Preencha `POSTGRES_PASSWORD` e `SETUP_TOKEN` no `.env` com dois valores hexadecimais aleatórios de 32 bytes, diferentes entre si. Depois:
+
+```sh
+docker compose up --build -d
+curl http://127.0.0.1:18880/readyz
+```
+
+Abra **http://127.0.0.1:18880** e informe o token no setup. O volume `database` mantém os dados. Veja [backup e operação Linux](docs/installation.md#linux).
+
+O modo suportado atualmente é local, em loopback. O computador precisa permanecer ligado para operar. Fontes, ícones e scripts da interface são locais, embutidos no executável; não há telemetria obrigatória.
+
+## Guias e desenvolvimento
+
+| Precisa de… | Consulte |
+| --- | --- |
+| Vender e receber | [PDV](docs/pos.md) · [Caixa](docs/cash.md) |
+| Organizar o atendimento | [Mesas e comandas](docs/dining.md) |
+| Montar seu cardápio | [Variantes e adicionais](docs/menu.md) · [Combos e clientes](docs/combos-customers.md) |
+| Instalar, atualizar ou recuperar dados | [Instalação e operação](docs/installation.md) |
+| Entender as próximas entregas | [Roadmap](project-memory/roadmap.md) · [Estado e limites](project-memory/status.md) |
+| Contribuir ou executar os testes | [Contribuição](CONTRIBUTING.md) · [Desenvolvimento e QA](docs/development.md) |
+| Reportar problemas de segurança | [Política de segurança](SECURITY.md) |
+
+**Stack:** Go 1.27.2, PostgreSQL 17, interface web embutida e Motion mini com respeito a `prefers-reduced-motion`. Node é usado para construir animações e executar QA, não pelo usuário final.
+
+A [release 0.11](https://github.com/gadevsbr/OpenFood/releases/tag/v0.11.0-alpha.1) inclui instalador, pacotes Windows/Linux, capturas de QA e manifests SHA-256. [CI da versão](https://github.com/gadevsbr/OpenFood/actions/runs/38193987452) e [registro de validação](project-memory/combo-customer-stage.md) documentam o que foi testado e os gates abertos.
+
+Encontrou um problema? [Abra uma issue](https://github.com/gadevsbr/OpenFood/issues/new/choose) com a versão e os passos para reproduzir, usando dados de teste. Sugestões e contribuições são bem-vindas.
+
+## Licença
+
+[AGPL-3.0-only](LICENSE). O software não exige assinatura comercial; provedores externos opcionais têm seus próprios custos.

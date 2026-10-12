@@ -1,6 +1,6 @@
 # Instalação e operação
 ## Windows 10/11 x64
-Execute OpenFood-0.1.0-alpha.1-windows-x64-setup.exe. Instalação por usuário, sem Go, Node, Docker ou PostgreSQL instalados manualmente. Abra OpenFood pelo menu Iniciar; o supervisor inicializa o banco local e abre o navegador somente após prontidão. Crie loja, e-mail e senha de pelo menos 12 caracteres.
+Baixe o instalador Windows x64 na [release atual](https://github.com/gadevsbr/OpenFood/releases) e confira o SHA256SUMS correspondente. Execute `OpenFood-<versão>-windows-x64-setup.exe`. Instalação por usuário, sem Go, Node, Docker ou PostgreSQL instalados manualmente. Abra OpenFood pelo menu Iniciar; o supervisor inicializa o banco local e abre o navegador somente após prontidão. Crie loja, e-mail e senha de pelo menos 12 caracteres.
 
 Programa: `%LOCALAPPDATA%\Programs\OpenFood`. Dados: `%LOCALAPPDATA%\OpenFood`, com ACL para usuário atual e SYSTEM. Não compartilhe config.json: contém senha gerada do banco e token temporário de setup, inutilizável após criar o administrador. Banco aceita apenas loopback com SCRAM.
 

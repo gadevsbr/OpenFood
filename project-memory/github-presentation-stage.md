@@ -1,0 +1,9 @@
+# Apresentação e descoberta no GitHub · 2026-10-11
+
+- Escopo autorizado: atualizar GitHub, README com prints e descoberta do repositório. Skills pertinentes: Technical Writer e SEO Specialist do Agency Agents; aplicar documentação e termos relevantes ao contexto GitHub, sem transplantar requisitos de Google Search Console.
+- README anterior centrado em histórico/QA: **superseded** por apresentação do produto, cinco capturas reais, downloads, recursos, limites e guias. Instruções de QA preservadas e organizadas em `docs/development.md`. Versão em inglês adicionada; a UI continua em português.
+- Corrigidas referências antigas a Go, instalador e permissões em CONTRIBUTING, instalação e SECURITY. Formulários de bugs/sugestões adicionados com orientação para dados sintéticos.
+- Descrição bilíngue e 18 tópicos relevantes publicados; homepage aponta para instalação. GitHub busca por padrão em nome, descrição e tópicos; README exige `in:readme` na busca específica. Não há medição nem promessa de ranking.
+- Fontes: [busca de repositórios](https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories), [tópicos](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/classifying-your-repository-with-topics).
+- Validação local/API PASS: 40 referências relativas existentes, cinco PNGs válidos, renderização GFM via API GitHub dos dois READMEs (oito/quatro imagens contando badges), links de download presentes na release 0.11 e descrição/homepage/18 tópicos conferidos remotamente. `git diff --check` PASS. Verificação de publicação dos documentos ainda pendente.
+- Etapa documental: não altera código, schema, dados nem versão. Release experimental 0.11 e checksums permanecem os artefatos publicados; não criar versão binária sem mudança funcional.

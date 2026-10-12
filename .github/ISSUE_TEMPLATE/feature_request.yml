@@ -1,0 +1,19 @@
+name: Sugerir melhoria / Feature request
+description: Descreva uma necessidade da operação do restaurante.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Confira o roadmap antes de enviar. Não inclua dados pessoais ou segredos. Português e inglês são aceitos."
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qual problema precisa resolver? / Operational need
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Como imagina o fluxo? / Proposed workflow
+    validations:
+      required: true

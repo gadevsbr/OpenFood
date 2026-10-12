@@ -1,0 +1,38 @@
+name: Relatar problema / Bug report
+description: Informe uma falha reproduzível no OpenFood.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Use dados de teste. Não publique senhas, tokens, dumps, logs brutos ou dados pessoais. Vulnerabilidades seguem SECURITY.md. Português e inglês são aceitos."
+  - type: input
+    id: version
+    attributes:
+      label: Versão / Version
+      placeholder: 0.11.0-alpha.1
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Sistema e instalação / Environment
+      placeholder: Windows 11 x64, instalador; ou Linux, Docker Compose
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Passos para reproduzir / Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Resultado esperado e observado / Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidência sanitizada / Sanitized evidence
+      description: Capturas com dados sintéticos ou códigos de erro, sem dados de operação.
