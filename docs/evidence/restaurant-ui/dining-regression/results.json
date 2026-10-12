@@ -1,0 +1,28 @@
+{
+  "passed": true,
+  "date": "2026-10-12T00:07:49.524Z",
+  "errors": [],
+  "checks": [
+    "table creation",
+    "free/occupied map",
+    "persistent tab",
+    "stock reserved once per round",
+    "preparation note",
+    "resume after reload",
+    "two rounds",
+    "partial payment excluded from due",
+    "split bill payment and change",
+    "lost closing response retry once",
+    "no duplicated sale/stock on settlement",
+    "preparation state independent of settlement",
+    "table released",
+    "empty tab cancellation",
+    "mobile no overflow",
+    "dark theme",
+    "closed cash permits consultation without opening another tab",
+    "table F4 sends round instead of counter sale",
+    "table F8 cannot detach draft",
+    "attendant cannot manage tables",
+    "finance can read without modifying tabs"
+  ]
+}

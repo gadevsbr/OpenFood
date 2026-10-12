@@ -1,4 +1,6 @@
 # Contrato UI/UX — 2026-10-10
+2026-10-11: identidade verde/lima e tratamento com iniciais são **superseded** pela direção pedida pelo usuário, inspirada nos padrões do iFood. Contrato atual: [restaurant-ui-stage.md](restaurant-ui-stage.md). Fluxos anteriores e referências funcionais continuam válidos.
+
 
 Skills: UI Designer, UX Architect e UI Finish-Gate Reviewer (Agency Agents local).
 Usuário: atendente acompanha pedidos; gestor mantém catálogo e equipe. Primeira leitura: pedidos ativos e próxima ação. Ação principal: novo pedido manual.

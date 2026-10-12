@@ -5,7 +5,7 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
   const url = JSON.parse(
       fs.readFileSync(process.env.OPENFOOD_UI_TEST_DATA + "/runtime.json"),
     ).URL,
-    out = "docs/evidence/dining-stage";
+    out = process.env.OPENFOOD_DINING_EVIDENCE || "docs/evidence/dining-stage";
   fs.mkdirSync(out, { recursive: true });
   const browser = await chromium.launch({ headless: true }),
     context = await browser.newContext({

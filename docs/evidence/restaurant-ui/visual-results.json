@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-11",
+  "status": "PASS",
+  "viewports": [
+    1440,
+    768,
+    390,
+    320
+  ],
+  "contrast": {
+    "body": 14.548198465495398,
+    "secondary": 5.572313328732911,
+    "action": 5.6626139486522264,
+    "selection": 5.119598936096588
+  },
+  "javascript_errors": [],
+  "external_requests": [],
+  "failed_assets": [],
+  "checked": [
+    "local category images",
+    "real menu data",
+    "first mobile product visible",
+    "page overflow",
+    "order mobile",
+    "light/dark",
+    "PDV/ADM"
+  ]
+}

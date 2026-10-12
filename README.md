@@ -1,7 +1,9 @@
 # OpenFood
 Software livre para operação local de lojas, sem servidor central obrigatório.
 
-Alpha 0.8.0-alpha.1: Windows x64 com PostgreSQL embarcado e Linux com Docker Compose. [Instalação e atualização](docs/installation.md), [plano](project-memory/plan.md), [decisões](project-memory/decisions.md) e [validação](project-memory/validation.md).
+Alpha 0.9.0-alpha.1: Windows x64 com PostgreSQL embarcado e Linux com Docker Compose. [Instalação e atualização](docs/installation.md), [plano](project-memory/plan.md), [decisões](project-memory/decisions.md) e [validação](project-memory/validation.md).
+
+Interface de restaurante com categorias visuais, cardápio descritivo e pedido lateral; inspiração de navegação iFood, identidade OpenFood. [Prévia do PDV](docs/evidence/restaurant-ui/pos-desktop.png) e [escopo validado](project-memory/restaurant-ui-stage.md).
 
 Catálogo: edição de produtos com proteção de estoque concorrente. Pedidos manuais com múltiplos itens e detalhes dos preços registrados na venda; horários de disponibilidade em America/Sao_Paulo.
 

@@ -175,7 +175,24 @@ function renderPOSCategories() {
     ...(posSummaryData?.categories || []),
   ]) {
     const b = document.createElement("button");
-    b.textContent = c.name;
+    const visual = document.createElement("span");
+    visual.className = "category-visual";
+    visual.setAttribute("aria-hidden", "true");
+    const name = c.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const image = /lanche|hamburg/.test(name) ? "lanches" : /porco|batata|petisco/.test(name) ? "porcoes" : /bebida|suco/.test(name) ? "bebidas" : /doce|sobremesa|bolo/.test(name) ? "doces" : null;
+    if (image) {
+      const img = document.createElement("img");
+      img.src = `/assets/food/${image}.jpg`;
+      img.alt = "";
+      img.width = 112;
+      img.height = 84;
+      visual.append(img);
+    } else {
+      visual.innerHTML = '<svg viewBox="0 0 48 48" fill="none"><path d="M8 32h32M12 30a12 12 0 0 1 24 0M24 15v3M6 36h36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    }
+    const label = document.createElement("span");
+    label.textContent = c.name;
+    b.append(visual, label);
     b.setAttribute("aria-pressed", String(String(c.id) === posCategory));
     b.onclick = () => {
       posCategory = String(c.id);
@@ -199,6 +216,8 @@ function renderPOSProducts() {
           .includes(q),
       ),
   );
+  $("posMenuTitle").textContent = posSummaryData?.categories.find((c) => String(c.id) === posCategory)?.name || "Todos os produtos";
+  $("posResultCount").textContent = `${products.length} ${products.length === 1 ? "item" : "itens"}`;
   for (const p of products) {
     const b = document.createElement("button");
     b.className = "pos-product";
@@ -208,16 +227,8 @@ function renderPOSProducts() {
       p.is_weight_based ||
       !["unidade", "porcao"].includes(p.unit);
     for (const [cls, value] of [
-      [
-        "product-initial",
-        p.name
-          .split(" ")
-          .slice(0, 2)
-          .map((s) => s[0])
-          .join("")
-          .toUpperCase(),
-      ],
       ["product-name", p.name],
+      ["product-description", p.description || (p.unit === "porcao" ? "Servido por porção" : "Vendido por unidade")],
       ["product-price", money(p.price_cents)],
       [
         "product-meta",
@@ -233,6 +244,11 @@ function renderPOSProducts() {
       el.textContent = value;
       b.append(el);
     }
+    const add = document.createElement("span");
+    add.className = "product-add";
+    add.textContent = "+";
+    add.setAttribute("aria-hidden", "true");
+    b.append(add);
     b.onclick = () => posAdd(p);
     root.append(b);
   }

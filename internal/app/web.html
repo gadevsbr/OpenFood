@@ -14,7 +14,7 @@
         <span class="brand-mark">
           <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">
             <path
-              d="M20 4c-7-1-14 2-14 9a6 6 0 0 0 6 6c7 0 9-8 8-15Z M5 21 15 11"
+              d="M3 18h18 M5 16a7 7 0 0 1 14 0 M12 6v3 M2 21h20"
             ></path>
           </svg>
         </span>
@@ -86,7 +86,7 @@
         <span class="brand-mark">
           <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">
             <path
-              d="M20 4c-7-1-14 2-14 9a6 6 0 0 0 6 6c7 0 9-8 8-15Z M5 21 15 11"
+              d="M3 18h18 M5 16a7 7 0 0 1 14 0 M12 6v3 M2 21h20"
             ></path>
           </svg>
         </span>
@@ -273,7 +273,7 @@
             <span class="brand-mark">
               <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">
                 <path
-                  d="M20 4c-7-1-14 2-14 9a6 6 0 0 0 6 6c7 0 9-8 8-15Z M5 21 15 11"
+                  d="M3 18h18 M5 16a7 7 0 0 1 14 0 M12 6v3 M2 21h20"
                 ></path>
               </svg>
             </span>
@@ -336,7 +336,7 @@
             <span class="brand-mark">
               <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">
                 <path
-                  d="M20 4c-7-1-14 2-14 9a6 6 0 0 0 6 6c7 0 9-8 8-15Z M5 21 15 11"
+                  d="M3 18h18 M5 16a7 7 0 0 1 14 0 M12 6v3 M2 21h20"
                 ></path>
               </svg>
             </span>
@@ -376,7 +376,7 @@
       <div id="modeChooser" class="hidden" aria-labelledby="modeTitle">
         <div class="mode-heading">
           <div class="mode-brand">OpenFood</div>
-          <h1 id="modeTitle" tabindex="-1">Onde vamos trabalhar?</h1>
+          <h1 id="modeTitle" tabindex="-1">Como você quer entrar?</h1>
           <p id="modeAccount"></p>
         </div>
         <div class="mode-split">
@@ -472,13 +472,25 @@
           <div class="pos-products">
             <div class="pos-section-title">
               <div>
-                <div class="eyebrow">Atendimento no balcão</div>
-                <h1>Nova venda</h1>
+                <div class="eyebrow">Ponto de venda</div>
+                <h1>Cardápio da loja</h1>
+                <p class="pos-menu-caption">Escolha os itens para montar o pedido.</p>
               </div>
               <button type="button" id="posReload" class="btn-secondary">
                 Atualizar
               </button>
             </div>
+            <nav class="pos-tools" aria-label="Ações do PDV">
+              <button type="button" id="posRecent" class="btn-secondary">
+                Vendas e comprovantes</button
+              ><button type="button" id="posPending" class="btn-secondary">
+                Pedidos a receber</button
+              ><button type="button" id="posHeld" class="btn-secondary">
+                Carrinhos guardados</button
+              ><button type="button" id="posHelp" class="btn-secondary">
+                Atalhos
+              </button>
+            </nav>
             <label class="pos-search"
               ><span aria-hidden="true">⌕</span
               ><span class="sr-only"
@@ -494,29 +506,20 @@
               class="pos-categories"
               aria-label="Filtrar por categoria"
             ></div>
+            <div class="pos-menu-heading"><h2 id="posMenuTitle">Todos os produtos</h2><span id="posResultCount" aria-live="polite"></span></div>
             <div id="posGrid" class="pos-grid"></div>
             <div id="posEmpty" class="pos-empty hidden">
               <h2>Nenhum produto encontrado.</h2>
               <p>Revise a busca ou cadastre produtos na administração.</p>
             </div>
-            <nav class="pos-tools" aria-label="Ações do PDV">
-              <button type="button" id="posRecent" class="btn-secondary">
-                Vendas e comprovantes</button
-              ><button type="button" id="posPending" class="btn-secondary">
-                Pedidos a receber</button
-              ><button type="button" id="posHeld" class="btn-secondary">
-                Carrinhos guardados</button
-              ><button type="button" id="posHelp" class="btn-secondary">
-                Atalhos
-              </button>
-            </nav>
+
           </div>
           <aside class="pos-cart" aria-labelledby="posCartTitle">
             <div class="pos-cart-heading">
               <div>
                 <div class="eyebrow">Venda atual</div>
                 <h2 id="posCartTitle">
-                  Carrinho <span id="posCartCount">0</span>
+                  Seu pedido <span id="posCartCount">0</span>
                 </h2>
               </div>
               <button type="button" id="posBackProducts" class="btn-secondary">
@@ -595,7 +598,7 @@
         <div id="panelDashboard" class="tab-panel">
           <section class="admin-overview">
             <div class="eyebrow">Visão de gestão</div>
-            <h2>Seu dia, em números reais.</h2>
+            <h2>Resumo do dia</h2>
             <p id="dashboardDate"></p>
             <div id="dashboardStats" class="dashboard-stats"></div>
           </section>

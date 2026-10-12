@@ -1,0 +1,15 @@
+OpenFood category illustrations - Unsplash photographs
+Downloaded 2026-10-11. These are category illustrations, not photographs of
+the restaurant's actual products. Bundled locally; no runtime image requests.
+
+License: https://unsplash.com/license
+Unsplash grants an irrevocable, nonexclusive, worldwide copyright license
+to download, copy, modify, distribute, perform, and use images for free,
+including commercial purposes. Images must not be sold without significant
+modification or compiled to replicate a similar or competing image service.
+
+Source URLs (240 x 180 crop, JPEG quality 75):
+lanches.jpg: https://images.unsplash.com/photo-1568901346375-23c9450c58cd
+porcoes.jpg: https://images.unsplash.com/photo-1573080496219-bb080dd4f877
+bebidas.jpg: https://images.unsplash.com/photo-1613478223719-2ab802602423
+doces.jpg: https://images.unsplash.com/photo-1488477181946-6428a0291777

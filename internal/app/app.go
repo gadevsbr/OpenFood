@@ -6,7 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
-	_ "embed"
+	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -64,7 +64,10 @@ var webJS []byte
 //go:embed web-ux.js
 var webUX []byte
 
-const Version = "0.8.0-alpha.1"
+//go:embed food/*.jpg
+var foodImages embed.FS
+
+const Version = "0.9.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -767,6 +770,12 @@ func (a *App) Handler() http.Handler {
 		if r.Method == "GET" || r.Method == "HEAD" {
 			var asset []byte
 			var contentType string
+			if strings.HasPrefix(r.URL.Path, "/assets/food/") {
+				name := strings.TrimPrefix(r.URL.Path, "/assets/")
+				if data, err := foodImages.ReadFile(name); err == nil {
+					asset, contentType = data, "image/jpeg"
+				}
+			}
 			switch r.URL.Path {
 			case "/assets/web-dining.js":
 				asset, contentType = webDining, "text/javascript; charset=utf-8"

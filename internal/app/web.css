@@ -1,41 +1,43 @@
 :root {
   color-scheme: light;
-  --bg: #f5f6f2;
+  --bg: #fafafa;
   --surface: #fff;
-  --subtle: #f8f9f6;
-  --ink: #202d26;
-  --muted: #667269;
-  --line: #e0e5dc;
-  --strong: #a5afa4;
-  --brand: #24543b;
-  --brand-hover: #183f2a;
-  --lime: #d8eea3;
-  --sidebar: #173b2a;
+  --subtle: #f7f7f7;
+  --ink: #292929;
+  --muted: #686868;
+  --line: #eaeaea;
+  --strong: #b4b4b4;
+  --brand: #c82032;
+  --brand-hover: #ac1627;
+  --lime: #fff0f1;
+  --sidebar: #fff;
   --danger: #a93636;
   --danger-bg: #fff3f1;
   --amber: #8a5b14;
   --amber-bg: #fff6df;
   --focus: #3779b5;
-  --shadow: 0 12px 36px #162b1812;
+  --shadow: 0 8px 28px #0000000d;
   --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
-  --radius: 12px;
+  --radius: 8px;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #152019;
-  --surface: #1e2b22;
-  --subtle: #253429;
-  --ink: #e8eee3;
-  --muted: #b3beb0;
-  --line: #394b3c;
-  --strong: #778b77;
-  --brand: #d8eea3;
-  --brand-hover: #c2dc86;
+  --bg: #171719;
+  --surface: #202023;
+  --subtle: #28282c;
+  --ink: #f1f1f3;
+  --muted: #b9b9bf;
+  --line: #39393f;
+  --strong: #797980;
+  --brand: #ff8794;
+  --brand-hover: #ffa3ad;
   --danger: #ffb4ab;
   --danger-bg: #462b29;
   --amber: #f1ce86;
   --amber-bg: #3c3424;
   --focus: #8ac5ff;
+  --lime: #3b252b;
+  --sidebar: #202023;
   --shadow: 0 12px 36px #0003;
 }
 * {
@@ -237,23 +239,24 @@ small {
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: var(--lime);
-  color: #1c422b;
+  background: var(--brand);
+  color: var(--surface);
 }
 .brand-mark .icon {
   width: 25px;
   height: 25px;
 }
 .brand span:last-child {
-  color: #c7e18d;
+  color: var(--brand);
 }
 .sidebar {
   position: fixed;
   inset: 0 auto 0 0;
   width: 234px;
   background: var(--sidebar);
-  color: #edf3e8;
+  color: var(--ink);
   padding: 31px 19px;
+  border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   z-index: 30;
@@ -262,7 +265,7 @@ small {
   padding: 0 10px;
 }
 .sidebar-caption {
-  color: #a7c0ac;
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 1.5px;
   font-size: 10px;
@@ -280,7 +283,7 @@ small {
   align-items: center;
   justify-content: flex-start;
   background: transparent;
-  color: #c5d6c9;
+  color: var(--muted);
   border: 0;
   text-align: left;
   width: 100%;
@@ -290,18 +293,18 @@ small {
   padding: 12px 14px;
 }
 .tab:hover:not(:disabled) {
-  background: #ffffff0d;
-  color: #fff;
+  background: var(--subtle);
+  color: var(--ink);
 }
 .tab.active {
-  background: #d8eea3;
-  color: #193b28;
+  background: var(--lime);
+  color: var(--brand);
   font-weight: 650;
 }
 .nav-count {
   margin-left: auto;
-  background: #1a412a;
-  color: #e8f5d5;
+  background: var(--subtle);
+  color: var(--ink);
   font-size: 11px;
   min-width: 23px;
   text-align: center;
@@ -311,7 +314,7 @@ small {
 .sidebar-bottom {
   margin-top: auto;
   padding: 24px 10px 0;
-  border-top: 1px solid #ffffff20;
+  border-top: 1px solid var(--line);
 }
 .local-label {
   display: flex;
@@ -327,13 +330,13 @@ small {
   display: inline-block;
 }
 .sidebar-bottom small {
-  color: #a7c0ac;
+  color: var(--muted);
   margin: 9px 0;
 }
 .sidebar-bottom .btn-quiet {
   background: transparent;
-  color: #c5d6c9;
-  border-color: #ffffff25;
+  color: var(--muted);
+  border-color: var(--line);
   width: 100%;
   margin-top: 13px;
 }
@@ -987,8 +990,8 @@ td:nth-child(2) {
   position: fixed;
   inset: 0 auto 0 0;
   width: 43%;
-  background: var(--sidebar);
-  color: #edf3e8;
+  background: #c82032;
+  color: #fff;
   padding: 52px 64px;
   flex-direction: column;
   justify-content: space-between;
@@ -1005,13 +1008,13 @@ td:nth-child(2) {
   margin: 28px 0 20px;
 }
 .auth-story p {
-  color: #b4cab9;
+  color: #fff1f2;
   max-width: 350px;
   font-size: 15px;
   line-height: 1.8;
 }
 .auth-story .eyebrow {
-  color: #b9d09b;
+  color: #fff1f2;
 }
 .auth-art {
   width: min(360px, 100%);
@@ -1020,7 +1023,7 @@ td:nth-child(2) {
 }
 .auth-story footer {
   font-size: 11px;
-  color: #a7c0ac;
+  color: var(--muted);
 }
 .auth-topline {
   display: flex;
@@ -1163,7 +1166,7 @@ td:nth-child(2) {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 175px;
-  color: #c5d6c9;
+  color: var(--muted);
   font-size: 12px;
   margin-top: 20px;
 }
@@ -1638,3 +1641,11 @@ td .order-reference {
     display: none;
   }
 }
+
+/* Restaurant identity: the sign-in panel carries the brand; navigation stays quiet. */
+.auth-story .brand span:last-child, .auth-story footer { color: #fff; }
+.auth-story .brand-mark { background: #fff; color: #c82032; }
+.auth-story h2 { font-weight: 650; }
+.auth-art { display: none; }
+.admin-shortcuts button { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.admin-shortcuts button:hover:not(:disabled) { background: var(--subtle); color: var(--brand); }
