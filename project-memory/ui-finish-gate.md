@@ -1,5 +1,5 @@
 # UI Finish Gate — 2026-10-10
-2026-10-11: direção restaurante **PASS no escopo visual testado**: cardápio, categorias visuais locais, pedido lateral e administração branca. Capturas finais 1440/768/390/320 inspecionadas; primeiro produto não encoberto no mobile. Temas, ausência de erros/requests externos e contraste dos tokens claros conferidos. Regressões PG/Chromium PASS. Gate não certifica WCAG completa/leitor de tela; distribuição pendente. [Contrato e evidências](restaurant-ui-stage.md).
+2026-10-11: direção restaurante **PASS no escopo visual testado**: cardápio, categorias visuais locais, pedido lateral e administração branca. Capturas finais 1440/768/390/320 inspecionadas; primeiro produto não encoberto no mobile. Temas, ausência de erros/requests externos e contraste dos tokens claros conferidos. Regressões PG/Chromium PASS. Gate não certifica WCAG completa/leitor de tela; distribuição PASS no CI 38187157507 e quatro hashes conferidos. Pendência superseded. [Contrato e evidências](restaurant-ui-stage.md).
 
 
 2026-10-11: o fluxo de entrada direto na fila abaixo é superseded por PDV | ADM. Contrato e evidências da nova etapa em `pos-stage.md` e `docs/evidence/pos-stage/`. Os gates anteriores permanecem como histórico.
