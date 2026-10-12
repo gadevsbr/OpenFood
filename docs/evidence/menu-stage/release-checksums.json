@@ -1,0 +1,30 @@
+{
+  "release": "v0.10.0-alpha.1",
+  "result": "PASS",
+  "artifacts": [
+    {
+      "file": "OpenFood-0.10.0-alpha.1-ui-evidence.zip",
+      "sha256": "cf9134b6a733d5d58ac79d1b9b336f95f1486dcfc32959ae817b30530a34ba66",
+      "manifest": "SHA256SUMS",
+      "verified": true
+    },
+    {
+      "file": "OpenFood-0.10.0-alpha.1-windows-x64-setup.exe",
+      "sha256": "5f7f88337d2d6fb91e9cfbf92493d4a27398e1f3eab1f92f684b93693cd90924",
+      "manifest": "SHA256SUMS",
+      "verified": true
+    },
+    {
+      "file": "OpenFood-0.10.0-alpha.1-windows-x64.zip",
+      "sha256": "8d87a67e84ff2dfa93341dde0836f3970c233d1f4a70cf138cba51834eb9b5e8",
+      "manifest": "SHA256SUMS",
+      "verified": true
+    },
+    {
+      "file": "OpenFood-0.10.0-alpha.1-linux-x64.tar.gz",
+      "sha256": "729b4562f67f827dc0336bfd3cf4717619f5be89dbdab9634c838ae596beb449",
+      "manifest": "SHA256SUMS-linux",
+      "verified": true
+    }
+  ]
+}

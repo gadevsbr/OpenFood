@@ -1,7 +1,7 @@
 # Cardápio configurável — etapa 0.10
 
 Skills: Backend Architect e UX Architect. Implementação autorizada em 2026-10-11;
-gate local PASS no escopo testado; distribuição ainda aguarda CI/checksums.
+gate local PASS no escopo testado; CI 38190135269 Windows/Linux/publicação PASS. Release experimental publicada, seis assets e quatro hashes dos artefatos baixados conferidos. Pendência de distribuição superseded.
 
 - Variantes são ajustes sobre o preço base; produto com variantes ativas exige uma.
   Estoque é baixado no produto e na variante, por unidade vendida.
