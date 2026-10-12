@@ -45,7 +45,7 @@ type DiningTab struct {
 }
 
 func diningFailure(w http.ResponseWriter, err error) {
-	known := map[string]bool{"cash_not_open": true, "tab_not_open": true, "tab_changed_reload": true, "table_unavailable": true, "tab_label_in_use": true, "tab_limit": true, "tab_not_empty": true, "payment_total_invalid": true, "idempotency_conflict": true, "checkout_price_changed": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "total_limit": true, "order_duplicate_product": true, "integrated_payment_unsupported": true}
+	known := map[string]bool{"cash_not_open": true, "tab_not_open": true, "tab_changed_reload": true, "table_unavailable": true, "tab_label_in_use": true, "tab_limit": true, "tab_not_empty": true, "payment_total_invalid": true, "idempotency_conflict": true, "checkout_price_changed": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "total_limit": true, "order_duplicate_product": true, "configuration_invalid": true, "configuration_changed": true, "variant_required": true, "addon_unavailable": true, "addon_limits_invalid": true, "integrated_payment_unsupported": true}
 	if known[err.Error()] {
 		failure(w, 409, err.Error())
 	} else {
@@ -536,7 +536,7 @@ func (a *App) diningReceipt(w http.ResponseWriter, r *http.Request, store int64,
 		failure(w, 500, "dining_read_failed")
 		return
 	}
-	rows, err := a.DB.Query(r.Context(), `SELECT i.name,i.price_cents,i.quantity,i.unit FROM dining_orders d JOIN orders o ON o.store_id=d.store_id AND o.id=d.order_id JOIN order_items i ON i.store_id=o.store_id AND i.order_id=o.id WHERE d.store_id=$1 AND d.tab_id=$2 AND o.state<>'cancelled' ORDER BY o.id,i.id`, store, id)
+	rows, err := a.DB.Query(r.Context(), `SELECT i.name,i.price_cents,i.quantity,i.unit,COALESCE(i.notes,''),i.selection FROM dining_orders d JOIN orders o ON o.store_id=d.store_id AND o.id=d.order_id JOIN order_items i ON i.store_id=o.store_id AND i.order_id=o.id WHERE d.store_id=$1 AND d.tab_id=$2 AND o.state<>'cancelled' ORDER BY o.id,i.id`, store, id)
 	if err != nil {
 		failure(w, 500, "dining_read_failed")
 		return
@@ -544,14 +544,15 @@ func (a *App) diningReceipt(w http.ResponseWriter, r *http.Request, store int64,
 	items := []map[string]any{}
 	var total int64
 	for rows.Next() {
-		var name, unit string
+		var name, unit, notes string
+		var selection json.RawMessage
 		var price int64
 		var quantity float64
-		if err = rows.Scan(&name, &price, &quantity, &unit); err != nil {
+		if err = rows.Scan(&name, &price, &quantity, &unit, &notes, &selection); err != nil {
 			break
 		}
 		total += price * int64(quantity)
-		items = append(items, map[string]any{"name": name, "unit": unit, "price_cents": price, "quantity": quantity})
+		items = append(items, map[string]any{"name": name, "unit": unit, "price_cents": price, "quantity": quantity, "notes": notes, "selection": selection})
 	}
 	if err == nil {
 		err = rows.Err()

@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-11",
+  "status": "PASS",
+  "javascript_errors": [],
+  "passed": [
+    "ADM sizes/addon choices",
+    "photo upload preserves unsaved editor",
+    "required choice validation",
+    "configured cart mobile",
+    "table round price and three stock deductions",
+    "snapshot names/notes",
+    "consolidated receipt",
+    "dark/mobile",
+    "kitchen details"
+  ]
+}

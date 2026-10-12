@@ -627,6 +627,12 @@ async function openOrderDetails(order) {
         " = " +
         money(item.price_cents * item.quantity);
       list.append(row);
+      if (item.notes) {
+        const note=document.createElement("p");
+        note.className="menu-item-note";
+        note.textContent=item.notes;
+        list.append(note);
+      }
     }
     if (order.discount_cents) {
       const row = document.createElement("p");
@@ -965,6 +971,11 @@ async function renderAdvancedProducts() {
       edit.className = "btn-secondary";
       edit.onclick = () => editProduct(p);
       action.append(edit);
+      const configure = document.createElement("button");
+      configure.textContent = "Tamanhos, adicionais e foto";
+      configure.className = "btn-secondary";
+      configure.onclick = () => menuEditor(p).catch(posError);
+      action.append(configure);
     }
     tbody.append(row);
   }

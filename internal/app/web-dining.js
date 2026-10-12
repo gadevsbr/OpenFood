@@ -476,10 +476,7 @@ function sendDiningRound() {
             id: diningActive.id,
             expected_version: diningActive.version,
             expected_remaining_cents: posSubtotal(),
-            items: posCart.map((i) => ({
-              product_id: i.product_id,
-              quantity: i.quantity,
-            })),
+            items: posCart.map(menuPayloadItem),
             note: diningNoteInput.value.trim(),
           },
         };

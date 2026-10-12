@@ -36,6 +36,8 @@ Este roadmap consolida todos os requisitos estabelecidos na especificação orig
 ---
 
 ## Fase 3: Catálogo Avançado (Restaurantes e Mercados)
+2026-10-11: etapa 0.10 valida variantes/tamanhos, adicionais, observações e fotos no PDV/mesas. [Evidências e limites](menu-stage.md). Critérios completos da fase ainda abertos.
+
 - [ ] **Categorias e Disponibilidade**:
   - Categorização hierárquica, horários de venda por loja e disponibilidade atômica (produto esgotado).
 - [ ] **Modelagem para Restaurantes**:

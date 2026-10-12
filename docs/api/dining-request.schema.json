@@ -3,28 +3,83 @@
   "title": "OpenFood DiningRequest — POST /api/dining-tabs",
   "description": "Session cookie + X-OpenFood:1 + X-Store-ID optional. Idempotency-Key 8..128 bytes required. Successful mutation returns {id: integer}. Money is integer BRL cents. Same key and payload replay the original result; altered payload yields 409 idempotency_conflict.",
   "type": "object",
-  "required": ["action"],
+  "required": [
+    "action"
+  ],
   "properties": {
-    "action": { "enum": ["open", "add", "close", "cancel"] },
-    "id": { "type": "integer", "minimum": 1 },
-    "table_id": { "type": "integer", "minimum": 0 },
-    "label": { "type": "string", "maxLength": 80 },
-    "expected_version": { "type": "integer", "minimum": 1 },
+    "action": {
+      "enum": [
+        "open",
+        "add",
+        "close",
+        "cancel"
+      ]
+    },
+    "id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "table_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "label": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 1
+    },
     "expected_remaining_cents": {
       "type": "integer",
       "minimum": 0,
       "maximum": 1000000000000
     },
-    "note": { "type": "string", "maxLength": 1000 },
+    "note": {
+      "type": "string",
+      "maxLength": 1000
+    },
     "items": {
       "type": "array",
       "maxItems": 100,
       "items": {
         "type": "object",
-        "required": ["product_id", "quantity"],
+        "required": [
+          "product_id",
+          "quantity"
+        ],
         "properties": {
-          "product_id": { "type": "integer", "minimum": 1 },
-          "quantity": { "type": "integer", "minimum": 1, "maximum": 100000 }
+          "product_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "variant_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "addon_option_ids": {
+            "type": "array",
+            "maxItems": 50,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "configuration_version": {
+            "type": "integer",
+            "minimum": 0
+          }
         },
         "additionalProperties": false
       }
@@ -34,9 +89,18 @@
       "maxItems": 10,
       "items": {
         "type": "object",
-        "required": ["method", "amount_cents"],
+        "required": [
+          "method",
+          "amount_cents"
+        ],
         "properties": {
-          "method": { "enum": ["cash", "card", "pix_manual"] },
+          "method": {
+            "enum": [
+              "cash",
+              "card",
+              "pix_manual"
+            ]
+          },
           "amount_cents": {
             "type": "integer",
             "minimum": 1,
@@ -54,23 +118,64 @@
   },
   "allOf": [
     {
-      "if": { "properties": { "action": { "const": "open" } } },
-      "then": {
-        "required": ["label"],
-        "properties": { "label": { "minLength": 1 } }
+      "if": {
+        "properties": {
+          "action": {
+            "const": "open"
+          }
+        }
       },
-      "else": { "required": ["id", "expected_version"] }
-    },
-    {
-      "if": { "properties": { "action": { "const": "add" } } },
       "then": {
-        "required": ["items", "expected_remaining_cents"],
-        "properties": { "items": { "minItems": 1 } }
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "label": {
+            "minLength": 1
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "id",
+          "expected_version"
+        ]
       }
     },
     {
-      "if": { "properties": { "action": { "const": "close" } } },
-      "then": { "required": ["payments", "expected_remaining_cents"] }
+      "if": {
+        "properties": {
+          "action": {
+            "const": "add"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "items",
+          "expected_remaining_cents"
+        ],
+        "properties": {
+          "items": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "close"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "payments",
+          "expected_remaining_cents"
+        ]
+      }
     }
   ],
   "additionalProperties": false

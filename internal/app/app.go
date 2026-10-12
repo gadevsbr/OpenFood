@@ -46,8 +46,14 @@ var motionJS []byte
 //go:embed dining-schema.sql
 var diningSchema string
 
+//go:embed menu-schema.sql
+var menuSchema string
+
 //go:embed web-dining.js
 var webDining []byte
+
+//go:embed web-menu.js
+var webMenu []byte
 
 //go:embed pos-schema.sql
 var posSchema string
@@ -67,7 +73,7 @@ var webUX []byte
 //go:embed food/*.jpg
 var foodImages embed.FS
 
-const Version = "0.9.0-alpha.1"
+const Version = "0.10.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -283,6 +289,9 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 		if e = migrateDining(ctx, tx); e != nil {
+			return e
+		}
+		if e = migrateMenu(ctx, tx); e != nil {
 			return e
 		}
 		return tx.Commit(ctx)
@@ -613,7 +622,7 @@ func (a *App) Migrate(ctx context.Context) error {
 			if e != nil {
 				return e
 			}
-		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) {
+		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) && (n != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema)) {
 			return errors.New("migration_incompatible")
 		}
 	}
@@ -635,11 +644,16 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 	}
+	if n < 7 {
+		if e = migrateMenu(ctx, tx); e != nil {
+			return e
+		}
+	}
 	return tx.Commit(ctx)
 }
 
 func ValidateSchema(version int, checksum string) error {
-	if version != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema) {
+	if version != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema) {
 		return errors.New("migration_incompatible")
 	}
 	return nil
@@ -777,6 +791,8 @@ func (a *App) Handler() http.Handler {
 				}
 			}
 			switch r.URL.Path {
+			case "/assets/web-menu.js":
+				asset, contentType = webMenu, "text/javascript; charset=utf-8"
 			case "/assets/web-dining.js":
 				asset, contentType = webDining, "text/javascript; charset=utf-8"
 			case "/assets/web-pos.js":
@@ -855,6 +871,9 @@ func (a *App) Handler() http.Handler {
 			a.DB.QueryRow(ctx, "SELECT id FROM stores WHERE org_id=$1 ORDER BY id LIMIT 1", user.OrgID).Scan(&targetStore)
 		}
 
+		if r.URL.Path == "/api/product-photo" && r.URL.Query().Get("store_id") != "" {
+			targetStore = ParseInt(r.URL.Query().Get("store_id"))
+		}
 		if user.Role == RoleOrgAdmin && targetStore > 0 {
 			var storeOrg int64
 			if err := a.DB.QueryRow(ctx, "SELECT org_id FROM stores WHERE id=$1", targetStore).Scan(&storeOrg); err != nil || storeOrg != user.OrgID {
@@ -929,6 +948,10 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			a.products(w, r, targetStore, user)
+		case "/api/product-configuration":
+			a.menuConfiguration(w, r, targetStore, user)
+		case "/api/product-photo":
+			a.productPhoto(w, r, targetStore, user)
 		case "/api/categories":
 			if !user.CanAccessStore(targetStore) {
 				failure(w, 403, "forbidden_cross_store_access")
@@ -1449,7 +1472,7 @@ func (a *App) usersHandler(w http.ResponseWriter, r *http.Request, u *SessionUse
 
 func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), `SELECT id,name,COALESCE(description,''),price_cents,stock_quantity,unit,COALESCE(sku,''),COALESCE(barcode,''),active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id FROM products WHERE store_id=$1 ORDER BY display_order, id`, store)
+		rows, e := a.DB.Query(r.Context(), `SELECT id,name,COALESCE(description,''),price_cents,stock_quantity,unit,COALESCE(sku,''),COALESCE(barcode,''),active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id,configuration_version,EXISTS(SELECT 1 FROM product_photos ph WHERE ph.store_id=products.store_id AND ph.product_id=products.id),EXISTS(SELECT 1 FROM product_variants v WHERE v.store_id=products.store_id AND v.product_id=products.id AND v.active) OR EXISTS(SELECT 1 FROM product_addon_groups pg JOIN addon_groups g ON g.id=pg.group_id AND g.store_id=pg.store_id WHERE pg.store_id=products.store_id AND pg.product_id=products.id AND g.active) FROM products WHERE store_id=$1 ORDER BY display_order, id`, store)
 		if e != nil {
 			failure(w, 500, "catalog_failed")
 			return
@@ -1469,7 +1492,9 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 			var prepTime int
 			var displayOrder int64
 			var categoryID *int64
-			if rows.Scan(&id, &name, &description, &priceCents, &stockQuantity, &unit, &sku, &barcode, &active, &availableFrom, &availableUntil, &minOrderQty, &maxOrderQty, &isWeightBased, &substitutionAllowed, &prepTime, &displayOrder, &categoryID) != nil {
+			var configVersion int64
+			var hasPhoto, hasConfiguration bool
+			if rows.Scan(&id, &name, &description, &priceCents, &stockQuantity, &unit, &sku, &barcode, &active, &availableFrom, &availableUntil, &minOrderQty, &maxOrderQty, &isWeightBased, &substitutionAllowed, &prepTime, &displayOrder, &categoryID, &configVersion, &hasPhoto, &hasConfiguration) != nil {
 				failure(w, 500, "catalog_failed")
 				return
 			}
@@ -1492,6 +1517,9 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 				"preparation_time_minutes": prepTime,
 				"display_order":            displayOrder,
 				"category_id":              categoryID,
+				"configuration_version":    configVersion,
+				"has_photo":                hasPhoto,
+				"has_configuration":        hasConfiguration,
 			}
 			result = append(result, item)
 		}
@@ -1508,6 +1536,9 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 	}
 	var p struct {
 		ID                     int64    `json:"id"`
+		ConfigurationVersion   int64    `json:"configuration_version"`
+		HasPhoto               bool     `json:"has_photo"`
+		HasConfiguration       bool     `json:"has_configuration"`
 		ExpectedStock          *float64 `json:"expected_stock_quantity"`
 		Name                   string   `json:"name"`
 		Description            string   `json:"description"`
@@ -1835,7 +1866,7 @@ func (a *App) productVariantsHandler(w http.ResponseWriter, r *http.Request, sto
 		return
 	}
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), "SELECT id,name,price_adjustment_cents,stock_quantity,sku,display_order,active FROM product_variants WHERE store_id=$1 AND product_id=$2 ORDER BY display_order, id", store, productID)
+		rows, e := a.DB.Query(r.Context(), "SELECT id,name,price_adjustment_cents,stock_quantity,COALESCE(sku,''),display_order,active FROM product_variants WHERE store_id=$1 AND product_id=$2 ORDER BY display_order, id", store, productID)
 		if e != nil {
 			failure(w, 500, "variants_failed")
 			return
@@ -1857,6 +1888,7 @@ func (a *App) productVariantsHandler(w http.ResponseWriter, r *http.Request, sto
 				"id":                     id,
 				"name":                   name,
 				"price_adjustment_cents": priceAdj,
+				"product_id":             productID,
 				"stock_quantity":         stockQty,
 				"sku":                    sku,
 				"display_order":          displayOrder,
@@ -1902,7 +1934,7 @@ func (a *App) addonGroupsHandler(w http.ResponseWriter, r *http.Request, store i
 		return
 	}
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), "SELECT id,name,description,min_selections,max_selections,required,display_order,active FROM addon_groups WHERE store_id=$1 ORDER BY display_order, id", store)
+		rows, e := a.DB.Query(r.Context(), "SELECT id,name,COALESCE(description,''),min_selections,max_selections,required,display_order,active FROM addon_groups WHERE store_id=$1 ORDER BY display_order, id", store)
 		if e != nil {
 			failure(w, 500, "addon_groups_failed")
 			return
@@ -1976,7 +2008,7 @@ func (a *App) addonOptionsHandler(w http.ResponseWriter, r *http.Request, store 
 		return
 	}
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), "SELECT id,name,description,price_cents,stock_quantity,is_default,display_order,active FROM addon_options WHERE store_id=$1 AND group_id=$2 ORDER BY display_order, id", store, groupID)
+		rows, e := a.DB.Query(r.Context(), "SELECT id,name,COALESCE(description,''),price_cents,stock_quantity,is_default,display_order,active FROM addon_options WHERE store_id=$1 AND group_id=$2 ORDER BY display_order, id", store, groupID)
 		if e != nil {
 			failure(w, 500, "addon_options_failed")
 			return
@@ -2298,8 +2330,12 @@ func (a *App) comboItemsHandler(w http.ResponseWriter, r *http.Request, store in
 }
 
 type Item struct {
-	ProductID int64 `json:"product_id"`
-	Quantity  int64 `json:"quantity"`
+	ProductID            int64   `json:"product_id"`
+	Quantity             int64   `json:"quantity"`
+	VariantID            int64   `json:"variant_id,omitempty"`
+	Addons               []int64 `json:"addon_option_ids,omitempty"`
+	Notes                string  `json:"notes,omitempty"`
+	ConfigurationVersion int64   `json:"configuration_version,omitempty"`
 }
 type OrderRequest struct {
 	Items []Item `json:"items"`
@@ -2346,9 +2382,10 @@ func (a *App) createOrderTx(ctx context.Context, tx pgx.Tx, store, user int64, k
 	}
 	type snapshot struct {
 		Item
-		Name  string
-		Price int64
-		Unit  string
+		Name      string
+		Price     int64
+		Unit      string
+		Selection menuSelection
 	}
 	snapshots := []snapshot{}
 	var total int64
@@ -2356,12 +2393,23 @@ func (a *App) createOrderTx(ctx context.Context, tx pgx.Tx, store, user int64, k
 	if _, e = tx.Exec(ctx, "SELECT id FROM stores WHERE id=$1 FOR UPDATE", store); e != nil {
 		return 0, e
 	}
-	seen := map[int64]bool{}
+	seen := map[string]bool{}
+	quantities := map[int64]int64{}
 	for _, item := range input.Items {
-		if seen[item.ProductID] {
+		if item.Quantity < 1 || item.Quantity > 100000 {
+			return 0, errors.New("quantity_invalid")
+		}
+		quantities[item.ProductID] += item.Quantity
+		if quantities[item.ProductID] > 100000 {
+			return 0, errors.New("quantity_invalid")
+		}
+	}
+	for _, item := range input.Items {
+		identity := itemIdentity(item)
+		if seen[identity] {
 			return 0, errors.New("order_duplicate_product")
 		}
-		seen[item.ProductID] = true
+		seen[identity] = true
 		if item.Quantity < 1 || item.Quantity > 100000 {
 			return 0, errors.New("quantity_invalid")
 		}
@@ -2377,11 +2425,16 @@ func (a *App) createOrderTx(ctx context.Context, tx pgx.Tx, store, user int64, k
 		if !active || weight || (unit != "unidade" && unit != "porcao") || !available {
 			return 0, errors.New("product_unavailable")
 		}
-		if float64(item.Quantity) < minimum || (maximum > 0 && float64(item.Quantity) > maximum) {
+		if float64(quantities[item.ProductID]) < minimum || (maximum > 0 && float64(quantities[item.ProductID]) > maximum) {
 			return 0, errors.New("quantity_invalid")
 		}
 		if stock < float64(item.Quantity) {
 			return 0, errors.New("stock_insufficient")
+		}
+		var selection menuSelection
+		name, price, selection, e = configuredItem(ctx, tx, store, item, name, price)
+		if e != nil {
+			return 0, e
 		}
 		total += price * item.Quantity
 		if total > 1000000000000 {
@@ -2390,15 +2443,21 @@ func (a *App) createOrderTx(ctx context.Context, tx pgx.Tx, store, user int64, k
 		if _, e = tx.Exec(ctx, "UPDATE products SET stock_quantity=stock_quantity-$3 WHERE store_id=$1 AND id=$2", store, item.ProductID, item.Quantity); e != nil {
 			return 0, e
 		}
-		snapshots = append(snapshots, snapshot{item, name, price, unit})
+		snapshots = append(snapshots, snapshot{item, name, price, unit, selection})
 	}
 	e = tx.QueryRow(ctx, "INSERT INTO orders(store_id,idempotency_key,request_hash,total_cents,state) VALUES($1,$2,$3,$4,'confirmed') RETURNING id", store, key, digest, total).Scan(&id)
 	if e != nil {
 		return 0, e
 	}
 	for _, s := range snapshots {
-		if _, e = tx.Exec(ctx, "INSERT INTO order_items(order_id,store_id,product_id,name,price_cents,quantity,unit) VALUES($1,$2,$3,$4,$5,$6,$7)", id, store, s.ProductID, s.Name, s.Price, s.Quantity, s.Unit); e != nil {
+		var lineID int64
+		if e = tx.QueryRow(ctx, "INSERT INTO order_items(order_id,store_id,product_id,name,price_cents,quantity,unit,variant_id,notes,selection) VALUES($1,$2,$3,$4,$5,$6,$7,NULLIF($8,0),$9,$10) RETURNING id", id, store, s.ProductID, s.Name, s.Price, s.Quantity, s.Unit, s.VariantID, strings.TrimSpace(s.Notes), selectionJSON(s.Selection)).Scan(&lineID); e != nil {
 			return 0, e
+		}
+		for _, option := range s.Selection.Addons {
+			if _, e = tx.Exec(ctx, "INSERT INTO order_item_addons(order_item_id,store_id,addon_group_id,addon_option_id,price_cents,quantity) SELECT $1,$2,group_id,id,$4,$5 FROM addon_options WHERE store_id=$2 AND id=$3", lineID, store, option.ID, option.Price, s.Quantity); e != nil {
+				return 0, e
+			}
 		}
 	}
 	if _, e = tx.Exec(ctx, "INSERT INTO jobs(store_id,kind,payload,dedup_key) VALUES($1,'order_created',jsonb_build_object('order_id',$2::bigint),$3)", store, id, fmt.Sprintf("order:%d", id)); e != nil {
@@ -2448,7 +2507,7 @@ func (a *App) orders(w http.ResponseWriter, r *http.Request, store int64, user *
 			failure(w, 404, "order_not_found")
 			return
 		}
-		rows, err := a.DB.Query(r.Context(), "SELECT product_id,name,price_cents,quantity,unit FROM order_items WHERE store_id=$1 AND order_id=$2 ORDER BY id", store, id)
+		rows, err := a.DB.Query(r.Context(), "SELECT product_id,name,price_cents,quantity,unit,COALESCE(notes,''),selection FROM order_items WHERE store_id=$1 AND order_id=$2 ORDER BY id", store, id)
 		if err != nil {
 			failure(w, 500, "orders_failed")
 			return
@@ -2457,13 +2516,14 @@ func (a *App) orders(w http.ResponseWriter, r *http.Request, store int64, user *
 		result := []map[string]any{}
 		for rows.Next() {
 			var product, price int64
-			var name, unit string
+			var name, unit, notes string
+			var selection json.RawMessage
 			var quantity float64
-			if rows.Scan(&product, &name, &price, &quantity, &unit) != nil {
+			if rows.Scan(&product, &name, &price, &quantity, &unit, &notes, &selection) != nil {
 				failure(w, 500, "orders_failed")
 				return
 			}
-			result = append(result, map[string]any{"product_id": product, "name": name, "price_cents": price, "quantity": quantity, "unit": unit})
+			result = append(result, map[string]any{"product_id": product, "name": name, "price_cents": price, "quantity": quantity, "unit": unit, "notes": notes, "selection": selection})
 		}
 		if rows.Err() != nil {
 			failure(w, 500, "orders_failed")
@@ -2548,6 +2608,10 @@ func (a *App) orderState(w http.ResponseWriter, r *http.Request, store int64, us
 		}
 		_, e = tx.Exec(r.Context(), "UPDATE products p SET stock_quantity=stock_quantity+i.quantity FROM (SELECT product_id,sum(quantity) quantity FROM order_items WHERE store_id=$1 AND order_id=$2 GROUP BY product_id) i WHERE p.store_id=$1 AND p.id=i.product_id", store, input.ID)
 		if e != nil {
+			failure(w, 500, "stock_release_failed")
+			return
+		}
+		if e = restoreMenuStock(r.Context(), tx, store, input.ID); e != nil {
 			failure(w, 500, "stock_release_failed")
 			return
 		}
@@ -3036,7 +3100,7 @@ func (a *App) customerExportHandler(w http.ResponseWriter, r *http.Request, stor
 	// Order items for each order
 	for _, order := range export["orders"].([]map[string]any) {
 		orderID := order["id"].(int64)
-		itemRows, e := a.DB.Query(ctx, "SELECT oi.product_id,p.name,oi.name,oi.price_cents,oi.quantity,oi.unit,oi.notes FROM order_items oi JOIN products p ON p.store_id=oi.store_id AND p.id=oi.product_id WHERE oi.store_id=$1 AND oi.order_id=$2", store, orderID)
+		itemRows, e := a.DB.Query(ctx, "SELECT oi.product_id,p.name,oi.name,oi.price_cents,oi.quantity,oi.unit,COALESCE(oi.notes,'') FROM order_items oi JOIN products p ON p.store_id=oi.store_id AND p.id=oi.product_id WHERE oi.store_id=$1 AND oi.order_id=$2", store, orderID)
 		if e == nil {
 			items := []map[string]any{}
 			defer itemRows.Close()

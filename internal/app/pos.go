@@ -54,7 +54,7 @@ func (a *App) posCheckout(w http.ResponseWriter, r *http.Request, store int64, u
 	}
 	id, e := a.Checkout(r.Context(), store, user.ID, r.Header.Get("Idempotency-Key"), input)
 	if e != nil {
-		known := map[string]bool{"cash_not_open": true, "checkout_price_changed": true, "payment_total_invalid": true, "checkout_invalid": true, "discount_invalid": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "idempotency_conflict": true, "order_duplicate_product": true}
+		known := map[string]bool{"cash_not_open": true, "checkout_price_changed": true, "payment_total_invalid": true, "checkout_invalid": true, "discount_invalid": true, "stock_insufficient": true, "product_unavailable": true, "quantity_invalid": true, "idempotency_conflict": true, "order_duplicate_product": true, "configuration_invalid": true, "configuration_changed": true, "variant_required": true, "addon_unavailable": true, "addon_limits_invalid": true}
 		if known[e.Error()] {
 			failure(w, 409, e.Error())
 		} else {
@@ -174,7 +174,7 @@ func (a *App) posReceipt(w http.ResponseWriter, r *http.Request, store int64, us
 		}
 		return
 	}
-	rows, e := a.DB.Query(r.Context(), "SELECT name,price_cents,quantity,unit FROM order_items WHERE store_id=$1 AND order_id=$2 ORDER BY id", store, id)
+	rows, e := a.DB.Query(r.Context(), "SELECT name,price_cents,quantity,unit,COALESCE(notes,''),selection FROM order_items WHERE store_id=$1 AND order_id=$2 ORDER BY id", store, id)
 	if e != nil {
 		failure(w, 500, "receipt_failed")
 		return
@@ -182,14 +182,15 @@ func (a *App) posReceipt(w http.ResponseWriter, r *http.Request, store int64, us
 	defer rows.Close()
 	items := []map[string]any{}
 	for rows.Next() {
-		var name, unit string
+		var name, unit, notes string
+		var selection json.RawMessage
 		var price int64
 		var quantity float64
-		if rows.Scan(&name, &price, &quantity, &unit) != nil {
+		if rows.Scan(&name, &price, &quantity, &unit, &notes, &selection) != nil {
 			failure(w, 500, "receipt_failed")
 			return
 		}
-		items = append(items, map[string]any{"name": name, "price_cents": price, "quantity": quantity, "unit": unit})
+		items = append(items, map[string]any{"name": name, "price_cents": price, "quantity": quantity, "unit": unit, "notes": notes, "selection": selection})
 	}
 	if rows.Err() != nil {
 		failure(w, 500, "receipt_failed")

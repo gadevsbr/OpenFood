@@ -1,0 +1,19 @@
+{
+  "status": "PASS",
+  "date": "2026-10-11",
+  "environment": "Chromium headless + PostgreSQL real, isolated synthetic QA data",
+  "checks": [
+    "cash opening",
+    "multi-item sale",
+    "cash/card/manual Pix split receipts",
+    "paid state",
+    "paid cancellation rejected",
+    "closing difference requires reason",
+    "expected/counted/difference reconciliation",
+    "mobile page overflow",
+    "refunds into new session preserve closed period",
+    "cancellation after refunds",
+    "duplicate receipt exactly once"
+  ],
+  "pageerrors": []
+}

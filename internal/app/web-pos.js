@@ -102,7 +102,7 @@ function posError(e) {
     quantity_invalid: "Confira os limites de quantidade dos produtos.",
     total_limit: "O valor excede o limite permitido.",
   };
-  const text = messages[e.message] || e.message;
+  const text = messages[e.message] || window.menuErrors?.[e.message] || e.message;
   const d = document.querySelector("dialog[open]");
   if (d) {
     let p = d.querySelector("[role=alert]");
@@ -229,7 +229,7 @@ function renderPOSProducts() {
     for (const [cls, value] of [
       ["product-name", p.name],
       ["product-description", p.description || (p.unit === "porcao" ? "Servido por porção" : "Vendido por unidade")],
-      ["product-price", money(p.price_cents)],
+      ["product-price", (p.has_configuration?"Base ":"")+money(p.price_cents)],
       [
         "product-meta",
         b.disabled
@@ -249,7 +249,17 @@ function renderPOSProducts() {
     add.textContent = "+";
     add.setAttribute("aria-hidden", "true");
     b.append(add);
-    b.onclick = () => posAdd(p);
+    if (p.has_photo) {
+      const img = document.createElement("img");
+      img.className = "product-photo";
+      img.alt = "";
+      img.loading = "lazy";
+      img.src = `/api/product-photo?product_id=${p.id}&store_id=${currentStoreId}`;
+      img.onerror = () => img.remove();
+      b.prepend(img);
+      b.classList.add("with-photo");
+    }
+    b.onclick = () => menuChoose(p).catch(posError);
     root.append(b);
   }
   $("posEmpty").classList.toggle("hidden", products.length > 0);
@@ -259,8 +269,8 @@ function posAdd(p) {
     posError(Error("Retome a confirmação desta venda antes de editar."));
     return;
   }
-  let i = posCart.find((i) => i.product_id === p.id);
-  if ((i?.quantity || 0) + 1 > p.stock_quantity) {
+  let i = posCart.find((i) => i.product_id === p.id && !i.variant_id && !i.addon_option_ids?.length && !i.notes);
+  if (posCart.filter(v=>v.product_id===p.id).reduce((sum,v)=>sum+v.quantity,0)+1 > p.stock_quantity) {
     posError(Error("stock_insufficient"));
     return;
   }
@@ -271,6 +281,7 @@ function posAdd(p) {
       quantity: 1,
       name: p.name,
       price_cents: p.price_cents,
+      configuration_version: p.configuration_version,
     });
   renderPOSCart();
   posSave();
@@ -319,7 +330,10 @@ function renderPOSCart() {
       if (posAttempt || (typeof diningPending !== "undefined" && diningPending))
         return;
       const p = allProducts.find((p) => p.id === i.product_id);
-      if (!Number.isInteger(n) || n < 1 || n > (p?.stock_quantity || 0)) {
+      const others=posCart.filter(v=>v!==i);
+      if (!Number.isInteger(n) || n < 1 || n+others.filter(v=>v.product_id===i.product_id).reduce((sum,v)=>sum+v.quantity,0) > (p?.stock_quantity || 0) ||
+          (i.variant_stock!=null && n+others.filter(v=>v.variant_id===i.variant_id).reduce((sum,v)=>sum+v.quantity,0)>i.variant_stock) ||
+          Object.entries(i.addon_stocks||{}).some(([id,stock])=>n+others.filter(v=>v.addon_option_ids?.includes(Number(id))).reduce((sum,v)=>sum+v.quantity,0)>stock)) {
         qty.value = i.quantity;
         return;
       }
@@ -345,6 +359,13 @@ function renderPOSCart() {
     );
     controls.append(minus, qty, plus, remove);
     row.append(title, controls);
+    if (i.notes) { const note=document.createElement("p");note.className="menu-item-note";note.textContent=i.notes;row.append(note); }
+    const customize = document.createElement("button");
+    customize.className="pos-remove";
+    customize.textContent="Personalizar";
+    customize.disabled=!!posAttempt || (typeof diningPending!=="undefined" && !!diningPending);
+    customize.onclick=()=>menuChoose(allProducts.find(p=>p.id===i.product_id),i).catch(posError);
+    row.append(customize);
     root.append(row);
   }
   const count = posCart.reduce((s, i) => s + i.quantity, 0),
@@ -539,10 +560,7 @@ function posPay(bill = null) {
                 payments,
               }
             : {
-                items: posCart.map((i) => ({
-                  product_id: i.product_id,
-                  quantity: i.quantity,
-                })),
+                items: posCart.map(menuPayloadItem),
                 payments,
                 expected_total_cents: total,
                 discount_cents: posDiscount(),
@@ -680,6 +698,7 @@ async function showPOSReceipt(id, endpoint = "pos-receipt") {
     v.textContent = money(i.quantity * i.price_cents);
     row.append(n, v);
     receipt.append(row);
+    if (i.notes) {const note=document.createElement("p");note.textContent=i.notes;receipt.append(note);}
   }
   for (const line of [
     r.discount_cents ? "Desconto: " + money(r.discount_cents) : "",
@@ -990,7 +1009,7 @@ $("posSearch").onkeydown = (e) => {
       (p) => p.active && (p.barcode === code || p.sku === code),
     );
   if (p && !p.is_weight_based && ["unidade", "porcao"].includes(p.unit)) {
-    posAdd(p);
+    menuChoose(p).catch(posError);
     e.target.value = "";
     renderPOSProducts();
   }

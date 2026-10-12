@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenFood POST /api/product-configuration?product_id=N",
+  "description": "Session cookie, X-OpenFood:1 and optional X-Store-ID. Manager only. Full transactional representation; current version required. Existing variant/option IDs require their observed stock_quantity in expected_stock_quantity. Shared groups must remain unchanged. Variant base+adjustment >= 0; names distinct in each scope; max>=min and required max>=1. Success returns saved configuration; conflicts 409. GET available within authorized store. No price from checkout clients is trusted. Photos use separate raw JPEG/PNG POST /api/product-photo, <=2 MB, <=4096 per dimension, <=12 MP; authenticated JPEG GET with store_id parameter and no-store caching.",
+  "type": "object",
+  "required": [
+    "product_id",
+    "version",
+    "variants",
+    "groups"
+  ],
+  "properties": {
+    "product_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "variants": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "price_adjustment_cents",
+          "stock_quantity",
+          "active"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "price_adjustment_cents": {
+            "type": "integer",
+            "minimum": -1000000000000,
+            "maximum": 1000000000
+          },
+          "stock_quantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "expected_stock_quantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "groups": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "min_selections",
+          "max_selections",
+          "required",
+          "active",
+          "options"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "min_selections": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "max_selections": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "options": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "price_cents",
+                "stock_quantity",
+                "active"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "price_cents": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000000
+                },
+                "stock_quantity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000
+                },
+                "expected_stock_quantity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
