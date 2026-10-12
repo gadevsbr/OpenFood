@@ -61,6 +61,9 @@ var webDining []byte
 //go:embed web-menu.js
 var webMenu []byte
 
+//go:embed web-addons.js
+var webAddons []byte
+
 //go:embed web-pizza.js
 var webPizza []byte
 
@@ -82,7 +85,7 @@ var webUX []byte
 //go:embed food/*.jpg
 var foodImages embed.FS
 
-const Version = "0.12.0-alpha.1"
+const Version = "0.13.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -816,6 +819,8 @@ func (a *App) Handler() http.Handler {
 				}
 			}
 			switch r.URL.Path {
+			case "/assets/web-addons.js":
+				asset, contentType = webAddons, "text/javascript; charset=utf-8"
 			case "/assets/web-pizza.js":
 				asset, contentType = webPizza, "text/javascript; charset=utf-8"
 			case "/assets/web-menu.js":
@@ -993,6 +998,8 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			a.productVariantsHandler(w, r, targetStore, user)
+		case "/api/addon-configuration":
+			a.addonConfiguration(w, r, targetStore, user)
 		case "/api/addon-groups":
 			if !user.CanAccessStore(targetStore) {
 				failure(w, 403, "forbidden_cross_store_access")
@@ -2026,6 +2033,17 @@ func (a *App) addonGroupsHandler(w http.ResponseWriter, r *http.Request, store i
 		return
 	}
 	if r.Method == "POST" {
+		tx, e := a.DB.Begin(r.Context())
+		if e != nil {
+			addonFailure(w, e)
+			return
+		}
+		defer tx.Rollback(r.Context())
+		if e = addonStoreLock(r.Context(), tx, store); e != nil {
+			addonFailure(w, e)
+			return
+		}
+
 		var input struct {
 			Name          string `json:"name"`
 			Description   string `json:"description"`
@@ -2039,14 +2057,22 @@ func (a *App) addonGroupsHandler(w http.ResponseWriter, r *http.Request, store i
 			failure(w, 400, "addon_group_invalid")
 			return
 		}
-		if input.MinSelections < 0 || input.MaxSelections < input.MinSelections {
+		if input.MinSelections < 0 || input.MaxSelections < input.MinSelections || input.MaxSelections > 50 || input.Required && input.MaxSelections < 1 {
 			failure(w, 400, "selection_limits_invalid")
 			return
 		}
 		var id int64
-		e := a.DB.QueryRow(r.Context(), "INSERT INTO addon_groups(store_id,name,description,min_selections,max_selections,required,display_order,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id", store, input.Name, input.Description, input.MinSelections, input.MaxSelections, input.Required, input.DisplayOrder, input.Active).Scan(&id)
+		e = tx.QueryRow(r.Context(), "INSERT INTO addon_groups(store_id,name,description,min_selections,max_selections,required,display_order,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id", store, input.Name, input.Description, input.MinSelections, input.MaxSelections, input.Required, input.DisplayOrder, input.Active).Scan(&id)
 		if e != nil {
 			failure(w, 500, "addon_group_failed")
+			return
+		}
+		if e = addonAudit(r.Context(), tx, store, user.ID, id, "addon_created"); e != nil {
+			addonFailure(w, e)
+			return
+		}
+		if e = tx.Commit(r.Context()); e != nil {
+			addonFailure(w, e)
 			return
 		}
 		jsonResponse(w, 201, map[string]int64{"id": id})
@@ -2088,6 +2114,7 @@ func (a *App) addonOptionsHandler(w http.ResponseWriter, r *http.Request, store 
 			}
 			result = append(result, map[string]any{
 				"id":             id,
+				"group_id":       groupID,
 				"name":           name,
 				"description":    description,
 				"price_cents":    priceCents,
@@ -2101,6 +2128,17 @@ func (a *App) addonOptionsHandler(w http.ResponseWriter, r *http.Request, store 
 		return
 	}
 	if r.Method == "POST" {
+		tx, e := a.DB.Begin(r.Context())
+		if e != nil {
+			addonFailure(w, e)
+			return
+		}
+		defer tx.Rollback(r.Context())
+		if e = addonStoreLock(r.Context(), tx, store); e != nil {
+			addonFailure(w, e)
+			return
+		}
+
 		var input struct {
 			Name          string  `json:"name"`
 			Description   string  `json:"description"`
@@ -2114,18 +2152,39 @@ func (a *App) addonOptionsHandler(w http.ResponseWriter, r *http.Request, store 
 			failure(w, 400, "addon_option_invalid")
 			return
 		}
-		if input.PriceCents < 0 {
+		if input.PriceCents < 0 || input.PriceCents > 1000000000 {
 			failure(w, 400, "price_invalid")
 			return
 		}
-		if input.StockQuantity < 0 {
+		if !menuStock(input.StockQuantity) {
 			failure(w, 400, "stock_invalid")
 			return
 		}
+		var count int
+		if e = tx.QueryRow(r.Context(), "SELECT (SELECT count(*) FROM addon_options WHERE store_id=$1 AND group_id=$2) FROM addon_groups WHERE store_id=$1 AND id=$2", store, groupID).Scan(&count); e != nil {
+			addonFailure(w, e)
+			return
+		}
+		if count >= 50 {
+			failure(w, 409, "addon_group_limit")
+			return
+		}
 		var id int64
-		e := a.DB.QueryRow(r.Context(), "INSERT INTO addon_options(group_id,store_id,name,description,price_cents,stock_quantity,is_default,display_order,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id", groupID, store, input.Name, input.Description, input.PriceCents, input.StockQuantity, input.IsDefault, input.DisplayOrder, input.Active).Scan(&id)
+		e = tx.QueryRow(r.Context(), "INSERT INTO addon_options(group_id,store_id,name,description,price_cents,stock_quantity,is_default,display_order,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id", groupID, store, input.Name, input.Description, input.PriceCents, input.StockQuantity, input.IsDefault, input.DisplayOrder, input.Active).Scan(&id)
 		if e != nil {
 			failure(w, 500, "addon_option_failed")
+			return
+		}
+		if _, e = tx.Exec(r.Context(), "UPDATE products SET configuration_version=configuration_version+1 WHERE store_id=$1 AND id IN(SELECT product_id FROM product_addon_groups WHERE store_id=$1 AND group_id=$2)", store, groupID); e != nil {
+			addonFailure(w, e)
+			return
+		}
+		if e = addonAudit(r.Context(), tx, store, user.ID, id, "addon_created"); e != nil {
+			addonFailure(w, e)
+			return
+		}
+		if e = tx.Commit(r.Context()); e != nil {
+			addonFailure(w, e)
 			return
 		}
 		jsonResponse(w, 201, map[string]int64{"id": id})
@@ -2146,7 +2205,7 @@ func (a *App) productAddonGroupsHandler(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), "SELECT pag.group_id,ag.name,pag.display_order FROM product_addon_groups pag JOIN addon_groups ag ON ag.id=pag.group_id WHERE pag.store_id=$1 AND pag.product_id=$2 ORDER BY pag.display_order", store, productID)
+		rows, e := a.DB.Query(r.Context(), "SELECT pag.group_id,ag.name,pag.display_order FROM product_addon_groups pag JOIN addon_groups ag ON ag.id=pag.group_id AND ag.store_id=pag.store_id WHERE pag.store_id=$1 AND pag.product_id=$2 ORDER BY pag.display_order", store, productID)
 		if e != nil {
 			failure(w, 500, "product_addon_groups_failed")
 			return
@@ -2170,42 +2229,8 @@ func (a *App) productAddonGroupsHandler(w http.ResponseWriter, r *http.Request, 
 		jsonResponse(w, 200, result)
 		return
 	}
-	if r.Method == "POST" {
-		var input struct {
-			GroupID      int64 `json:"group_id"`
-			DisplayOrder int64 `json:"display_order"`
-		}
-		if decode(w, r, &input) != nil || input.GroupID <= 0 {
-			failure(w, 400, "product_addon_group_invalid")
-			return
-		}
-		// Verify group exists and belongs to store
-		var exists bool
-		e := a.DB.QueryRow(r.Context(), "SELECT true FROM addon_groups WHERE store_id=$1 AND id=$2", store, input.GroupID).Scan(&exists)
-		if e != nil || !exists {
-			failure(w, 400, "addon_group_not_found")
-			return
-		}
-		_, e = a.DB.Exec(r.Context(), "INSERT INTO product_addon_groups(product_id,store_id,group_id,display_order) VALUES($1,$2,$3,$4) ON CONFLICT (product_id,group_id) DO UPDATE SET display_order=$4", productID, store, input.GroupID, input.DisplayOrder)
-		if e != nil {
-			failure(w, 500, "product_addon_group_failed")
-			return
-		}
-		jsonResponse(w, 200, map[string]bool{"ok": true})
-		return
-	}
-	if r.Method == "DELETE" {
-		groupID := ParseInt(r.URL.Query().Get("group_id"))
-		if groupID <= 0 {
-			failure(w, 400, "group_id_required")
-			return
-		}
-		_, e := a.DB.Exec(r.Context(), "DELETE FROM product_addon_groups WHERE store_id=$1 AND product_id=$2 AND group_id=$3", store, productID, groupID)
-		if e != nil {
-			failure(w, 500, "product_addon_group_delete_failed")
-			return
-		}
-		jsonResponse(w, 200, map[string]bool{"ok": true})
+	if r.Method == "POST" || r.Method == "DELETE" {
+		a.changeAddonLink(w, r, store, user, productID)
 		return
 	}
 	failure(w, 405, "method_not_allowed")

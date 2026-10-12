@@ -452,6 +452,7 @@ async function renderAddonGroups() {
       );
       let actCell = document.createElement("td");
 
+      actCell.append(posButton("Configurar grupo", () => sharedAddonEditor(g.id).catch(e => msg(menuError(e), true))));
       r.append(actCell);
       tbody.append(r);
     }

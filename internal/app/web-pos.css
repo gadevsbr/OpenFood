@@ -1076,3 +1076,6 @@ kbd {
   .mode-heading { top: 0; padding: 16px; }
   .mode-heading h1 { font-size: 18px; }
 }
+.addon-product-links { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:8px; max-height:280px; overflow:auto; padding:8px 0; }
+.addon-product-links .menu-check { padding:10px; border:1px solid var(--line); border-radius:8px; }
+#addonImpact { overflow-wrap:anywhere; }

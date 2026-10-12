@@ -1,0 +1,1 @@
+{"date":"2026-10-12","result":"PASS","environment":"Windows development host; synthetic isolated PostgreSQL 17.11","go_full_seconds":263.342,"focal_seconds":28.92,"checks":["go vet","JavaScript syntax","Python syntax","git diff check","npm audit zero vulnerabilities"],"limits":["clean-machine certification","physical peripherals","fiscal operation","external providers"]}

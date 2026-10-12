@@ -1,0 +1,14 @@
+{
+  "result": "PASS",
+  "data": "synthetic isolated QA only",
+  "checks": [
+    "shared editor and impact confirmation",
+    "desktop/mobile without horizontal overflow",
+    "same option IDs across products",
+    "unsaved parent variant preserved",
+    "two-product POS checkout and shared stock",
+    "price propagation and original receipt snapshot",
+    "unlink preserves other product"
+  ],
+  "javascript_errors": []
+}

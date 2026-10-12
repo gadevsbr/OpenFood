@@ -51,6 +51,10 @@ const fs = require("fs"),
   for (const id of ["subtabVariantes", "subtabAdicionais", "subtabCombos"]) {
     await p.locator("#" + id).click();
     await p.locator("#pageAction").click();
+    if (id === "subtabAdicionais") {
+      await p.locator("#addonEditorDialog").waitFor({state:"visible"});
+      await p.getByRole("button", {name:"Fechar adicionais",exact:true}).click();
+    }
     assert.equal(
       await p.locator("#panelCatalogo .sub-tab-panel.active").count(),
       1,
@@ -113,7 +117,7 @@ const fs = require("fs"),
   });
   assert.equal(errors.length, 0, errors.join("\n"));
   const report = {
-    date: "2026-10-10",
+    date: new Date().toISOString().slice(0,10),
     status: "PASS",
     passed: [
       "contextual catalog actions",

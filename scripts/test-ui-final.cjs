@@ -2,6 +2,9 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
   fs = require("fs"),
   assert = require("assert");
 (async () => {
+  const suffix=process.env.OPENFOOD_UI_FIXTURE_SUFFIX||"";
+  const customerName="Cliente QA revisado"+suffix;
+  const customerEmail="customer-qa"+suffix.replace(/[^a-zA-Z0-9_-]/g,"_")+"@example.org";
   const data = process.env.OPENFOOD_UI_TEST_DATA || "runtime/qa-ui";
   const { URL: url } = JSON.parse(fs.readFileSync(data + "/runtime.json"));
   const b = await chromium.launch({ headless: true });
@@ -27,7 +30,7 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
   await p.locator("#tabClientes").click();
   await p
     .locator("#customersTable")
-    .getByText("Cliente QA revisado", { exact: true })
+    .getByText(customerName, { exact: true })
     .waitFor();
   await p.locator("#subtabConsentimentos").click();
   await p
@@ -35,7 +38,7 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
     .evaluate((f) => (f.closest("details").open = true));
   await p
     .locator("#consentForm [name=customer_id]")
-    .selectOption({ label: "Cliente QA revisado (customer-qa@example.org)" });
+    .selectOption({ label: `${customerName} (${customerEmail})` });
   await p.locator("#consentForm [name=purpose]").fill("qa-test");
   await p.locator("#consentForm [name=terms_text]").fill("Termos de consentimento QA");
   await p.locator("#consentForm [name=version]").fill("1");
@@ -110,7 +113,7 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
   });
   assert.equal(errors.length, 0, errors.join("\n"));
   const report = {
-    date: "2026-10-10",
+    date: new Date().toISOString().slice(0,10),
     status: "PASS",
     passed: [
       "consent register/revoke badge",

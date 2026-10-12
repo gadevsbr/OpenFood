@@ -385,6 +385,7 @@ function updateCatalogPrimary() {
 }
 function catalogPrimary() {
   const sub = $("#panelCatalogo .sub-tab.active")?.dataset.subtab || "produtos";
+  if (sub === "adicionais") { sharedAddonEditor(0).catch(e => msg(menuError(e), true)); return; }
   const id = catalogActions[sub][1];
   if (!id) {
     openProductDialog();

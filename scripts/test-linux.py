@@ -85,6 +85,23 @@ assert api("orders?id=" + str(pizza_order["id"]))[0]["selection"]["pizza"]["tota
 api("order-state", {"id": pizza_order["id"], "state": "cancelled"})
 assert next(x for x in api("products") if x["id"] == pizza["id"])["stock_quantity"] == 3
 
+# Shared add-on stock and price propagation across products use the same tables in Linux.
+addon_products = [api("products", {"name": name, "price_cents": 2000, "stock_quantity": 3, "active": True, "unit": "unidade"}) for name in ["QA Burger", "QA Fries"]]
+shared = api("addon-configuration?group_id=0", {"version": "", "group": {"id": 0, "name": "Shared sauces QA", "min_selections": 0, "max_selections": 1, "required": False, "active": True, "options": [{"id": 0, "name": "Sauce QA", "price_cents": 251, "stock_quantity": 4, "active": True}]}, "products": [{"id": p["id"]} for p in addon_products]})
+addon_endpoint = "addon-configuration?group_id=" + str(shared["group"]["id"])
+assert shared["group"]["shared"]
+for p in addon_products:
+    menu = api("product-configuration?product_id=" + str(p["id"]))
+    assert menu["groups"][0]["options"][0]["id"] == shared["group"]["options"][0]["id"]
+    extra_order = api("orders", {"items": [{"product_id": p["id"], "quantity": 1, "configuration_version": menu["version"], "addon_option_ids": [shared["group"]["options"][0]["id"]]}]}, {"Idempotency-Key": "linux-shared-" + str(p["id"])})
+    assert next(x for x in api("orders") if x["id"] == extra_order["id"])["total_cents"] == 2251
+shared = api(addon_endpoint)
+assert shared["group"]["options"][0]["stock_quantity"] == 2
+shared["group"]["options"][0]["expected_stock_quantity"] = 2
+shared["group"]["options"][0]["price_cents"] = 399
+shared = api(addon_endpoint, shared)
+assert api("product-configuration?product_id=" + str(addon_products[1]["id"]))["groups"][0]["options"][0]["price_cents"] == 399
+
 with tempfile.TemporaryDirectory() as tmp:
     dump = Path(tmp) / "openfood.dump"
     with dump.open("wb") as file:
@@ -105,4 +122,6 @@ with tempfile.TemporaryDirectory() as tmp:
     assert api("orders?id=" + str(pizza_order["id"]))[0]["selection"]["pizza"]["price_cents"] == 3335
 assert len(api("cash-sessions")["receipts"]) == 4
 assert next(x for x in api("orders") if x["id"] == order["id"])["financial_state"] == "refunded"
+assert api(addon_endpoint)["group"]["options"][0]["stock_quantity"] == 2
+assert len(api(addon_endpoint)["products"]) == 2
 print("PASS: manual receipts, split payments, cash closing/refunds across periods and real Compose setup, authentication, catalog, transactional stock, idempotency, order states, pg_dump/pg_restore, restart")

@@ -293,11 +293,12 @@ async function menuEditor(product) {
     row.append(posButton("Adicionar opção", () => addOption()));
     if (g.shared) {
       row.disabled = true;
-      row.append(menuNode("p", "menu-hint", "Grupo compartilhado com outros produtos. A edição conjunta fica para outra etapa."));
+      row.append(menuNode("p", "menu-hint", "Grupo compartilhado. Alterações no cadastro de adicionais afetam todos os produtos vinculados."));
     }
     const entry = { g, name, minimum, maximum, required, active, options };
     groups.push(entry);
     groupRoot.append(row);
+    if (g.shared) groupRoot.append(posButton("Editar grupo compartilhado: " + g.name, () => sharedAddonEditor(g.id).catch(e => msg(menuError(e), true))));
     if (!g.id) row.append(posButton("Descartar grupo", () => {
       groups.splice(groups.indexOf(entry), 1);
       row.remove();
