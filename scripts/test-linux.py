@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import time
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 base = "http://127.0.0.1:18880"
@@ -102,6 +103,22 @@ shared["group"]["options"][0]["price_cents"] = 399
 shared = api(addon_endpoint, shared)
 assert api("product-configuration?product_id=" + str(addon_products[1]["id"]))["groups"][0]["options"][0]["price_cents"] == 399
 
+# Weekly schedule applies to new product sales; old order retries remain unchanged after closing.
+schedule = api("sale-schedule")
+assert schedule["timezone"] == "America/Sao_Paulo" and not schedule["schedule"]["enabled"]
+schedule["timezone"] = "UTC"
+schedule["schedule"] = {"enabled": True, "windows": []}
+schedule = api("sale-schedule", schedule)
+assert not next(x for x in api("products") if x["id"] == product["id"])["available_now"]
+assert api("orders", payload, headers)["id"] == order["id"]
+try:
+    api("orders", {"items": [{"product_id": product["id"], "quantity": 1}]}, {"Idempotency-Key": "linux-closed-new-order"})
+    raise AssertionError("Closed store accepted a new sale")
+except urllib.error.HTTPError as error:
+    assert error.code == 409
+    assert json.load(error)["error"] == "product_unavailable"
+
+
 with tempfile.TemporaryDirectory() as tmp:
     dump = Path(tmp) / "openfood.dump"
     with dump.open("wb") as file:
@@ -124,4 +141,6 @@ assert len(api("cash-sessions")["receipts"]) == 4
 assert next(x for x in api("orders") if x["id"] == order["id"])["financial_state"] == "refunded"
 assert api(addon_endpoint)["group"]["options"][0]["stock_quantity"] == 2
 assert len(api(addon_endpoint)["products"]) == 2
+assert api("sale-schedule")["timezone"] == "UTC"
+assert api("sale-schedule")["schedule"]["enabled"]
 print("PASS: manual receipts, split payments, cash closing/refunds across periods and real Compose setup, authentication, catalog, transactional stock, idempotency, order states, pg_dump/pg_restore, restart")

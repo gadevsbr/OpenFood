@@ -41,7 +41,7 @@ function menuLineKey(i) {
 }
 let menuOpening = false;
 async function menuChoose(product, existing) {
-  if (!product) throw Error("product_unavailable");
+  if (!product || product.available_now === false) throw Error("product_unavailable");
   if (menuOpening || posAttempt || typeof diningPending !== "undefined" && diningPending) return;
   if (!existing && !product.has_configuration) {
     posAdd(product);

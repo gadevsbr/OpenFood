@@ -113,7 +113,7 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
   });
   assert.equal(errors.length, 0, errors.join("\n"));
   const report = {
-    date: new Date().toISOString().slice(0,10),
+    date: new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo"}).format(new Date()),
     status: "PASS",
     passed: [
       "consent register/revoke badge",

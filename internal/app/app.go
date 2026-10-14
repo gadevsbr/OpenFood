@@ -61,6 +61,9 @@ var webDining []byte
 //go:embed web-menu.js
 var webMenu []byte
 
+//go:embed web-schedule.js
+var webSchedule []byte
+
 //go:embed web-addons.js
 var webAddons []byte
 
@@ -85,7 +88,7 @@ var webUX []byte
 //go:embed food/*.jpg
 var foodImages embed.FS
 
-const Version = "0.13.0-alpha.1"
+const Version = "0.14.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -310,6 +313,9 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 		if e = migratePizza(ctx, tx); e != nil {
+			return e
+		}
+		if e = migrateSchedule(ctx, tx); e != nil {
 			return e
 		}
 		return tx.Commit(ctx)
@@ -640,7 +646,7 @@ func (a *App) Migrate(ctx context.Context) error {
 			if e != nil {
 				return e
 			}
-		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) && (n != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema)) && (n != 8 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema)) && (n != 9 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema)) {
+		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) && (n != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema)) && (n != 8 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema)) && (n != 9 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema)) && (n != 10 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema+scheduleSchema)) {
 			return errors.New("migration_incompatible")
 		}
 	}
@@ -677,11 +683,16 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 	}
+	if n < 10 {
+		if e = migrateSchedule(ctx, tx); e != nil {
+			return e
+		}
+	}
 	return tx.Commit(ctx)
 }
 
 func ValidateSchema(version int, checksum string) error {
-	if version != 9 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema) {
+	if version != 10 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema+scheduleSchema) {
 		return errors.New("migration_incompatible")
 	}
 	return nil
@@ -819,6 +830,8 @@ func (a *App) Handler() http.Handler {
 				}
 			}
 			switch r.URL.Path {
+			case "/assets/web-schedule.js":
+				asset, contentType = webSchedule, "text/javascript; charset=utf-8"
 			case "/assets/web-addons.js":
 				asset, contentType = webAddons, "text/javascript; charset=utf-8"
 			case "/assets/web-pizza.js":
@@ -998,6 +1011,8 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			a.productVariantsHandler(w, r, targetStore, user)
+		case "/api/sale-schedule":
+			a.scheduleConfiguration(w, r, targetStore, user)
 		case "/api/addon-configuration":
 			a.addonConfiguration(w, r, targetStore, user)
 		case "/api/addon-groups":
@@ -1538,7 +1553,7 @@ func (a *App) usersHandler(w http.ResponseWriter, r *http.Request, u *SessionUse
 
 func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user *SessionUser) {
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), `SELECT id,name,COALESCE(description,''),price_cents,stock_quantity,unit,COALESCE(sku,''),COALESCE(barcode,''),active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id,configuration_version,EXISTS(SELECT 1 FROM product_photos ph WHERE ph.store_id=products.store_id AND ph.product_id=products.id),EXISTS(SELECT 1 FROM product_variants v WHERE v.store_id=products.store_id AND v.product_id=products.id AND v.active) OR EXISTS(SELECT 1 FROM product_addon_groups pg JOIN addon_groups g ON g.id=pg.group_id AND g.store_id=pg.store_id WHERE pg.store_id=products.store_id AND pg.product_id=products.id AND g.active) OR (pizza_configuration->>'enabled')::boolean FROM products WHERE store_id=$1 ORDER BY display_order, id`, store)
+		rows, e := a.DB.Query(r.Context(), `SELECT id,name,COALESCE(description,''),price_cents,stock_quantity,unit,COALESCE(sku,''),COALESCE(barcode,''),active,available_from,available_until,min_order_quantity,max_order_quantity,is_weight_based,substitution_allowed,preparation_time_minutes,display_order,category_id,configuration_version,EXISTS(SELECT 1 FROM product_photos ph WHERE ph.store_id=products.store_id AND ph.product_id=products.id),EXISTS(SELECT 1 FROM product_variants v WHERE v.store_id=products.store_id AND v.product_id=products.id AND v.active) OR EXISTS(SELECT 1 FROM product_addon_groups pg JOIN addon_groups g ON g.id=pg.group_id AND g.store_id=pg.store_id WHERE pg.store_id=products.store_id AND pg.product_id=products.id AND g.active) OR (pizza_configuration->>'enabled')::boolean,openfood_product_open(store_id,id,statement_timestamp()) FROM products WHERE store_id=$1 ORDER BY display_order, id`, store)
 		if e != nil {
 			failure(w, 500, "catalog_failed")
 			return
@@ -1559,8 +1574,8 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 			var displayOrder int64
 			var categoryID *int64
 			var configVersion int64
-			var hasPhoto, hasConfiguration bool
-			if rows.Scan(&id, &name, &description, &priceCents, &stockQuantity, &unit, &sku, &barcode, &active, &availableFrom, &availableUntil, &minOrderQty, &maxOrderQty, &isWeightBased, &substitutionAllowed, &prepTime, &displayOrder, &categoryID, &configVersion, &hasPhoto, &hasConfiguration) != nil {
+			var hasPhoto, hasConfiguration, availableNow bool
+			if rows.Scan(&id, &name, &description, &priceCents, &stockQuantity, &unit, &sku, &barcode, &active, &availableFrom, &availableUntil, &minOrderQty, &maxOrderQty, &isWeightBased, &substitutionAllowed, &prepTime, &displayOrder, &categoryID, &configVersion, &hasPhoto, &hasConfiguration, &availableNow) != nil {
 				failure(w, 500, "catalog_failed")
 				return
 			}
@@ -1586,6 +1601,7 @@ func (a *App) products(w http.ResponseWriter, r *http.Request, store int64, user
 				"configuration_version":    configVersion,
 				"has_photo":                hasPhoto,
 				"has_configuration":        hasConfiguration,
+				"available_now":            availableNow,
 			}
 			result = append(result, item)
 		}
@@ -1780,6 +1796,16 @@ func (a *App) categoriesHandler(w http.ResponseWriter, r *http.Request, store in
 		jsonResponse(w, 200, result)
 		return
 	}
+	tx, e := a.DB.Begin(r.Context())
+	if e != nil {
+		scheduleFailure(w, e)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	if e = addonStoreLock(r.Context(), tx, store); e != nil {
+		scheduleFailure(w, e)
+		return
+	}
 	if r.Method == "POST" {
 		var input struct {
 			Name         string `json:"name"`
@@ -1794,16 +1820,20 @@ func (a *App) categoriesHandler(w http.ResponseWriter, r *http.Request, store in
 		}
 		if input.ParentID != nil {
 			var exists bool
-			e := a.DB.QueryRow(r.Context(), "SELECT true FROM categories WHERE store_id=$1 AND id=$2", store, *input.ParentID).Scan(&exists)
+			e := tx.QueryRow(r.Context(), "SELECT true FROM categories WHERE store_id=$1 AND id=$2", store, *input.ParentID).Scan(&exists)
 			if e != nil || !exists {
 				failure(w, 400, "parent_category_not_found")
 				return
 			}
 		}
 		var id int64
-		e := a.DB.QueryRow(r.Context(), "INSERT INTO categories(store_id,parent_id,name,description,display_order,active) VALUES($1,$2,$3,$4,$5,$6) RETURNING id", store, input.ParentID, input.Name, input.Description, input.DisplayOrder, input.Active).Scan(&id)
+		e := tx.QueryRow(r.Context(), "INSERT INTO categories(store_id,parent_id,name,description,display_order,active) VALUES($1,$2,$3,$4,$5,$6) RETURNING id", store, input.ParentID, input.Name, input.Description, input.DisplayOrder, input.Active).Scan(&id)
 		if e != nil {
 			failure(w, 500, "category_failed")
+			return
+		}
+		if e = tx.Commit(r.Context()); e != nil {
+			scheduleFailure(w, e)
 			return
 		}
 		jsonResponse(w, 201, map[string]int64{"id": id})
@@ -1824,7 +1854,7 @@ func (a *App) categoriesHandler(w http.ResponseWriter, r *http.Request, store in
 		}
 		if input.ParentID != nil {
 			var exists bool
-			e := a.DB.QueryRow(r.Context(), "SELECT true FROM categories WHERE store_id=$1 AND id=$2", store, *input.ParentID).Scan(&exists)
+			e := tx.QueryRow(r.Context(), "SELECT true FROM categories WHERE store_id=$1 AND id=$2", store, *input.ParentID).Scan(&exists)
 			if e != nil || !exists {
 				failure(w, 400, "parent_category_not_found")
 				return
@@ -1833,13 +1863,16 @@ func (a *App) categoriesHandler(w http.ResponseWriter, r *http.Request, store in
 				failure(w, 400, "category_cannot_be_own_parent")
 				return
 			}
+			var cycle bool
+			if e := tx.QueryRow(r.Context(), `WITH RECURSIVE ancestors AS (SELECT id,parent_id FROM categories WHERE store_id=$1 AND id=$2 UNION SELECT c.id,c.parent_id FROM categories c JOIN ancestors a ON c.id=a.parent_id WHERE c.store_id=$1) SELECT EXISTS(SELECT 1 FROM ancestors WHERE id=$3)`, store, *input.ParentID, input.ID).Scan(&cycle); e != nil {
+				scheduleFailure(w, e)
+				return
+			}
+			if cycle {
+				failure(w, 400, "category_cycle_invalid")
+				return
+			}
 		}
-		tx, e := a.DB.Begin(r.Context())
-		if e != nil {
-			failure(w, 500, "database_unavailable")
-			return
-		}
-		defer tx.Rollback(r.Context())
 		query := "UPDATE categories SET "
 		args := []any{}
 		argNum := 1
@@ -1876,6 +1909,16 @@ func (a *App) categoriesHandler(w http.ResponseWriter, r *http.Request, store in
 			failure(w, 500, "category_update_failed")
 			return
 		}
+		if _, e = tx.Exec(r.Context(), "UPDATE categories SET schedule_version=schedule_version+1 WHERE store_id=$1 AND id=$2", store, input.ID); e != nil {
+			scheduleFailure(w, e)
+			return
+		}
+		if input.Active != nil || input.ParentID != nil {
+			if _, e = tx.Exec(r.Context(), "UPDATE products SET configuration_version=configuration_version+1 WHERE store_id=$1", store); e != nil {
+				scheduleFailure(w, e)
+				return
+			}
+		}
 		e = tx.Commit(r.Context())
 		if e != nil {
 			failure(w, 500, "category_update_failed")
@@ -1897,21 +1940,25 @@ func (a *App) categoriesHandler(w http.ResponseWriter, r *http.Request, store in
 		}
 		// Check for child categories
 		var childCount int
-		e := a.DB.QueryRow(r.Context(), "SELECT count(*) FROM categories WHERE store_id=$1 AND parent_id=$2", store, id).Scan(&childCount)
+		e := tx.QueryRow(r.Context(), "SELECT count(*) FROM categories WHERE store_id=$1 AND parent_id=$2", store, id).Scan(&childCount)
 		if e == nil && childCount > 0 {
 			failure(w, 409, "category_has_children")
 			return
 		}
 		// Check for products using this category
 		var productCount int
-		e = a.DB.QueryRow(r.Context(), "SELECT count(*) FROM products WHERE store_id=$1 AND category_id=$2", store, id).Scan(&productCount)
+		e = tx.QueryRow(r.Context(), "SELECT count(*) FROM products WHERE store_id=$1 AND category_id=$2", store, id).Scan(&productCount)
 		if e == nil && productCount > 0 {
 			failure(w, 409, "category_in_use")
 			return
 		}
-		_, e = a.DB.Exec(r.Context(), "DELETE FROM categories WHERE store_id=$1 AND id=$2", store, id)
+		_, e = tx.Exec(r.Context(), "DELETE FROM categories WHERE store_id=$1 AND id=$2", store, id)
 		if e != nil {
 			failure(w, 500, "category_delete_failed")
+			return
+		}
+		if e = tx.Commit(r.Context()); e != nil {
+			scheduleFailure(w, e)
 			return
 		}
 		jsonResponse(w, 200, map[string]bool{"ok": true})
@@ -2603,7 +2650,7 @@ func (a *App) createOrderTx(ctx context.Context, tx pgx.Tx, store, user int64, k
 		var active, weight, available bool
 		var unit string
 		var minimum, maximum float64
-		if e = tx.QueryRow(ctx, `SELECT name,price_cents,stock_quantity,active,is_weight_based,unit,COALESCE(min_order_quantity,1),COALESCE(max_order_quantity,0),CASE WHEN available_from IS NULL OR available_until IS NULL THEN true WHEN available_from<=available_until THEN (now() AT TIME ZONE 'America/Sao_Paulo')::time BETWEEN available_from AND available_until ELSE (now() AT TIME ZONE 'America/Sao_Paulo')::time>=available_from OR (now() AT TIME ZONE 'America/Sao_Paulo')::time<=available_until END FROM products WHERE store_id=$1 AND id=$2 FOR UPDATE`, store, item.ProductID).Scan(&name, &price, &stock, &active, &weight, &unit, &minimum, &maximum, &available); e != nil {
+		if e = tx.QueryRow(ctx, `SELECT name,price_cents,stock_quantity,active,is_weight_based,unit,COALESCE(min_order_quantity,1),COALESCE(max_order_quantity,0),openfood_product_open(store_id,id,statement_timestamp()) FROM products WHERE store_id=$1 AND id=$2 FOR UPDATE`, store, item.ProductID).Scan(&name, &price, &stock, &active, &weight, &unit, &minimum, &maximum, &available); e != nil {
 			return 0, errors.New("product_unavailable")
 		}
 		if !active || weight || (unit != "unidade" && unit != "porcao") || !available {

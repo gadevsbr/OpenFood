@@ -95,6 +95,7 @@ const errors = {
     "O estoque mudou. Feche e reabra a edição para conferir os valores atuais.",
   quantity_invalid: "Confira a quantidade mínima e máxima de cada produto.",
   order_duplicate_product: "Agrupe as quantidades do mesmo produto em um item.",
+  category_cycle_invalid: "A categoria superior não pode ser a própria categoria nem uma de suas descendentes.",
   availability_invalid: "Informe os dois horários de disponibilidade válidos.",
   category_invalid: "Escolha uma categoria desta loja.",
   sku_already_exists: "Este SKU já está cadastrado nesta loja.",
@@ -916,8 +917,8 @@ async function renderAdvancedProducts() {
         )) &&
       (availability === "all" ||
         (availability === "available"
-          ? p.active && p.stock_quantity > 0
-          : !p.active || p.stock_quantity <= 0)),
+          ? p.active && p.stock_quantity > 0 && p.available_now !== false
+          : !p.active || p.stock_quantity <= 0 || p.available_now === false)),
   );
   const tbody = $("advProducts");
   tbody.replaceChildren();
@@ -952,9 +953,9 @@ async function renderAdvancedProducts() {
     const status = td(row, "");
     status.append(
       statusBadge(
-        p.active && p.stock_quantity > 0 ? "active" : "inactive",
+        p.active && p.stock_quantity > 0 && p.available_now !== false ? "active" : "inactive",
         p.active
-          ? p.stock_quantity > 0
+          ? p.available_now === false ? "Fora do horário" : p.stock_quantity > 0
             ? "Disponível"
             : "Sem estoque"
           : "Inativo",

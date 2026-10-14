@@ -122,7 +122,7 @@ func configuredCombo(ctx context.Context, tx pgx.Tx, store int64, item Item) (st
 		var price int64
 		var stock, minimum, maximum float64
 		var available bool
-		err = tx.QueryRow(ctx, `SELECT name,price_cents,stock_quantity,unit,COALESCE(min_order_quantity,1),COALESCE(max_order_quantity,0),active AND NOT is_weight_based AND (available_from IS NULL OR available_until IS NULL OR CASE WHEN available_from<=available_until THEN (now() AT TIME ZONE 'America/Sao_Paulo')::time BETWEEN available_from AND available_until ELSE (now() AT TIME ZONE 'America/Sao_Paulo')::time>=available_from OR (now() AT TIME ZONE 'America/Sao_Paulo')::time<=available_until END) FROM products WHERE store_id=$1 AND id=$2 FOR UPDATE`, store, d.Product).Scan(&name, &price, &stock, &unit, &minimum, &maximum, &available)
+		err = tx.QueryRow(ctx, `SELECT name,price_cents,stock_quantity,unit,COALESCE(min_order_quantity,1),COALESCE(max_order_quantity,0),active AND NOT is_weight_based AND openfood_product_open(store_id,id,statement_timestamp()) FROM products WHERE store_id=$1 AND id=$2 FOR UPDATE`, store, d.Product).Scan(&name, &price, &stock, &unit, &minimum, &maximum, &available)
 		if err != nil || !available || (unit != "unidade" && unit != "porcao") {
 			return fail("product_unavailable")
 		}

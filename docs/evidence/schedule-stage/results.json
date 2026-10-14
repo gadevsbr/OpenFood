@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-13",
+  "result": "PASS",
+  "fixtures": "synthetic isolated PostgreSQL",
+  "checks": [
+    "store timezone and full-day window",
+    "category editor and inherited timezone",
+    "closed category disables POS item",
+    "open category permits server checkout",
+    "configuration conflict shown without overwrite",
+    "stock and original receipt preserved",
+    "desktop/mobile/dark no horizontal overflow"
+  ],
+  "javascript_errors": []
+}

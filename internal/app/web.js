@@ -259,7 +259,7 @@ async function renderCategories() {
       editBtn.style.fontSize = "12px";
       editBtn.style.padding = "6px 10px";
       editBtn.onclick = () => editCategory(c);
-      actCell.append(editBtn);
+      actCell.append(editBtn, posButton("Horários", () => scheduleEditor(c.id).catch(e => msg(menuError(e),true))));
       let delBtn = document.createElement("button");
       delBtn.className = "btn-cancel";
       delBtn.textContent = "Excluir";

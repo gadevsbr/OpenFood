@@ -8,11 +8,11 @@ OpenFood is an open-source, local-first restaurant POS and management system for
 [![Build and tests](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml/badge.svg)](https://github.com/gadevsbr/OpenFood/actions/runs/38324219895)
 [![AGPL-3.0 license](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-[**Download for Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/OpenFood-0.13.0-alpha.1-windows-x64-setup.exe) · [Português](README.md) · [Installation guide (Portuguese)](docs/installation.md) · [Roadmap (Portuguese)](project-memory/roadmap.md)
+[**Download for Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.14.0-alpha.1/OpenFood-0.14.0-alpha.1-windows-x64-setup.exe) · [Português](README.md) · [Installation guide (Portuguese)](docs/installation.md) · [Roadmap (Portuguese)](project-memory/roadmap.md)
 
 ![OpenFood restaurant POS with categories, menu and order panel](docs/evidence/restaurant-ui/pos-desktop.png)
 
-> **Experimental alpha · 0.13.0-alpha.1.** Browser/PostgreSQL journeys and Windows/Linux CI have passed within the documented scope. Clean-machine installation, physical peripherals and fiscal operation still have open validation gates. Screenshots use synthetic QA data; this overview shows the visual direction introduced in version 0.9.
+> **Experimental alpha · 0.14.0-alpha.1.** Browser/PostgreSQL journeys and Windows/Linux CI have passed within the documented scope. Clean-machine installation, physical peripherals and fiscal operation still have open validation gates. Screenshots use synthetic QA data; this overview shows the visual direction introduced in version 0.9.
 
 ## Features
 
@@ -30,7 +30,7 @@ OpenFood is an open-source, local-first restaurant POS and management system for
 
 ### Windows 10/11 x64
 
-Download the [0.13 installer](https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/OpenFood-0.13.0-alpha.1-windows-x64-setup.exe) and verify [SHA256SUMS](https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/SHA256SUMS). Install per user, open OpenFood from the Start menu, then create your store, email and a password of at least 12 characters. There are no default credentials. Go, Node and Docker are not required.
+Download the [0.14 installer](https://github.com/gadevsbr/OpenFood/releases/download/v0.14.0-alpha.1/OpenFood-0.14.0-alpha.1-windows-x64-setup.exe) and verify [SHA256SUMS](https://github.com/gadevsbr/OpenFood/releases/download/v0.14.0-alpha.1/SHA256SUMS). Install per user, open OpenFood from the Start menu, then create your store, email and a password of at least 12 characters. There are no default credentials. Go, Node and Docker are not required.
 
 ### Linux with Docker Compose
 
@@ -59,7 +59,7 @@ Fonts, icons and UI scripts are embedded locally; there is no mandatory telemetr
 
 Built with **Go 1.27.2, PostgreSQL 17 and an embedded web interface**. Motion mini animations respect reduced-motion preferences. Read [contribution guidelines](CONTRIBUTING.md), [development and QA](docs/development.md) and [security policy](SECURITY.md). Project guides are currently in Portuguese.
 
-[Release 0.13](https://github.com/gadevsbr/OpenFood/releases/tag/v0.13.0-alpha.1) includes Windows/Linux packages, QA evidence and SHA-256 manifests. See [the CI run](https://github.com/gadevsbr/OpenFood/actions/runs/38324219895) and [validation scope](project-memory/addons-stage.md).
+[Release 0.14](https://github.com/gadevsbr/OpenFood/releases/tag/v0.14.0-alpha.1) includes Windows/Linux packages, QA evidence and SHA-256 manifests. See [the CI run](https://github.com/gadevsbr/OpenFood/actions/runs/38324219895) and [validation scope](project-memory/schedule-stage.md).
 
 [Report a bug or suggest a feature](https://github.com/gadevsbr/OpenFood/issues/new/choose) using synthetic data and reproducible steps.
 
@@ -68,6 +68,13 @@ Built with **Go 1.27.2, PostgreSQL 17 and an embedded web interface**. Motion mi
 Reuse the same add-on group across products with shared prices and stock, explicit impact confirmation and preserved order snapshots. [Guide (Portuguese)](docs/addons.md).
 
 ![Shared add-on editor](docs/evidence/addons-stage/shared-addons-desktop.png)
+
+
+## Sales schedules
+
+Weekly store and category windows, store timezones and server-enforced availability in POS, combos and tab rounds. Overnight windows are supported. [Guide (Portuguese)](docs/schedules.md).
+
+![Weekly sales schedule editor](docs/evidence/schedule-stage/sale-schedule-desktop.png)
 
 
 ## License

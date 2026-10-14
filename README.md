@@ -8,11 +8,11 @@ OpenFood é um sistema de ponto de venda (PDV / POS) e gestão de restaurantes, 
 [![Build e testes](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml/badge.svg)](https://github.com/gadevsbr/OpenFood/actions/runs/38324219895)
 [![Licença AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-[**Baixar para Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/OpenFood-0.13.0-alpha.1-windows-x64-setup.exe) · [Instalação Windows / Linux](docs/installation.md) · [Roadmap](project-memory/roadmap.md) · [English](README.en.md)
+[**Baixar para Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.14.0-alpha.1/OpenFood-0.14.0-alpha.1-windows-x64-setup.exe) · [Instalação Windows / Linux](docs/installation.md) · [Roadmap](project-memory/roadmap.md) · [English](README.en.md)
 
 ![PDV OpenFood: categorias de restaurante, cardápio e pedido lateral](docs/evidence/restaurant-ui/pos-desktop.png)
 
-> **Alpha experimental · 0.13.0-alpha.1.** Há testes com PostgreSQL e navegador, além de CI Windows/Linux. Instalação em ambiente limpo, periféricos e operação fiscal ainda têm validações pendentes. As capturas são reais, com dados sintéticos de QA; as telas gerais mostram a direção visual introduzida na versão 0.9.
+> **Alpha experimental · 0.14.0-alpha.1.** Há testes com PostgreSQL e navegador, além de CI Windows/Linux. Instalação em ambiente limpo, periféricos e operação fiscal ainda têm validações pendentes. As capturas são reais, com dados sintéticos de QA; as telas gerais mostram a direção visual introduzida na versão 0.9.
 
 ## Um espaço para atender. Outro para administrar.
 
@@ -53,7 +53,7 @@ Capturas da etapa 0.11, com produtos e clientes de teste.
 
 ### Windows 10/11 · x64
 
-1. Baixe o [instalador da versão 0.13](https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/OpenFood-0.13.0-alpha.1-windows-x64-setup.exe) e confira o [SHA256SUMS](https://github.com/gadevsbr/OpenFood/releases/download/v0.13.0-alpha.1/SHA256SUMS).
+1. Baixe o [instalador da versão 0.14](https://github.com/gadevsbr/OpenFood/releases/download/v0.14.0-alpha.1/OpenFood-0.14.0-alpha.1-windows-x64-setup.exe) e confira o [SHA256SUMS](https://github.com/gadevsbr/OpenFood/releases/download/v0.14.0-alpha.1/SHA256SUMS).
 2. Instale e abra **OpenFood** pelo menu Iniciar. O PostgreSQL está incluído; o painel abre no navegador após a inicialização.
 3. Crie sua loja, e-mail e senha com pelo menos 12 caracteres. Não há login ou senha padrão.
 4. Cadastre seu cardápio pela **ADM**; entre no **PDV** e abra o caixa para vender.
@@ -87,7 +87,7 @@ O modo suportado atualmente é local, em loopback. O computador precisa permanec
 | --- | --- |
 | Vender e receber | [PDV](docs/pos.md) · [Caixa](docs/cash.md) |
 | Organizar o atendimento | [Mesas e comandas](docs/dining.md) |
-| Montar seu cardápio | [Variantes e adicionais](docs/menu.md) · [Combos e clientes](docs/combos-customers.md) · [Pizzas](docs/pizza.md) · [Adicionais compartilhados](docs/addons.md) |
+| Montar seu cardápio | [Variantes e adicionais](docs/menu.md) · [Combos e clientes](docs/combos-customers.md) · [Pizzas](docs/pizza.md) · [Adicionais compartilhados](docs/addons.md) · [Horários de venda](docs/schedules.md) |
 | Instalar, atualizar ou recuperar dados | [Instalação e operação](docs/installation.md) |
 | Entender as próximas entregas | [Roadmap](project-memory/roadmap.md) · [Estado e limites](project-memory/status.md) |
 | Contribuir ou executar os testes | [Contribuição](CONTRIBUTING.md) · [Desenvolvimento e QA](docs/development.md) |
@@ -95,7 +95,7 @@ O modo suportado atualmente é local, em loopback. O computador precisa permanec
 
 **Stack:** Go 1.27.2, PostgreSQL 17, interface web embutida e Motion mini com respeito a `prefers-reduced-motion`. Node é usado para construir animações e executar QA, não pelo usuário final.
 
-A [release 0.13](https://github.com/gadevsbr/OpenFood/releases/tag/v0.13.0-alpha.1) inclui instalador, pacotes Windows/Linux, capturas de QA e manifests SHA-256. [CI da versão](https://github.com/gadevsbr/OpenFood/actions/runs/38324219895) e [registro de validação](project-memory/addons-stage.md) documentam o que foi testado e os gates abertos.
+A [release 0.14](https://github.com/gadevsbr/OpenFood/releases/tag/v0.14.0-alpha.1) inclui instalador, pacotes Windows/Linux, capturas de QA e manifests SHA-256. [CI da versão](https://github.com/gadevsbr/OpenFood/actions/runs/38324219895) e [registro de validação](project-memory/schedule-stage.md) documentam o que foi testado e os gates abertos.
 
 Encontrou um problema? [Abra uma issue](https://github.com/gadevsbr/OpenFood/issues/new/choose) com a versão e os passos para reproduzir, usando dados de teste. Sugestões e contribuições são bem-vindas.
 
@@ -104,6 +104,13 @@ Encontrou um problema? [Abra uma issue](https://github.com/gadevsbr/OpenFood/iss
 Um cadastro de molhos, bordas ou acompanhamentos para vários produtos, com preço e estoque comuns e confirmação dos produtos afetados. [Guia](docs/addons.md).
 
 ![Editor conjunto de adicionais com produtos vinculados](docs/evidence/addons-stage/shared-addons-desktop.png)
+
+
+## Horários de venda
+
+Faixas semanais da loja e das categorias, fuso por loja e bloqueio no PDV fora do horário. Mantenha faixas de almoço/jantar ou venda após meia-noite. [Guia](docs/schedules.md).
+
+![Editor de horários da loja](docs/evidence/schedule-stage/sale-schedule-desktop.png)
 
 
 ## Licença

@@ -236,6 +236,7 @@ function renderPOSProducts() {
     b.className = "pos-product";
     b.dataset.productId = p.id;
     b.disabled =
+      p.available_now === false ||
       p.stock_quantity < 1 ||
       p.is_weight_based ||
       !["unidade", "porcao"].includes(p.unit);
@@ -245,7 +246,7 @@ function renderPOSProducts() {
       ["product-price", (p.has_configuration?"Base ":"")+money(p.price_cents)],
       [
         "product-meta",
-        b.disabled
+        p.available_now === false ? "Fora do horário de venda" : b.disabled
           ? "Indisponível"
           : `${p.unit === "porcao" ? "Porção" : "Unidade"} · ${p.stock_quantity} disponíveis`,
       ],
@@ -280,6 +281,7 @@ function renderPOSProducts() {
   $("posEmpty").classList.toggle("hidden", products.length+comboCount > 0);
 }
 function posAdd(p) {
+  if (p.available_now === false) { posError(Error("product_unavailable")); return; }
   if (posAttempt || (typeof diningPending !== "undefined" && diningPending)) {
     posError(Error("Retome a confirmação desta venda antes de editar."));
     return;
