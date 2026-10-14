@@ -62,7 +62,7 @@ pelo foco explícito nos itens 1 e 2. Nenhuma funcionalidade nova declarada pron
 ---
 
 ## Fase 3: Catálogo Avançado (Restaurantes e Mercados)
-2026-10-13: etapa 0.14 horários semanais por loja/categoria e fuso implementada; validação local PASS, última revisão/CI/publicação pendentes. [Escopo](schedule-stage.md). Próxima frente: clientes/privacidade. Fase 3 continua aberta para peso/mercados e critérios restantes.
+2026-10-13: etapa 0.14 horários semanais por loja/categoria e fuso validada e publicada, PostgreSQL/Chromium e CI 38497740815 PASS, hashes conferidos. Gate de distribuição superseded. [Escopo](schedule-stage.md). Próxima frente: clientes/privacidade. Fase 3 continua aberta para peso/mercados e critérios restantes.
 2026-10-12: etapa 0.13 adicionais compartilhados validada e publicada, PostgreSQL/Chromium e CI 38324219895 PASS, hashes conferidos. Pendência de distribuição superseded. [Escopo](addons-stage.md). Próxima entrega: horários por loja/categoria; depois revisão de clientes/privacidade. Fase 3 aberta.
 2026-10-12: etapa 0.12 integra sabores de pizza e preço maior/média ponderada no servidor; PostgreSQL/Chromium e CI 38320810285 Windows/Linux/publicação PASS, release experimental com checksums conferidos. Pendência de distribuição superseded. [Escopo e limites](pizza-stage.md). Adicionais compartilhados e horários por loja/categoria continuam próximos; Fase 3 não concluída.
 2026-10-11: etapa 0.10 valida variantes/tamanhos, adicionais, observações e fotos no PDV/mesas. [Evidências e limites](menu-stage.md). Etapa 0.11 valida combos operacionais; sabores de pizza e adicionais compartilhados continuam pendentes. [Escopo](combo-customer-stage.md). Critérios completos da fase ainda abertos.

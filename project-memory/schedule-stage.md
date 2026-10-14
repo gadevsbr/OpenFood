@@ -1,6 +1,6 @@
 # Horários de venda · etapa 0.14 · 2026-10-13
 
-Skills: Backend Architect e UX Architect. Implementada e validada localmente; publicação pendente.
+Skills: Backend Architect e UX Architect. Implementada, validada e publicada no escopo testado. Fases 3/4 continuam abertas.
 
 - Horários semanais por loja e categoria, múltiplas faixas, meia-noite e fuso da loja.
   Restrições se somam: loja, categorias superiores e janela diária existente do produto.
@@ -19,3 +19,5 @@ Skills: Backend Architect e UX Architect. Implementada e validada localmente; pu
   Clientes/privacidade seguem próximos; periféricos, ambiente limpo e fiscal continuam abertos.
 
 Revisão final: API rejeita novo ciclo de categoria, preservando a resposta anterior para categoria como própria mãe. PostgreSQL focal final PASS 34.46s; repetição Chromium em base fresca schedule-20261013-b PASS. Publicação ainda pendente.
+
+Distribuição concluída: CI [38497740815](https://github.com/gadevsbr/OpenFood/actions/runs/38497740815) Linux/Windows/publicação PASS, com PostgreSQL real, upgrades/restauração v1–v9, Compose e ciclo instalado. [Release experimental v0.14.0-alpha.1](https://github.com/gadevsbr/OpenFood/releases/tag/v0.14.0-alpha.1): seis assets; quatro artefatos baixados e hashes iguais aos manifests e digests GitHub. Gates CI/publicação/checksums antes pendentes: **superseded** pela evidência. Fonte 680dba0; encerramento documental em main. Evidências `docs/evidence/schedule-stage/release-*.json`. Bases QA encerradas; dados de trabalho não utilizados.
