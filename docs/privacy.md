@@ -31,6 +31,11 @@ campos livres de finalidade/versão dos termos, operadores e registros externos 
 revisão própria. IDs/datas/hashes e histórico comercial permanecem; não há garantia
 de anonimato. Não coloque identificadores pessoais em campos operacionais gerais.
 
+A limpeza se aplica aos registros vinculados no PostgreSQL. Rascunhos e carrinhos
+em espera no `sessionStorage` do navegador, telas já abertas e comprovantes já
+impressos também podem conter textos anteriores. Revise e descarte esses dados nas
+sessões de atendimento; esta versão não coordena limpeza entre sessões de navegador.
+
 Backups e exportações anteriores não são modificados. Restaurar um backup antigo
 pode reintroduzir informações e consentimentos removidos; revise e reaplique os
 pedidos de remoção antes de retomar o atendimento. Ainda não há registro externo

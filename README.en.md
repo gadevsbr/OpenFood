@@ -5,7 +5,7 @@
 OpenFood is an open-source, local-first restaurant POS and management system for Windows and Linux. Menu configuration, tables, tabs, kitchen workflow and administration share a local PostgreSQL database. No mandatory central server or commercial subscription. The application interface is currently in Portuguese.
 
 [![Experimental release](https://img.shields.io/github/v/release/gadevsbr/OpenFood?include_prereleases&label=alpha)](https://github.com/gadevsbr/OpenFood/releases)
-[![Build and tests](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml/badge.svg)](https://github.com/gadevsbr/OpenFood/actions/runs/38497740815)
+[![Build and tests](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml/badge.svg)](https://github.com/gadevsbr/OpenFood/actions/runs/38668909597)
 [![AGPL-3.0 license](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 [**Download for Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.15.0-alpha.1/OpenFood-0.15.0-alpha.1-windows-x64-setup.exe) · [Português](README.md) · [Installation guide (Portuguese)](docs/installation.md) · [Roadmap (Portuguese)](project-memory/roadmap.md)
@@ -59,7 +59,7 @@ Fonts, icons and UI scripts are embedded locally; there is no mandatory telemetr
 
 Built with **Go 1.27.2, PostgreSQL 17 and an embedded web interface**. Motion mini animations respect reduced-motion preferences. Read [contribution guidelines](CONTRIBUTING.md), [development and QA](docs/development.md) and [security policy](SECURITY.md). Project guides are currently in Portuguese.
 
-[Release 0.15](https://github.com/gadevsbr/OpenFood/releases/tag/v0.15.0-alpha.1) includes Windows/Linux packages, QA evidence and SHA-256 manifests. See [the CI run](https://github.com/gadevsbr/OpenFood/actions/runs/38497740815) and [validation scope](project-memory/privacy-stage.md).
+[Release 0.15](https://github.com/gadevsbr/OpenFood/releases/tag/v0.15.0-alpha.1) includes Windows/Linux packages, QA evidence and SHA-256 manifests. See [the CI run](https://github.com/gadevsbr/OpenFood/actions/runs/38668909597) and [validation scope](project-memory/privacy-stage.md).
 
 [Report a bug or suggest a feature](https://github.com/gadevsbr/OpenFood/issues/new/choose) using synthetic data and reproducible steps.
 
