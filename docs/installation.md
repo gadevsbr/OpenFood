@@ -32,13 +32,17 @@ Backup Linux, no host com Compose:
 umask 077
 docker compose exec -T db pg_dump -U openfood -d openfood -Fc > openfood.dump
 ```
-Restaure somente arquivos de origem confiável. Pare app, gere backup prévio, valide o dump em banco temporário, então:
+Restaure somente arquivos próprios de origem confiável, com a imagem atualizada:
 ```sh
-docker compose stop app
-cat openfood.dump | docker compose exec -T db pg_restore -U openfood -d openfood --clean --if-exists --single-transaction --no-owner --no-acl
-docker compose exec -T db psql -U openfood -d openfood -c "DELETE FROM sessions; UPDATE jobs SET state='failed',last_error_code='restored_requires_review' WHERE state IN ('pending','running');"
-docker compose start app
+python3 scripts/restore-compose.py openfood.dump pre-restauracao.dump
 ```
+O script para o app, exporta o registro de remoções, gera backup prévio e valida/migra
+o banco temporário. Remoções recentes são reaplicadas antes da substituição em
+transação única. O caminho prévio precisa ser novo. Preserve também o arquivo
+`.privacy.json` gerado. Sessões são revogadas e retenção automática fica desativada
+para revisão. O comando antigo de `pg_restore` direto é **superseded**, pois pula
+a reconciliação de privacidade. [Guia de privacidade](privacy.md).
+
 Backup pela interface Linux ainda indisponível; API retorna explicitamente 501. Atualize com backup, `git pull` e `docker compose up --build -d`. Rollback de binário só funciona quando esquema é compatível; caso contrário restaure backup anterior em volume separado e reconcilie efeitos.
 
 ## Backups e diagnóstico Windows

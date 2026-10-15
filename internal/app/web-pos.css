@@ -1082,3 +1082,9 @@ kbd {
 .privacy-impact { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px 16px; padding:16px; border:1px solid var(--line); border-radius:10px; }
 .privacy-impact dt,.privacy-impact dd { margin:0; }
 .privacy-impact dd { font-weight:700; font-variant-numeric:tabular-nums; }
+#privacyShield:not([hidden]) {position:fixed;inset:0;z-index:99999;display:grid;place-content:center;width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;border:0;padding:2rem;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--ink);font-size:1.1rem;}
+
+#privacyPolicyDialog[open] {display:flex;flex-direction:column;max-height:calc(100dvh - 32px);}
+#privacyPolicyDialog .dialog-body {min-height:0;max-height:none;flex:1;}
+#privacyPolicyDialog .dialog-header,.privacy-policy-footer {flex-shrink:0;}
+.privacy-policy-footer {padding:16px 25px;border-top:1px solid var(--line);background:var(--surface);}

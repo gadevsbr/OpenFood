@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-14",
+  "result": "PASS",
+  "fixtures": "synthetic isolated PostgreSQL",
+  "checks": [
+    "cross-tab removal clears carts, held sales and pending dining text",
+    "current page reload clears in-memory data",
+    "retention preview and explicit versioned activation",
+    "desktop/mobile/dark without overflow",
+    "offline modal blocks interaction and Escape",
+    "separate session reconnect clears stale drafts",
+    "financial/identity export verified after removal"
+  ],
+  "javascript_errors": []
+}

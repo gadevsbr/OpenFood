@@ -8,11 +8,11 @@ OpenFood é um sistema de ponto de venda (PDV / POS) e gestão de restaurantes, 
 [![Build e testes](https://github.com/gadevsbr/OpenFood/actions/workflows/release.yml/badge.svg)](https://github.com/gadevsbr/OpenFood/actions/runs/38668909597)
 [![Licença AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-[**Baixar para Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.15.0-alpha.1/OpenFood-0.15.0-alpha.1-windows-x64-setup.exe) · [Instalação Windows / Linux](docs/installation.md) · [Roadmap](project-memory/roadmap.md) · [English](README.en.md)
+[**Baixar para Windows**](https://github.com/gadevsbr/OpenFood/releases/download/v0.16.0-alpha.1/OpenFood-0.16.0-alpha.1-windows-x64-setup.exe) · [Instalação Windows / Linux](docs/installation.md) · [Roadmap](project-memory/roadmap.md) · [English](README.en.md)
 
 ![PDV OpenFood: categorias de restaurante, cardápio e pedido lateral](docs/evidence/restaurant-ui/pos-desktop.png)
 
-> **Alpha experimental · 0.15.0-alpha.1.** Há testes com PostgreSQL e navegador, além de CI Windows/Linux. Instalação em ambiente limpo, periféricos e operação fiscal ainda têm validações pendentes. As capturas são reais, com dados sintéticos de QA; as telas gerais mostram a direção visual introduzida na versão 0.9.
+> **Alpha experimental · 0.16.0-alpha.1.** Há testes com PostgreSQL e navegador, além de CI Windows/Linux. Instalação em ambiente limpo, periféricos e operação fiscal ainda têm validações pendentes. As capturas são reais, com dados sintéticos de QA; as telas gerais mostram a direção visual introduzida na versão 0.9.
 
 ## Um espaço para atender. Outro para administrar.
 
@@ -47,13 +47,13 @@ Capturas da etapa 0.11, com produtos e clientes de teste.
 
 </details>
 
-**Pagamentos são registros manuais:** dinheiro, cartão e Pix não acionam bancos, adquirentes ou reembolsos externos. Venda por peso, taxas, retenção automática e tratamento de remoções após restaurar backups antigos seguem no roadmap. Pix integrado, TEF, emissão fiscal, WhatsApp, iFood e IA não estão conectados. Os controles de privacidade existentes não constituem certificação de conformidade legal.
+**Pagamentos são registros manuais:** dinheiro, cartão e Pix não acionam bancos, adquirentes ou reembolsos externos. Venda por peso e taxas seguem no roadmap; retenção configurável por loja e reaplicação de remoções na restauração suportada estão disponíveis. Pix integrado, TEF, emissão fiscal, WhatsApp, iFood e IA não estão conectados. Os controles de privacidade existentes não constituem certificação de conformidade legal.
 
 ## Começar a usar
 
 ### Windows 10/11 · x64
 
-1. Baixe o [instalador da versão 0.15](https://github.com/gadevsbr/OpenFood/releases/download/v0.15.0-alpha.1/OpenFood-0.15.0-alpha.1-windows-x64-setup.exe) e confira o [SHA256SUMS](https://github.com/gadevsbr/OpenFood/releases/download/v0.15.0-alpha.1/SHA256SUMS).
+1. Baixe o [instalador da versão 0.16](https://github.com/gadevsbr/OpenFood/releases/download/v0.16.0-alpha.1/OpenFood-0.16.0-alpha.1-windows-x64-setup.exe) e confira o [SHA256SUMS](https://github.com/gadevsbr/OpenFood/releases/download/v0.16.0-alpha.1/SHA256SUMS).
 2. Instale e abra **OpenFood** pelo menu Iniciar. O PostgreSQL está incluído; o painel abre no navegador após a inicialização.
 3. Crie sua loja, e-mail e senha com pelo menos 12 caracteres. Não há login ou senha padrão.
 4. Cadastre seu cardápio pela **ADM**; entre no **PDV** e abra o caixa para vender.
@@ -95,7 +95,7 @@ O modo suportado atualmente é local, em loopback. O computador precisa permanec
 
 **Stack:** Go 1.27.2, PostgreSQL 17, interface web embutida e Motion mini com respeito a `prefers-reduced-motion`. Node é usado para construir animações e executar QA, não pelo usuário final.
 
-A [release 0.15](https://github.com/gadevsbr/OpenFood/releases/tag/v0.15.0-alpha.1) inclui instalador, pacotes Windows/Linux, capturas de QA e manifests SHA-256. [CI da versão](https://github.com/gadevsbr/OpenFood/actions/runs/38668909597) e [registro de validação](project-memory/privacy-stage.md) documentam o que foi testado e os gates abertos.
+A [release 0.16](https://github.com/gadevsbr/OpenFood/releases/tag/v0.16.0-alpha.1) inclui instalador, pacotes Windows/Linux, capturas de QA e manifests SHA-256. [CI da versão](https://github.com/gadevsbr/OpenFood/actions/runs/38668909597) e [registro de validação](project-memory/privacy-completion-stage.md) documentam o que foi testado e os gates abertos.
 
 Encontrou um problema? [Abra uma issue](https://github.com/gadevsbr/OpenFood/issues/new/choose) com a versão e os passos para reproduzir, usando dados de teste. Sugestões e contribuições são bem-vindas.
 
@@ -119,6 +119,14 @@ Confira os registros afetados antes de remover identificação e textos vinculad
 
 ![Revisão dos registros vinculados ao cliente](docs/evidence/privacy-stage/privacy-review-desktop.png)
 
+
+## Retenção e continuidade da privacidade
+
+Defina o prazo por loja, simule o impacto e ative a limpeza de clientes inativos.
+Restaurações suportadas reaplicam remoções recentes; abas do PDV limpam rascunhos
+ao detectar a mudança. Desativado por padrão, com financeiro preservado. [Guia e limites](docs/privacy.md).
+
+![Política de retenção de clientes por loja](docs/evidence/privacy-completion-stage/retention-desktop.png)
 
 ## Licença
 

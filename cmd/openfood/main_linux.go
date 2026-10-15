@@ -30,6 +30,12 @@ func main() {
 	if dsn == "" {
 		log.Fatal("DATABASE_URL ausente")
 	}
+	if len(os.Args) > 1 {
+		if e := app.PrivacyMaintenance(ctx, dsn, os.Args[1:], os.Stdin, os.Stdout); e != nil {
+			log.Fatal("privacy_maintenance_failed")
+		}
+		return
+	}
 	a, e := app.Open(ctx, dsn, os.Getenv("SETUP_TOKEN"), nil)
 	if e != nil {
 		log.Fatal("database_or_migration_failed")

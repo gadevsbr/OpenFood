@@ -519,7 +519,7 @@ func TestPostgresUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, version := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9} {
+	for _, version := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 			defer cancel()
@@ -566,6 +566,11 @@ func TestPostgresUpgrade(t *testing.T) {
 				t.Fatal(err)
 			}
 			var oldDump []byte
+			if version == 10 {
+				if _, err = db.Exec(ctx, "INSERT INTO customers(store_id,name,email,anonymized_at) VALUES($1,'Cliente removido legado','legacy-private@example.org',now())", store); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if version >= 3 {
 				path, e := r.Backup(ctx)
 				if e != nil {
@@ -581,6 +586,12 @@ func TestPostgresUpgrade(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer a.DB.Close()
+			if version == 10 {
+				var removals int
+				if err = a.DB.QueryRow(ctx, "SELECT count(*) FROM privacy_removals WHERE store_id=$1", store).Scan(&removals); err != nil || removals != 1 {
+					t.Fatalf("legacy removal not recorded: %d %v", removals, err)
+				}
+			}
 			var stock, price int64
 			if err = a.DB.QueryRow(ctx, "SELECT stock_quantity,price_cents FROM products WHERE store_id=$1", store).Scan(&stock, &price); err != nil {
 				t.Fatal(err)
@@ -593,8 +604,14 @@ func TestPostgresUpgrade(t *testing.T) {
 					t.Fatalf("legacy v3 backup restore: %v", err)
 				}
 				var restored int
-				if err = a.DB.QueryRow(ctx, "SELECT max(version) FROM schema_migrations").Scan(&restored); err != nil || restored != 10 {
+				if err = a.DB.QueryRow(ctx, "SELECT max(version) FROM schema_migrations").Scan(&restored); err != nil || restored != 11 {
 					t.Fatalf("legacy backup not upgraded: %d %v", restored, err)
+				}
+				if version == 10 {
+					var retained bool
+					if err = a.DB.QueryRow(ctx, "SELECT email IS NOT NULL FROM customers WHERE store_id=$1", store).Scan(&retained); err != nil || retained {
+						t.Fatalf("legacy text returned on restore: %v", err)
+					}
 				}
 			}
 			if err = a.Migrate(ctx); err != nil {

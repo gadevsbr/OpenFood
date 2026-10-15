@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"openfood/internal/app"
 )
 
@@ -217,7 +218,22 @@ func (r *Runtime) Restore(ctx context.Context, raw []byte) error {
 	if e != nil {
 		return e
 	}
+
+	live, e := pgxpool.New(ctx, r.DSN)
+	if e != nil {
+		upgraded.DB.Close()
+		return e
+	}
+	ledger, e := app.PrivacyRemovals(ctx, live)
+	live.Close()
+	if e == nil {
+		e = app.ReapplyPrivacyRemovals(ctx, upgraded.DB, ledger)
+	}
 	upgraded.DB.Close()
+	if e != nil {
+		return e
+	}
+
 	// Dump the migrated staging database; the live restore remains a single transaction.
 	if e = r.run(ctx, "pg_dump", append(r.dbArgs(stage), "--format=custom", "--file="+path, "--no-owner", "--no-acl")...); e != nil {
 		return e

@@ -240,12 +240,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     await page.locator("#menuToggle").click();
   await page.locator("#tabOperacao").click();
   await page.context().setOffline(true);
-  await page.locator("#refresh").click();
-  await page.locator("#connectionNotice:not(.hidden)").waitFor();
+  await page.locator("#privacyShield").waitFor({ state: "visible" });
   assert.equal(await page.locator("#orders tr").count(), 4);
   await page.context().setOffline(false);
-  await page.locator("#retryConnection").click();
-  await page.locator("#connectionNotice").waitFor({ state: "hidden" });
+  await page.locator("#privacyShield").waitFor({ state: "hidden" });
+  await page.locator("#refresh").click();
   await page.locator("#tabUsuarios").click();
   await page.locator("#usersTable").getByText("qa@example.org").waitFor();
   await page.screenshot({

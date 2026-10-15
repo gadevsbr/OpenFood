@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-14",
+  "status": "PASS",
+  "environment": "Windows de desenvolvimento, Chromium headless, PostgreSQL 17 real e dados de teste isolados. Sem valida\u00e7\u00e3o de provedor ou ambiente limpo.",
+  "passed": [
+    "setup",
+    "login",
+    "empty states",
+    "product creation via real backend",
+    "catalog search and availability",
+    "manual orders and integer cents",
+    "stock consumption",
+    "prepare and ready transitions",
+    "order search and filters",
+    "desktop/tablet/mobile page overflow",
+    "mobile navigation",
+    "dark theme persistence",
+    "dialog Escape and focus return",
+    "payments visibly unavailable",
+    "team list",
+    "backup and restore with session revocation and preserved data"
+  ],
+  "javascript_errors": [],
+  "http_failures": []
+}

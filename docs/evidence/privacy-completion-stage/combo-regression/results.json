@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "javascript_errors": [],
+  "passed": [
+    "ADM combo create/edit",
+    "required component and addon",
+    "variants and fixed price with adjustments",
+    "desktop/mobile/dark",
+    "real checkout and two component stocks",
+    "customer linkage/history",
+    "consent text/revocation",
+    "identification removal preserves financial totals"
+  ]
+}

@@ -70,6 +70,12 @@ func TestCustomerPrivacyJourney(t *testing.T) {
 		t.Fatal("login")
 	}
 	admin := res.Cookies()[0]
+	_, initialState, _ := call("GET", "/api/privacy-state", nil, admin)
+	policyCode, policyBody, _ := call("GET", "/api/privacy-policy", nil, admin)
+	_, afterPolicyRead, _ := call("GET", "/api/privacy-state", nil, admin)
+	if policyCode != 200 || !bytes.Equal(initialState, afterPolicyRead) {
+		t.Fatalf("policy read invalidated drafts %d %s", policyCode, policyBody)
+	}
 	var store, user, org, otherStore, product int64
 	if err = a.DB.QueryRow(ctx, "SELECT store_id,id,org_id FROM users WHERE email='pizza-qa@example.org'").Scan(&store, &user, &org); err != nil {
 		t.Fatal(err)
@@ -164,6 +170,11 @@ func TestCustomerPrivacyJourney(t *testing.T) {
 	}
 	_, e = a.DB.Exec(ctx, "DROP TRIGGER qa_privacy_failure ON pos_checkouts; DROP FUNCTION qa_refuse_privacy()")
 	must(e)
+
+	oldPath, err := r.Backup(ctx)
+	must(err)
+	oldDump, err := os.ReadFile(oldPath)
+	must(err)
 	c = review()
 	code, raw, _ = call("DELETE", remove, nil, admin, "X-Privacy-Review", c.Version)
 	if code != 200 {
@@ -210,6 +221,149 @@ func TestCustomerPrivacyJourney(t *testing.T) {
 		if code != 403 {
 			t.Fatalf("restricted review %s %d", role, code)
 		}
+	}
+
+	// Policies default off and need an explicit, versioned activation.
+	var policy app.PrivacyPolicy
+	code, raw, _ = call("GET", "/api/privacy-policy", nil, admin)
+	must(json.Unmarshal(raw, &policy))
+	if code != 200 || policy.Enabled || policy.Days != 0 {
+		t.Fatalf("default policy %d %s", code, raw)
+	}
+	oldVersion := policy.Version
+	policy.Days = 30
+	policy.Enabled = true
+	code, raw, _ = call("POST", "/api/privacy-policy", policy, admin)
+	if code != 400 {
+		t.Fatalf("unconfirmed retention %d %s", code, raw)
+	}
+	policy.Confirm = true
+	code, raw, _ = call("POST", "/api/privacy-policy", policy, admin)
+	if code != 200 {
+		t.Fatalf("activate %d %s", code, raw)
+	}
+	must(json.Unmarshal(raw, &policy))
+	var auditedDays int
+	must(a.DB.QueryRow(ctx, "SELECT (details->>'inactive_days')::int FROM audit WHERE store_id=$1 AND action='privacy_policy_changed' ORDER BY id DESC LIMIT 1", store).Scan(&auditedDays))
+	if auditedDays != 30 {
+		t.Fatal("approved retention period missing from audit")
+	}
+	code, raw, _ = call("POST", "/api/privacy-policy", app.PrivacyPolicy{Version: oldVersion}, admin)
+	if code != 409 {
+		t.Fatal("stale policy accepted")
+	}
+	var aged, recent, foreign int64
+	must(a.DB.QueryRow(ctx, "INSERT INTO customers(store_id,name,created_at,updated_at) VALUES($1,'Aged QA',now()-interval '40 days',now()-interval '40 days') RETURNING id", store).Scan(&aged))
+	must(a.DB.QueryRow(ctx, "INSERT INTO customers(store_id,name) VALUES($1,'Recent QA') RETURNING id", store).Scan(&recent))
+	must(a.DB.QueryRow(ctx, "INSERT INTO customers(store_id,name,created_at,updated_at) VALUES($1,'Foreign QA',now()-interval '40 days',now()-interval '40 days') RETURNING id", otherStore).Scan(&foreign))
+	code, raw, _ = call("GET", "/api/privacy-policy?days=30", nil, admin)
+	must(json.Unmarshal(raw, &policy))
+	if code != 200 || policy.Candidates != 1 {
+		t.Fatalf("preview %d %s", code, raw)
+	}
+	// Existing customer's open shared tab blocks automatic cleanup regardless of age.
+	_, e = a.DB.Exec(ctx, "UPDATE customers SET created_at=now()-interval '40 days',updated_at=now()-interval '40 days' WHERE id=$1", other)
+	must(e)
+	_, e = a.DB.Exec(ctx, "UPDATE orders SET created_at=now()-interval '40 days' WHERE customer_id=$1", other)
+	must(e)
+	_, e = a.DB.Exec(ctx, "CREATE FUNCTION qa_retention_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'qa'; END $$; CREATE TRIGGER qa_retention_fail BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION qa_retention_fail()")
+	must(e)
+	if e = a.RunRetention(ctx); e == nil {
+		t.Fatal("retention failure injection ignored")
+	}
+	var stillNamed string
+	must(a.DB.QueryRow(ctx, "SELECT name FROM customers WHERE id=$1", aged).Scan(&stillNamed))
+	if stillNamed != "Aged QA" {
+		t.Fatal("retention partially committed")
+	}
+	_, e = a.DB.Exec(ctx, "DROP TRIGGER qa_retention_fail ON customers; DROP FUNCTION qa_retention_fail()")
+	must(e)
+	retentionResults := make(chan error, 2)
+	for i := 0; i < 2; i++ {
+		go func() { retentionResults <- a.RunRetention(ctx) }()
+	}
+	for i := 0; i < 2; i++ {
+		must(<-retentionResults)
+	}
+	var removed bool
+	must(a.DB.QueryRow(ctx, "SELECT anonymized_at IS NOT NULL FROM customers WHERE id=$1", aged).Scan(&removed))
+	if !removed {
+		t.Fatal("aged customer retained")
+	}
+	for _, id := range []int64{recent, foreign, other} {
+		must(a.DB.QueryRow(ctx, "SELECT anonymized_at IS NOT NULL FROM customers WHERE id=$1", id).Scan(&removed))
+		if removed {
+			t.Fatalf("ineligible customer removed %d", id)
+		}
+	}
+	var count int
+	must(a.DB.QueryRow(ctx, "SELECT count(*) FROM audit WHERE action='customer_retention_removed' AND entity_id=$1", aged).Scan(&count))
+	if count != 1 {
+		t.Fatal("retention not idempotent")
+	}
+	// Recent financial activity and recent order transitions restart the clock.
+	var paid int64
+	must(a.DB.QueryRow(ctx, "INSERT INTO customers(store_id,name,created_at,updated_at) VALUES($1,'Paid QA',now()-interval '40 days',now()-interval '40 days') RETURNING id", store).Scan(&paid))
+	paidOrder, e := a.Checkout(ctx, store, user, "retention-paid", app.CheckoutRequest{CustomerID: paid, Items: []app.Item{{ProductID: product, Quantity: 1}}, Expected: 3001, Service: "counter", Payments: []app.POSPayment{{Method: "card", Amount: 3001}}})
+	must(e)
+	_, e = a.DB.Exec(ctx, "UPDATE orders SET state='completed',created_at=now()-interval '40 days',confirmed_at=now()-interval '40 days' WHERE id=$1", paidOrder)
+	must(e)
+	must(a.RunRetention(ctx))
+	must(a.DB.QueryRow(ctx, "SELECT anonymized_at IS NOT NULL FROM customers WHERE id=$1", paid).Scan(&removed))
+	if removed {
+		t.Fatal("recent order transition ignored")
+	}
+	_, e = a.DB.Exec(ctx, "UPDATE orders SET privacy_activity_at=now()-interval '40 days' WHERE id=$1", paidOrder)
+	must(e)
+	must(a.RunRetention(ctx))
+	must(a.DB.QueryRow(ctx, "SELECT anonymized_at IS NOT NULL FROM customers WHERE id=$1", paid).Scan(&removed))
+	if removed {
+		t.Fatal("recent receipt ignored")
+	}
+	_, e = a.DB.Exec(ctx, "UPDATE manual_receipts SET created_at=now()-interval '40 days' WHERE order_id=$1", paidOrder)
+	must(e)
+	must(a.RunRetention(ctx))
+	must(a.DB.QueryRow(ctx, "SELECT anonymized_at IS NOT NULL FROM customers WHERE id=$1", paid).Scan(&removed))
+	if !removed {
+		t.Fatal("old paid customer retained")
+	}
+	for _, role := range []string{"attendant", "finance_viewer"} {
+		_, _, res = call("POST", "/api/login", map[string]string{"email": "privacy-" + role + "@example.org", "password": "QA-pizza-test-password"}, nil)
+		code, raw, _ = call("POST", "/api/privacy-policy", policy, res.Cookies()[0])
+		if code != 403 {
+			t.Fatal("policy role bypass")
+		}
+	}
+	// A mismatching record identity must not erase a re-used numeric ID.
+	ledger, e := app.PrivacyRemovals(ctx, a.DB)
+	must(e)
+	for i := range ledger {
+		ledger[i].CustomerID = recent
+		ledger[i].CustomerCreated = time.Now().Add(-time.Hour)
+	}
+	must(app.ReapplyPrivacyRemovals(ctx, a.DB, ledger))
+	must(a.DB.QueryRow(ctx, "SELECT anonymized_at IS NOT NULL FROM customers WHERE id=$1", recent).Scan(&removed))
+	if removed {
+		t.Fatal("numeric ID collision erased another customer")
+	}
+
+	// Restore an older snapshot containing personal data, not merely a clean backup.
+	must(r.Restore(ctx, oldDump))
+	var restoredEmail string
+	must(a.DB.QueryRow(ctx, "SELECT COALESCE(email,'') FROM customers WHERE id=$1", customer).Scan(&restoredEmail))
+	if restoredEmail != "" {
+		t.Fatal("old restore resurrected identity")
+	}
+	var granted bool
+	must(a.DB.QueryRow(ctx, "SELECT granted FROM consents WHERE customer_id=$1", customer).Scan(&granted))
+	if granted {
+		t.Fatal("old restore resurrected consent")
+	}
+	must(r.Restore(ctx, oldDump)) // repeated restore retains the ledger
+	var enabled bool
+	must(a.DB.QueryRow(ctx, "SELECT enabled FROM privacy_policies WHERE store_id=$1", store).Scan(&enabled))
+	if enabled {
+		t.Fatal("restore enabled destructive schedule")
 	}
 	path, e := r.Backup(ctx)
 	must(e)

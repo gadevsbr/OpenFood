@@ -1,7 +1,7 @@
 const { chromium } = require("../tools/qa/node_modules/playwright"), fs = require("fs"), assert = require("assert");
 (async () => {
   for(let i=0;i<60&&!fs.existsSync(process.env.OPENFOOD_UI_TEST_DATA+"/runtime.json");i++)await new Promise(resolve=>setTimeout(resolve,1000));
-  const data = process.env.OPENFOOD_UI_TEST_DATA, url = JSON.parse(fs.readFileSync(data + "/runtime.json")).URL, out = "docs/evidence/combo-stage";
+  const data = process.env.OPENFOOD_UI_TEST_DATA, url = JSON.parse(fs.readFileSync(data + "/runtime.json")).URL, out = process.env.OPENFOOD_UI_EVIDENCE || "docs/evidence/combo-stage";
   fs.mkdirSync(out, { recursive: true });
   const browser = await chromium.launch({ headless: true }), p = await browser.newPage({ viewport: { width: 1440, height: 1e3 }, locale: "pt-BR" });
   p.setDefaultTimeout(15e3);
@@ -99,17 +99,19 @@ const { chromium } = require("../tools/qa/node_modules/playwright"), fs = requir
   await p.locator("#consentForm [name=version]").fill("1");
   await p.locator("#consentForm [name=terms_text]").fill("Aceito receber ofertas por email desta loja · QA");
   await p.locator("#consentForm button").click();
-  await p.locator("#consentsTable tr").filter({ hasText: "marketing_email" }).waitFor();
+  await p.locator("#consentsTable tr").filter({ hasText: "marketing_email" }).filter({hasText:"Cliente combo QA "+suffix}).waitFor();
   await shot("customer-consent");
   p.once("dialog", (d) => d.accept());
-  await p.locator("#consentsTable tr").filter({ hasText: "marketing_email" }).getByRole("button", { name: "Revogar", exact: true }).click();
-  await p.locator("#consentsTable tr").filter({ hasText: "Revogado" }).waitFor();
+  await p.locator("#consentsTable tr").filter({ hasText: "marketing_email" }).filter({hasText:"Cliente combo QA "+suffix}).getByRole("button", { name: "Revogar", exact: true }).click();
+  await p.locator("#consentsTable tr").filter({ hasText: "Revogado" }).filter({hasText:"Cliente combo QA "+suffix}).waitFor();
   await p.locator("#subtabLGPD").click();
   await p.locator("#lgpdDeleteCustomerSelect").selectOption(String(customer));
   await p.locator("#lgpdDeleteConfirm").check();
   await p.locator("#lgpdDeleteBtn").click();
   await p.locator("#privacyRemovalForm [name=privacy_confirm]").check();
   await p.getByRole("button",{name:"Remover identificação e textos vinculados",exact:true}).click();
+  await p.locator("#enterAdmin").waitFor();
+  await p.locator("#enterAdmin").click();
   await p.waitForFunction(async (id) => (await api("customer-export?customer_id=" + id)).customer.anonymized_at !== null, customer);
   const removed = await read("customer-export?customer_id=" + customer);
   assert.equal(removed.customer.phone, null);

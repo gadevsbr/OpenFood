@@ -62,13 +62,12 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
     await p.locator("#menuToggle").click();
   await p.locator("#tabOperacao").click();
   await p.context().setOffline(true);
-  await p.locator("#refresh").click();
-  await p.locator("#connectionNotice:not(.hidden)").waitFor();
+  await p.locator("#privacyShield").waitFor({state:"visible"});
   assert.equal(await p.locator("#orders tr").count(), 4);
   await p.context().setOffline(false);
-  await p.locator("#retryConnection").click();
-  await p.locator("#connectionNotice").waitFor({ state: "hidden" });
-  await p.locator("#dismissMessage").click();
+  await p.locator("#privacyShield").waitFor({state:"hidden"});
+  await p.locator("#refresh").click();
+  if(await p.locator("#dismissMessage").isVisible()) await p.locator("#dismissMessage").click();
   await p.setViewportSize({ width: 390, height: 844 });
   await p
     .locator("#orders tr")
@@ -117,7 +116,7 @@ const { chromium } = require("../tools/qa/node_modules/playwright"),
     status: "PASS",
     passed: [
       "consent register/revoke badge",
-      "offline last-read preservation and retry",
+      "offline privacy shield and successful reconnect",
       "mobile order amount detail",
       "mobile menu focus and inert background",
       "updated screenshot review",

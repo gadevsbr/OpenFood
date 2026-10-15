@@ -50,3 +50,15 @@ Ordem das jornadas incrementais:
 ## Dados e migrações
 
 Nunca use dados de trabalho em QA. Não versione `.env`, dumps, sessões, logs, tokens ou dados pessoais. Gere uma migração nova para cada alteração de esquema; nunca edite migrações aplicadas. Teste upgrade em backup restaurado. Atualize `project-memory` com escopo, decisões e evidências; marque decisões substituídas como `superseded`.
+
+
+## Privacidade 0.16
+
+Com PostgreSQL real: `go test ./internal/app -run TestCustomerPrivacyJourney -count=1`.
+Inclui backup antigo, rollback, retenção concorrente, atividade recente e auditoria.
+Upgrades históricos incluem v10→v11, com fixtures congeladas.
+Chromium: `node scripts/test-ui-privacy-completion.cjs`, usando
+`OPENFOOD_UI_TEST_DATA` em instalação QA isolada. Valida abas paralelas,
+sessão offline/reconectada, retenção/confirmar/simular e desktop/mobile/escuro.
+`scripts/test-linux.py` usa o caminho suportado `restore-compose.py`, incluindo
+backup anterior à remoção. Não execute esses fixtures em dados de trabalho.

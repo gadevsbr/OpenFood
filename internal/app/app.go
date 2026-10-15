@@ -15,6 +15,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -91,7 +92,7 @@ var webUX []byte
 //go:embed food/*.jpg
 var foodImages embed.FS
 
-const Version = "0.15.0-alpha.1"
+const Version = "0.16.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -288,18 +289,18 @@ func (a *App) Migrate(ctx context.Context) error {
 	var checksum string
 	e = tx.QueryRow(ctx, "SELECT version,checksum FROM schema_migrations ORDER BY version DESC LIMIT 1").Scan(&n, &checksum)
 	if errors.Is(e, pgx.ErrNoRows) {
-		fmt.Printf("MIGRATE: Fresh DB detected (ErrNoRows), n=%d, checksum=%s\n", n, checksum)
+		fmt.Fprintf(os.Stderr, "MIGRATE: Fresh DB detected (ErrNoRows), n=%d, checksum=%s\n", n, checksum)
 		if _, e = tx.Exec(ctx, schema); e != nil {
-			fmt.Printf("MIGRATE: schema exec error: %v\n", e)
+			fmt.Fprintf(os.Stderr, "MIGRATE: schema exec error: %v\n", e)
 			return e
 		}
-		fmt.Printf("MIGRATE: schema exec OK\n")
+		fmt.Fprintf(os.Stderr, "MIGRATE: schema exec OK\n")
 		_, e = tx.Exec(ctx, "INSERT INTO schema_migrations(version,checksum) VALUES(3,$1)", Hash(schema))
 		if e != nil {
-			fmt.Printf("MIGRATE: insert version error: %v\n", e)
+			fmt.Fprintf(os.Stderr, "MIGRATE: insert version error: %v\n", e)
 			return e
 		}
-		fmt.Printf("MIGRATE: insert version OK\n")
+		fmt.Fprintf(os.Stderr, "MIGRATE: insert version OK\n")
 		if e = migrateCash(ctx, tx); e != nil {
 			return e
 		}
@@ -321,9 +322,12 @@ func (a *App) Migrate(ctx context.Context) error {
 		if e = migrateSchedule(ctx, tx); e != nil {
 			return e
 		}
+		if e = migratePrivacy(ctx, tx); e != nil {
+			return e
+		}
 		return tx.Commit(ctx)
 	} else if e == nil {
-		fmt.Printf("MIGRATE: Existing DB detected, version=%d, checksum=%s\n", n, checksum)
+		fmt.Fprintf(os.Stderr, "MIGRATE: Existing DB detected, version=%d, checksum=%s\n", n, checksum)
 		if n == 1 {
 			// Migration from v1 to v2 (Organizations, RBAC, Store scoping)
 			migrationSQL := `
@@ -649,7 +653,7 @@ func (a *App) Migrate(ctx context.Context) error {
 			if e != nil {
 				return e
 			}
-		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) && (n != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema)) && (n != 8 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema)) && (n != 9 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema)) && (n != 10 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema+scheduleSchema)) {
+		} else if (n != 3 || checksum != Hash(schema)) && (n != 4 || checksum != Hash(schema+cashSchema)) && (n != 5 || checksum != Hash(schema+cashSchema+posSchema)) && (n != 6 || checksum != Hash(schema+cashSchema+posSchema+diningSchema)) && (n != 7 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema)) && (n != 8 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema)) && (n != 9 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema)) && (n != 10 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema+scheduleSchema)) && (n != 11 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema+scheduleSchema+privacySchema)) {
 			return errors.New("migration_incompatible")
 		}
 	}
@@ -691,11 +695,16 @@ func (a *App) Migrate(ctx context.Context) error {
 			return e
 		}
 	}
+	if n < 11 {
+		if e = migratePrivacy(ctx, tx); e != nil {
+			return e
+		}
+	}
 	return tx.Commit(ctx)
 }
 
 func ValidateSchema(version int, checksum string) error {
-	if version != 10 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema+scheduleSchema) {
+	if version != 11 || checksum != Hash(schema+cashSchema+posSchema+diningSchema+menuSchema+comboSchema+pizzaSchema+scheduleSchema+privacySchema) {
 		return errors.New("migration_incompatible")
 	}
 	return nil
@@ -1086,6 +1095,10 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			a.customersHandler(w, r, targetStore, user)
+		case "/api/privacy-state":
+			a.privacyState(w, r, targetStore, user)
+		case "/api/privacy-policy":
+			a.privacyPolicy(w, r, targetStore, user)
 		case "/api/customer-privacy-review":
 			a.privacyReview(w, r, targetStore, user)
 		case "/api/consents":
@@ -2938,12 +2951,20 @@ func (a *App) WorkOnce(ctx context.Context) error {
 }
 
 func (a *App) Worker(ctx context.Context) {
+	retention := time.NewTicker(time.Minute)
+	defer retention.Stop()
 	timer := time.NewTicker(time.Second)
 	defer timer.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-retention.C:
+			call, cancel := context.WithTimeout(ctx, 45*time.Second)
+			if err := a.RunRetention(call); err != nil {
+				log.Print("privacy_retention_failed")
+			}
+			cancel()
 		case <-timer.C:
 			call, cancel := context.WithTimeout(ctx, 10*time.Second)
 			a.WorkOnce(call)
@@ -3400,20 +3421,9 @@ func (a *App) customerDeleteHandler(w http.ResponseWriter, r *http.Request, stor
 			return
 		}
 	}
-	for _, query := range []string{
-		`UPDATE customers SET name='Cliente sem identificação',phone=NULL,email=NULL,document=NULL,notes=NULL,marketing_consent=false,marketing_consent_at=NULL,anonymized_at=COALESCE(anonymized_at,now()),updated_at=now() WHERE store_id=$1 AND id=$2`,
-		`UPDATE consents SET granted=false,revoked_at=COALESCE(revoked_at,now()),source='anonymized',evidence=NULL,terms_text='' WHERE store_id=$1 AND customer_id=$2`,
-		`UPDATE order_items SET notes=NULL,selection=jsonb_set(selection,'{combo,components}',COALESCE((SELECT jsonb_agg(x - 'notes') FROM jsonb_array_elements(selection#>'{combo,components}') x),'[]')) WHERE store_id=$1 AND order_id IN (SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2) AND selection ? 'combo'`,
-		`UPDATE order_items SET notes=NULL WHERE store_id=$1 AND order_id IN (SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2)`,
-		`UPDATE manual_receipts SET note=CASE WHEN note='' THEN '' ELSE '[texto removido por solicitação]' END WHERE store_id=$1 AND order_id IN(SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2)`,
-		`UPDATE pos_checkouts SET discount_note=CASE WHEN discount_note='' THEN '' ELSE '[texto removido por solicitação]' END WHERE store_id=$1 AND order_id IN(SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2)`,
-		`UPDATE dining_tabs SET label='Comanda #'||id||' · identificação removida',version=version+1 WHERE store_id=$1 AND id IN(SELECT d.tab_id FROM dining_orders d JOIN orders o ON o.store_id=d.store_id AND o.id=d.order_id WHERE o.store_id=$1 AND o.customer_id=$2) AND label<>'Comanda #'||id||' · identificação removida'`,
-		`UPDATE orders SET customer_name='Cliente sem identificação',customer_phone=NULL,customer_email=NULL,notes=NULL WHERE store_id=$1 AND customer_id=$2`,
-	} {
-		if _, e = tx.Exec(r.Context(), query, store, id); e != nil {
-			failure(w, 500, "anonymization_failed")
-			return
-		}
+	if e = removeCustomerData(r.Context(), tx, store, id); e != nil {
+		failure(w, 500, "anonymization_failed")
+		return
 	}
 	if _, e = tx.Exec(r.Context(), "INSERT INTO audit(store_id,user_id,action,entity_id) VALUES($1,$2,'customer_anonymized',$3)", store, user.ID, id); e != nil {
 		failure(w, 500, "anonymization_failed")

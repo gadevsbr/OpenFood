@@ -108,6 +108,10 @@ privacy_customer = api("customers", {"name": "Privacy QA", "email": "privacy-lin
 privacy_product = api("products", {"name": "Privacy item", "price_cents": 1000, "stock_quantity": 2, "active": True, "unit": "unidade"})
 privacy_order = api("orders", {"customer_id": privacy_customer["id"], "items": [{"product_id": privacy_product["id"], "quantity": 1, "notes": "privacy-linux@example.org"}]}, {"Idempotency-Key": "linux-privacy-order"})
 api("consents", {"customer_id": privacy_customer["id"], "purpose": "contact", "version": "qa", "granted": True, "terms_text": "privacy-linux@example.org", "source": "qa"})
+Path("dist").mkdir(exist_ok=True)
+privacy_old = Path("dist/linux-privacy-old.dump")
+with privacy_old.open("wb") as f:
+    command("exec", "-T", "db", "pg_dump", "-U", "openfood", "-d", "openfood", "-Fc", stdout=f)
 privacy_review = api("customer-privacy-review?customer_id=" + str(privacy_customer["id"]))
 assert privacy_review["counts"]["orders"] == 1
 req = urllib.request.Request(base + "/api/customer-delete?customer_id=" + str(privacy_customer["id"]), method="DELETE", headers={"X-OpenFood": "1", "X-Privacy-Review": privacy_review["version"]})
@@ -133,16 +137,40 @@ except urllib.error.HTTPError as error:
     assert json.load(error)["error"] == "product_unavailable"
 
 
+# Old snapshot still contains contact + granted consent. Supported restore must
+# remove both before the HTTP process can expose the restored database.
+from importlib.util import spec_from_file_location, module_from_spec
+spec = spec_from_file_location("restore_compose", "scripts/restore-compose.py")
+restore_module = module_from_spec(spec)
+spec.loader.exec_module(restore_module)
+with tempfile.TemporaryDirectory() as safety_dir:
+    restore_module.restore(privacy_old, Path(safety_dir) / "safety.dump")
+ready()
+jar.clear()
+api("login", {"email": "linux-qa@example.org", "password": password})
+assert "privacy-linux@example.org" not in json.dumps(api("customer-export?customer_id=" + str(privacy_customer["id"])))
+assert not api("consents?customer_id=" + str(privacy_customer["id"]))[0]["granted"]
+# Schedule was saved after this older snapshot; put it back for regression.
+schedule = api("sale-schedule")
+schedule["timezone"] = "UTC"
+schedule["schedule"] = {"enabled": True, "windows": []}
+api("sale-schedule", schedule)
+policy = api("privacy-policy")
+assert not policy["enabled"]
+try:
+    api("privacy-policy", {"version": policy["version"], "enabled": True, "inactive_days": 30})
+    raise AssertionError("Unconfirmed policy accepted")
+except urllib.error.HTTPError as e:
+    assert e.code == 400
+policy = api("privacy-policy", {"version": policy["version"], "enabled": True, "inactive_days": 30, "confirm": True})
+assert policy["enabled"]
+
 with tempfile.TemporaryDirectory() as tmp:
     dump = Path(tmp) / "openfood.dump"
     with dump.open("wb") as file:
         command("exec", "-T", "db", "pg_dump", "-U", "openfood", "-d", "openfood", "-Fc", stdout=file)
     assert dump.read_bytes().startswith(b"PGDMP")
-    command("stop", "app")
-    with dump.open("rb") as file:
-        command("exec", "-T", "db", "pg_restore", "-U", "openfood", "-d", "openfood", "--clean", "--if-exists", "--single-transaction", "--no-owner", "--no-acl", stdin=file)
-    command("exec", "-T", "db", "psql", "-U", "openfood", "-d", "openfood", "-c", "DELETE FROM sessions; UPDATE jobs SET state='failed',last_error_code='restored_requires_review' WHERE state IN ('pending','running');")
-    command("start", "app")
+    restore_module.restore(dump, Path(tmp) / "safety.dump")
     ready()
     jar.clear()
     api("login", {"email": "linux-qa@example.org", "password": password})
@@ -159,3 +187,5 @@ assert api("sale-schedule")["timezone"] == "UTC"
 assert api("sale-schedule")["schedule"]["enabled"]
 assert api("customer-export?customer_id=" + str(privacy_customer["id"]))["customer"]["email"] is None
 print("PASS: manual receipts, split payments, cash closing/refunds across periods and real Compose setup, authentication, catalog, transactional stock, idempotency, order states, pg_dump/pg_restore, restart")
+
+assert not api("privacy-policy")["enabled"]
