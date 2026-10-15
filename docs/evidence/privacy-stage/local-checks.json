@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-14",
+  "timezone": "America/Sao_Paulo",
+  "result": "PASS",
+  "environment": "Windows development host; synthetic isolated PostgreSQL 17.11",
+  "go_full_seconds": 412.212,
+  "focal_seconds": 25.12,
+  "checks": [
+    "upgrades/restoration v1-v9",
+    "go vet",
+    "JavaScript/Python syntax",
+    "git diff check",
+    "npm audit zero",
+    "govulncheck zero reachable; one required-module finding without calls"
+  ],
+  "limits": [
+    "previous backups/exports",
+    "unlinked free-text fields",
+    "automatic retention",
+    "clean-machine certification",
+    "physical peripherals",
+    "fiscal operation"
+  ]
+}

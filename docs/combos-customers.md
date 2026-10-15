@@ -50,3 +50,7 @@ remoção. Valores/IDs/datas, produtos/composição, finalidade/versão/texto do
 operadores e motivos financeiros permanecem. Não colocar contatos pessoais em
 nomes de produtos, identificação de comanda, texto dos termos ou motivos financeiros.
 Revisão desses campos livres, retenção e tombstones em backups continuam no backlog.
+
+## Atualização da política de remoção · 0.15
+
+A descrição anterior que preservava texto dos termos e motivos financeiros está **superseded** pela limpeza ampliada de registros vinculados, com revisão de impacto e preservação dos valores. Sabores de pizza e adicionais compartilhados também já foram entregues nas etapas 0.12/0.13. Consulte o [guia atual de privacidade](privacy.md), inclusive os limites de campos sem vínculo e backups antigos.

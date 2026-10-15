@@ -61,6 +61,9 @@ var webDining []byte
 //go:embed web-menu.js
 var webMenu []byte
 
+//go:embed web-privacy.js
+var webPrivacy []byte
+
 //go:embed web-schedule.js
 var webSchedule []byte
 
@@ -88,7 +91,7 @@ var webUX []byte
 //go:embed food/*.jpg
 var foodImages embed.FS
 
-const Version = "0.14.0-alpha.1"
+const Version = "0.15.0-alpha.1"
 
 // Roles supported by OpenFood RBAC
 const (
@@ -830,6 +833,8 @@ func (a *App) Handler() http.Handler {
 				}
 			}
 			switch r.URL.Path {
+			case "/assets/web-privacy.js":
+				asset, contentType = webPrivacy, "text/javascript; charset=utf-8"
 			case "/assets/web-schedule.js":
 				asset, contentType = webSchedule, "text/javascript; charset=utf-8"
 			case "/assets/web-addons.js":
@@ -1081,6 +1086,8 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			a.customersHandler(w, r, targetStore, user)
+		case "/api/customer-privacy-review":
+			a.privacyReview(w, r, targetStore, user)
 		case "/api/consents":
 			if !user.CanAccessStore(targetStore) {
 				failure(w, 403, "forbidden_cross_store_access")
@@ -2986,7 +2993,7 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 		return
 	}
 	if r.Method == "GET" {
-		rows, e := a.DB.Query(r.Context(), "SELECT id,name,COALESCE(phone,''),COALESCE(email,''),COALESCE(document,''),COALESCE(notes,''),marketing_consent,marketing_consent_at,created_at,updated_at FROM customers WHERE store_id=$1 ORDER BY created_at DESC", store)
+		rows, e := a.DB.Query(r.Context(), "SELECT id,name,COALESCE(phone,''),COALESCE(email,''),COALESCE(document,''),COALESCE(notes,''),marketing_consent,marketing_consent_at,created_at,updated_at,anonymized_at IS NOT NULL FROM customers WHERE store_id=$1 ORDER BY created_at DESC", store)
 		if e != nil {
 			failure(w, 500, "customers_failed")
 			return
@@ -2996,24 +3003,25 @@ func (a *App) customersHandler(w http.ResponseWriter, r *http.Request, store int
 		for rows.Next() {
 			var id int64
 			var name, phone, email, document, notes string
-			var marketingConsent bool
+			var marketingConsent, identificationRemoved bool
 			var marketingConsentAt *time.Time
 			var createdAt, updatedAt time.Time
-			if rows.Scan(&id, &name, &phone, &email, &document, &notes, &marketingConsent, &marketingConsentAt, &createdAt, &updatedAt) != nil {
+			if rows.Scan(&id, &name, &phone, &email, &document, &notes, &marketingConsent, &marketingConsentAt, &createdAt, &updatedAt, &identificationRemoved) != nil {
 				failure(w, 500, "customers_scan_failed")
 				return
 			}
 			result = append(result, map[string]any{
-				"id":                   id,
-				"name":                 name,
-				"phone":                phone,
-				"email":                email,
-				"document":             document,
-				"notes":                notes,
-				"marketing_consent":    marketingConsent,
-				"marketing_consent_at": marketingConsentAt,
-				"created_at":           createdAt,
-				"updated_at":           updatedAt,
+				"id":                     id,
+				"name":                   name,
+				"phone":                  phone,
+				"email":                  email,
+				"document":               document,
+				"notes":                  notes,
+				"marketing_consent":      marketingConsent,
+				"identification_removed": identificationRemoved,
+				"marketing_consent_at":   marketingConsentAt,
+				"created_at":             createdAt,
+				"updated_at":             updatedAt,
 			})
 		}
 		jsonResponse(w, 200, result)
@@ -3318,12 +3326,14 @@ func (a *App) customerExportHandler(w http.ResponseWriter, r *http.Request, stor
 	defer tx.Rollback(r.Context())
 	result := map[string]json.RawMessage{}
 	queries := map[string]string{
-		"customer": `SELECT to_jsonb(c) - 'store_id' FROM customers c WHERE store_id=$1 AND id=$2`,
-		"orders":   `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT id,total_cents,state,financial_state,delivery_type,delivery_fee_cents,notes,created_at,confirmed_at FROM orders WHERE store_id=$1 AND customer_id=$2) x`,
-		"items":    `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT i.id,i.order_id,i.product_id,i.name,i.price_cents,i.quantity,i.unit,i.notes,i.selection FROM order_items i JOIN orders o ON o.store_id=i.store_id AND o.id=i.order_id WHERE o.store_id=$1 AND o.customer_id=$2) x`,
-		"consents": `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT id,purpose,version,granted,granted_at,revoked_at,source,evidence,terms_text FROM consents WHERE store_id=$1 AND customer_id=$2) x`,
-		"payments": `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT p.id,p.order_id,p.provider,p.amount_cents,p.currency,p.status,p.confirmed_at,p.refunded_amount_cents,p.created_at FROM payments p JOIN orders o ON o.store_id=p.store_id AND o.id=p.order_id WHERE o.store_id=$1 AND o.customer_id=$2) x`,
-		"receipts": `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT m.id,m.order_id,m.method,m.amount_cents,m.created_at FROM manual_receipts m JOIN orders o ON o.store_id=m.store_id AND o.id=m.order_id WHERE o.store_id=$1 AND o.customer_id=$2) x`,
+		"customer":  `SELECT to_jsonb(c) - 'store_id' FROM customers c WHERE store_id=$1 AND id=$2`,
+		"orders":    `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT id,total_cents,state,financial_state,delivery_type,delivery_fee_cents,notes,created_at,confirmed_at FROM orders WHERE store_id=$1 AND customer_id=$2) x`,
+		"items":     `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT i.id,i.order_id,i.product_id,i.name,i.price_cents,i.quantity,i.unit,i.notes,i.selection FROM order_items i JOIN orders o ON o.store_id=i.store_id AND o.id=i.order_id WHERE o.store_id=$1 AND o.customer_id=$2) x`,
+		"consents":  `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT id,purpose,version,granted,granted_at,revoked_at,source,evidence,terms_text FROM consents WHERE store_id=$1 AND customer_id=$2) x`,
+		"payments":  `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT p.id,p.order_id,p.provider,p.amount_cents,p.currency,p.status,p.confirmed_at,p.refunded_amount_cents,p.created_at FROM payments p JOIN orders o ON o.store_id=p.store_id AND o.id=p.order_id WHERE o.store_id=$1 AND o.customer_id=$2) x`,
+		"receipts":  `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT m.id,m.order_id,m.method,m.amount_cents,m.note,m.refund_of,m.created_at FROM manual_receipts m JOIN orders o ON o.store_id=m.store_id AND o.id=m.order_id WHERE o.store_id=$1 AND o.customer_id=$2) x`,
+		"checkouts": `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT p.id,p.order_id,p.discount_cents,p.discount_note,p.service,p.payments,p.created_at FROM pos_checkouts p JOIN orders o ON o.store_id=p.store_id AND o.id=p.order_id WHERE o.store_id=$1 AND o.customer_id=$2) x`,
+		"tabs":      `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY id),'[]') FROM (SELECT t.id,t.label,t.state,t.opened_at,t.closed_at FROM dining_tabs t WHERE t.store_id=$1 AND t.id IN(SELECT d.tab_id FROM dining_orders d JOIN orders o ON o.store_id=d.store_id AND o.id=d.order_id WHERE o.store_id=$1 AND o.customer_id=$2)) x`,
 	}
 	for name, query := range queries {
 		var raw []byte
@@ -3370,17 +3380,35 @@ func (a *App) customerDeleteHandler(w http.ResponseWriter, r *http.Request, stor
 		failure(w, 500, "anonymization_failed")
 		return
 	}
+	if e = cashLock(r.Context(), tx, store); e != nil {
+		failure(w, 500, "anonymization_failed")
+		return
+	}
 	var exists bool
 	if e = tx.QueryRow(r.Context(), "SELECT true FROM customers WHERE store_id=$1 AND id=$2 FOR UPDATE", store, id).Scan(&exists); e != nil {
 		failure(w, 404, "customer_not_found")
 		return
 	}
+	if expected := r.Header.Get("X-Privacy-Review"); expected != "" {
+		review, err := readPrivacyReview(r.Context(), tx, store, id)
+		if err != nil {
+			failure(w, 500, "privacy_review_failed")
+			return
+		}
+		if review.Version != expected {
+			failure(w, 409, "privacy_review_changed")
+			return
+		}
+	}
 	for _, query := range []string{
-		`UPDATE customers SET name='Cliente Anonimizado',phone=NULL,email=NULL,document=NULL,notes=NULL,marketing_consent=false,marketing_consent_at=NULL,anonymized_at=COALESCE(anonymized_at,now()),updated_at=now() WHERE store_id=$1 AND id=$2`,
-		`UPDATE consents SET granted=false,revoked_at=COALESCE(revoked_at,now()),source='anonymized',evidence=NULL WHERE store_id=$1 AND customer_id=$2`,
+		`UPDATE customers SET name='Cliente sem identificação',phone=NULL,email=NULL,document=NULL,notes=NULL,marketing_consent=false,marketing_consent_at=NULL,anonymized_at=COALESCE(anonymized_at,now()),updated_at=now() WHERE store_id=$1 AND id=$2`,
+		`UPDATE consents SET granted=false,revoked_at=COALESCE(revoked_at,now()),source='anonymized',evidence=NULL,terms_text='' WHERE store_id=$1 AND customer_id=$2`,
 		`UPDATE order_items SET notes=NULL,selection=jsonb_set(selection,'{combo,components}',COALESCE((SELECT jsonb_agg(x - 'notes') FROM jsonb_array_elements(selection#>'{combo,components}') x),'[]')) WHERE store_id=$1 AND order_id IN (SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2) AND selection ? 'combo'`,
 		`UPDATE order_items SET notes=NULL WHERE store_id=$1 AND order_id IN (SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2)`,
-		`UPDATE orders SET customer_name='Cliente Anonimizado',customer_phone=NULL,customer_email=NULL,notes=NULL WHERE store_id=$1 AND customer_id=$2`,
+		`UPDATE manual_receipts SET note=CASE WHEN note='' THEN '' ELSE '[texto removido por solicitação]' END WHERE store_id=$1 AND order_id IN(SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2)`,
+		`UPDATE pos_checkouts SET discount_note=CASE WHEN discount_note='' THEN '' ELSE '[texto removido por solicitação]' END WHERE store_id=$1 AND order_id IN(SELECT id FROM orders WHERE store_id=$1 AND customer_id=$2)`,
+		`UPDATE dining_tabs SET label='Comanda #'||id||' · identificação removida',version=version+1 WHERE store_id=$1 AND id IN(SELECT d.tab_id FROM dining_orders d JOIN orders o ON o.store_id=d.store_id AND o.id=d.order_id WHERE o.store_id=$1 AND o.customer_id=$2) AND label<>'Comanda #'||id||' · identificação removida'`,
+		`UPDATE orders SET customer_name='Cliente sem identificação',customer_phone=NULL,customer_email=NULL,notes=NULL WHERE store_id=$1 AND customer_id=$2`,
 	} {
 		if _, e = tx.Exec(r.Context(), query, store, id); e != nil {
 			failure(w, 500, "anonymization_failed")

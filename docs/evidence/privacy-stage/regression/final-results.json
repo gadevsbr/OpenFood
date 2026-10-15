@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-14",
+  "status": "PASS",
+  "passed": [
+    "consent register/revoke badge",
+    "offline last-read preservation and retry",
+    "mobile order amount detail",
+    "mobile menu focus and inert background",
+    "updated screenshot review"
+  ],
+  "javascript_errors": []
+}

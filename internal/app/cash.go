@@ -267,6 +267,14 @@ func (a *App) recordReceiptTx(ctx context.Context, tx pgx.Tx, store, user int64,
 		}
 		return 0, err
 	}
+	recordedNote := input.Note
+	var identificationRemoved bool
+	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM orders o JOIN customers c ON c.store_id=o.store_id AND c.id=o.customer_id WHERE o.store_id=$1 AND o.id=$2 AND c.anonymized_at IS NOT NULL)", store, order).Scan(&identificationRemoved); err != nil {
+		return 0, err
+	}
+	if identificationRemoved && recordedNote != "" {
+		recordedNote = "[texto removido por solicitação]"
+	}
 	var integrated bool
 	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM payments WHERE store_id=$1 AND order_id=$2)", store, order).Scan(&integrated); err != nil {
 		return 0, err
@@ -303,7 +311,7 @@ func (a *App) recordReceiptTx(ctx context.Context, tx pgx.Tx, store, user int64,
 	if input.RefundOf > 0 {
 		refund = input.RefundOf
 	}
-	err = tx.QueryRow(ctx, "INSERT INTO manual_receipts(store_id,session_id,order_id,method,amount_cents,user_id,note,refund_of,idempotency_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id", store, session, order, method, amount, user, input.Note, refund, key, digest).Scan(&id)
+	err = tx.QueryRow(ctx, "INSERT INTO manual_receipts(store_id,session_id,order_id,method,amount_cents,user_id,note,refund_of,idempotency_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id", store, session, order, method, amount, user, recordedNote, refund, key, digest).Scan(&id)
 	if err != nil {
 		return 0, err
 	}

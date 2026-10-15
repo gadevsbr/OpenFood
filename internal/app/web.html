@@ -1853,7 +1853,7 @@
             <section>
               <h2>Exportação de dados do titular (Art. 18 LGPD)</h2>
               <p>
-                Gera um arquivo JSON com todos os dados pessoais do cliente,
+                Gera um arquivo JSON com os registros vinculados ao cliente nesta loja,
                 incluindo pedidos, consentimentos e pagamentos.
               </p>
               <div style="margin-bottom: 16px">
@@ -1869,11 +1869,7 @@
             <section style="margin-top: 24px">
               <h2>Remover identificação do cliente</h2>
               <p class="notice">
-                <strong>Atenção:</strong> Se o cliente tiver pedidos não
-                cancelados, os dados serão anonimizados (mantidos para
-                conformidade fiscal) em vez de excluídos. A anonimização remove
-                dados pessoais (nome, telefone, e-mail, documento) mas preserva
-                os registros de pedidos para fins contábeis.
+                <strong>Atenção:</strong> A remoção limpa identificação e textos livres dos registros vinculados, incluindo motivos de recebimento/desconto e rótulos de comandas compartilhadas. Valores, IDs e datas são preservados. Backups e exportações anteriores continuam contendo dados antigos. Campos sem vínculo precisam de revisão manual. Não há retenção automática nem garantia de anonimato.
               </p>
               <div style="margin-bottom: 16px">
                 <label
@@ -1895,7 +1891,7 @@
                 Confirmo que compreendi as consequências</label
               >
               <button id="lgpdDeleteBtn" class="btn-cancel">
-                Anonimizar/Excluir cliente
+                Revisar remoção do cliente
               </button>
             </section>
           </div>
@@ -2481,5 +2477,6 @@
     <script src="/assets/web-pizza.js"></script>
     <script src="/assets/web-addons.js"></script>
     <script src="/assets/web-schedule.js"></script>
+    <script src="/assets/web-privacy.js"></script>
   </body>
 </html>

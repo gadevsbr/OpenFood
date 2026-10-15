@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-14",
+  "result": "PASS",
+  "fixtures": "synthetic isolated PostgreSQL",
+  "checks": [
+    "customer-row and privacy-tools review flows",
+    "explicit confirmation and scope notices",
+    "desktop/mobile/dark without overflow",
+    "stale review refuses overwrite",
+    "consent terms, receipt/refund, discount and tab texts removed",
+    "financial cents preserved",
+    "removed customer excluded from POS lookup",
+    "real JSON export download"
+  ],
+  "javascript_errors": []
+}

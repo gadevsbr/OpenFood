@@ -107,8 +107,9 @@ const { chromium } = require("../tools/qa/node_modules/playwright"), fs = requir
   await p.locator("#subtabLGPD").click();
   await p.locator("#lgpdDeleteCustomerSelect").selectOption(String(customer));
   await p.locator("#lgpdDeleteConfirm").check();
-  p.once("dialog", (d) => d.accept());
   await p.locator("#lgpdDeleteBtn").click();
+  await p.locator("#privacyRemovalForm [name=privacy_confirm]").check();
+  await p.getByRole("button",{name:"Remover identificação e textos vinculados",exact:true}).click();
   await p.waitForFunction(async (id) => (await api("customer-export?customer_id=" + id)).customer.anonymized_at !== null, customer);
   const removed = await read("customer-export?customer_id=" + customer);
   assert.equal(removed.customer.phone, null);

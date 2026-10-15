@@ -103,6 +103,20 @@ shared["group"]["options"][0]["price_cents"] = 399
 shared = api(addon_endpoint, shared)
 assert api("product-configuration?product_id=" + str(addon_products[1]["id"]))["groups"][0]["options"][0]["price_cents"] == 399
 
+# Linked-text removal preserves financial values and survives a new backup/restore.
+privacy_customer = api("customers", {"name": "Privacy QA", "email": "privacy-linux@example.org"})
+privacy_product = api("products", {"name": "Privacy item", "price_cents": 1000, "stock_quantity": 2, "active": True, "unit": "unidade"})
+privacy_order = api("orders", {"customer_id": privacy_customer["id"], "items": [{"product_id": privacy_product["id"], "quantity": 1, "notes": "privacy-linux@example.org"}]}, {"Idempotency-Key": "linux-privacy-order"})
+api("consents", {"customer_id": privacy_customer["id"], "purpose": "contact", "version": "qa", "granted": True, "terms_text": "privacy-linux@example.org", "source": "qa"})
+privacy_review = api("customer-privacy-review?customer_id=" + str(privacy_customer["id"]))
+assert privacy_review["counts"]["orders"] == 1
+req = urllib.request.Request(base + "/api/customer-delete?customer_id=" + str(privacy_customer["id"]), method="DELETE", headers={"X-OpenFood": "1", "X-Privacy-Review": privacy_review["version"]})
+with client.open(req, timeout=30) as res:
+    assert res.status == 200
+privacy_export = api("customer-export?customer_id=" + str(privacy_customer["id"]))
+assert "privacy-linux@example.org" not in json.dumps(privacy_export)
+assert privacy_export["orders"][0]["total_cents"] == 1000
+
 # Weekly schedule applies to new product sales; old order retries remain unchanged after closing.
 schedule = api("sale-schedule")
 assert schedule["timezone"] == "America/Sao_Paulo" and not schedule["schedule"]["enabled"]
@@ -143,4 +157,5 @@ assert api(addon_endpoint)["group"]["options"][0]["stock_quantity"] == 2
 assert len(api(addon_endpoint)["products"]) == 2
 assert api("sale-schedule")["timezone"] == "UTC"
 assert api("sale-schedule")["schedule"]["enabled"]
+assert api("customer-export?customer_id=" + str(privacy_customer["id"]))["customer"]["email"] is None
 print("PASS: manual receipts, split payments, cash closing/refunds across periods and real Compose setup, authentication, catalog, transactional stock, idempotency, order states, pg_dump/pg_restore, restart")

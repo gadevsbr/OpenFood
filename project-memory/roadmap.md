@@ -83,6 +83,7 @@ pelo foco explícito nos itens 1 e 2. Nenhuma funcionalidade nova declarada pron
 ---
 
 ## Fase 4: Clientes, Consentimentos e Privacidade (LGPD-first)
+2026-10-14: etapa 0.15 amplia limpeza de textos vinculados e revisão de impacto; PostgreSQL/Chromium locais PASS, CI/publicação pendentes. [Escopo](privacy-stage.md). Retenção automática, campos sem vínculo e registro/reaplicação de remoções após backup antigo continuam abertos.
 2026-10-11: etapa 0.11 valida vínculo no PDV/rodadas, histórico por loja, texto/versionamento de consentimentos, exportação e remoção manual de identificação. Retenção automática, campos livres e remoções após restaurar backups seguem abertos. [Evidências e limites](combo-customer-stage.md).
 - [ ] **Cadastro de Clientes e Consentimentos**:
   - Identificação de cliente por telefone/e-mail sem compartilhamento automático entre lojas independentes.

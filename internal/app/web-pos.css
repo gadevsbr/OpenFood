@@ -1079,3 +1079,6 @@ kbd {
 .addon-product-links { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:8px; max-height:280px; overflow:auto; padding:8px 0; }
 .addon-product-links .menu-check { padding:10px; border:1px solid var(--line); border-radius:8px; }
 #addonImpact { overflow-wrap:anywhere; }
+.privacy-impact { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px 16px; padding:16px; border:1px solid var(--line); border-radius:10px; }
+.privacy-impact dt,.privacy-impact dd { margin:0; }
+.privacy-impact dd { font-weight:700; font-variant-numeric:tabular-nums; }

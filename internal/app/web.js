@@ -996,7 +996,7 @@ async function loadCustomers() {
       editBtn.textContent = "Editar";
       editBtn.style.fontSize = "12px";
       editBtn.style.padding = "6px 10px";
-      editBtn.disabled=!canManageUsers()||c.name==="Cliente Anonimizado";
+      editBtn.disabled=!canManageUsers()||c.identification_removed;
       editBtn.onclick = () => editCustomer(c);
       actCell.append(editBtn);
       const history=document.createElement("button");history.textContent="Histórico";history.onclick=()=>run(async()=>{const data=await api("customer-export?customer_id="+c.id),body=posDialog("Histórico · "+c.name);body.append(menuNode("p","menu-hint","Pedidos desta loja, com os valores registrados na venda."));for(const order of data.orders){const row=menuNode("section","menu-choice-group");row.append(menuNode("strong","",`Pedido #${order.id} · ${money(order.total_cents)}`),menuNode("p","",`${order.state} · ${new Date(order.created_at).toLocaleString("pt-BR")}`));for(const item of data.items.filter(i=>i.order_id===order.id))row.append(menuNode("p","",`${item.quantity}x ${item.name} · ${money(item.price_cents*Number(item.quantity))}`));body.append(row)}if(!data.orders.length)body.append(menuNode("p","","Nenhum pedido vinculado."))});actCell.append(history);
@@ -1004,16 +1004,10 @@ async function loadCustomers() {
       let delBtn = document.createElement("button");
       delBtn.className = "btn-cancel";
       delBtn.textContent = "Remover identificação";
-      delBtn.disabled=!canManageUsers()||c.name==="Cliente Anonimizado";
+      delBtn.disabled=!canManageUsers()||c.identification_removed;
       delBtn.style.fontSize = "12px";
       delBtn.style.padding = "6px 10px";
-      delBtn.onclick = () =>
-        run(async () => {
-          if (confirm('Remover identificação de "' + c.name + '"? O histórico financeiro será preservado.')) {
-            await apiDelete("customers?id=" + c.id);
-            await loadCustomers();
-          }
-        });
+      delBtn.onclick = () => lgpdDelete(c.id).catch(e=>msg(menuError(e),true));
       actCell.append(delBtn);
       r.append(actCell);
       tbody.append(r);
@@ -1188,37 +1182,9 @@ async function lgpdExport(customerId) {
         new Date().toISOString().split("T")[0] +
         ".json",
     );
-    msg("Exportação concluída. O arquivo contém todos os dados do titular.");
+    msg("Exportação concluída. O arquivo contém os registros vinculados deste cliente na loja selecionada. Proteja o arquivo baixado.");
   } catch (e) {
     msg("Erro na exportação: " + e.message, "error");
-  }
-}
-
-async function lgpdDelete(customerId) {
-  if (
-    !confirm(
-      "Remover identificação, contatos e observações deste cliente? O histórico financeiro será preservado. Backups anteriores podem conter dados antigos. Esta ação não pode ser desfeita.",
-    )
-  )
-    return;
-  try {
-    let res = await fetch("/api/customer-delete?customer_id=" + customerId, {
-      method: "DELETE",
-      headers: { "X-OpenFood": "1", "X-Store-ID": String(currentStoreId) },
-    });
-    if (!res.ok) {
-      if (res.status === 401) show("login");
-      throw Error((await res.json()).error || "Falha na exclusão");
-    }
-    let result = await res.json();
-    if (result.anonymized) {
-      msg("Identificação e contatos removidos; histórico financeiro preservado.");
-    } else {
-      msg("Cliente excluído permanentemente.");
-    }
-    await loadCustomers();
-  } catch (e) {
-    msg("Erro na exclusão/anonimização: " + e.message, "error");
   }
 }
 
@@ -1240,7 +1206,7 @@ $("#lgpdDeleteBtn").onclick = () => {
     msg("Marque a confirmação.");
     return;
   }
-  lgpdDelete(cid);
+  lgpdDelete(cid).catch(e=>msg(menuError(e),true));
 };
 
 // --- Maintenance ---
