@@ -1,5 +1,5 @@
 # Estado
-- 2026-10-14, 0.16: três pontos de privacidade implementados e gate local PG/Chromium PASS; CI/release/hashes pendentes. [Etapa](privacy-completion-stage.md).
+- 2026-10-14, 0.16: três pontos de privacidade validados e publicados; PG/Chromium e CI 38672838655 Windows/Linux/publicação PASS; seis assets, quatro hashes conferidos. Gates pendentes superseded. [Etapa](privacy-completion-stage.md).
 - 2026-10-14: etapa 0.15 revisão/limpeza ampliada de privacidade implementada; PostgreSQL/Chromium e CI 38668909597 Windows/Linux/publicação PASS; seis assets e quatro hashes conferidos, pendências de distribuição superseded. [Escopo](privacy-stage.md). Retenção e reaplicação após backup antigo continuam pendentes.
 - 2026-10-13: horários de venda 0.14 validados e publicados: PostgreSQL/Chromium PASS; CI 38497740815 Linux/Windows/publicação PASS, seis assets e quatro hashes conferidos. Gates de distribuição superseded. [Escopo](schedule-stage.md). Próximo foco: clientes/privacidade; Fases 3/4 abertas.
 - 2026-10-12: adicionais compartilhados 0.13 validados e publicados: PostgreSQL/Chromium PASS; CI 38324219895 Linux/Windows/publicação PASS, seis assets e quatro hashes conferidos. Gates de distribuição superseded. [Escopo](addons-stage.md). Horários por loja/categoria continuam próximos; Fases 3/4 abertas.

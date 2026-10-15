@@ -86,7 +86,7 @@ pelo foco explícito nos itens 1 e 2. Nenhuma funcionalidade nova declarada pron
 2026-10-14, etapa 0.16: os três pontos autorizados foram implementados: registro/reaplicação
 de remoções no staging da restauração; descarte coordenado de rascunhos/telas do PDV;
 política de retenção por loja, simulação e ativação explícita, inicialmente desativada.
-PostgreSQL completo 423.924s, focal 59.444s e Chromium PASS; distribuição em andamento. [Etapa](privacy-completion-stage.md).
+PostgreSQL completo 423.924s, focal 59.444s, Chromium e CI 38672838655 PASS; release experimental publicada com seis assets e quatro hashes conferidos. [Etapa](privacy-completion-stage.md).
 Pendências anteriores desses três mecanismos: superseded no escopo testado, sem
 certificação legal ou apagar arquivos/campos sem vínculo. Fase 4 mantém esses limites explícitos.
 

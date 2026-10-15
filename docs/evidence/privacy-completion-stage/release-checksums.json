@@ -1,0 +1,33 @@
+{
+  "result": "PASS",
+  "checks": [
+    {
+      "file": "OpenFood-0.16.0-alpha.1-ui-evidence.zip",
+      "sha256": "c374143159fe399102de387ba334df568f8e1aec60fc3f6222ddb92d07960eeb",
+      "bytes": 34873209,
+      "manifest_match": true,
+      "github_digest_match": true
+    },
+    {
+      "file": "OpenFood-0.16.0-alpha.1-windows-x64-setup.exe",
+      "sha256": "769047545641dcbc5a2696a58177f7fe662cda66fac2ce174c7207f08aabea0b",
+      "bytes": 33473615,
+      "manifest_match": true,
+      "github_digest_match": true
+    },
+    {
+      "file": "OpenFood-0.16.0-alpha.1-windows-x64.zip",
+      "sha256": "a993552b7ca5320c9f32f6bc6f084caa0a75f5d1e63593e1eee0cea41189d7f7",
+      "bytes": 56533263,
+      "manifest_match": true,
+      "github_digest_match": true
+    },
+    {
+      "file": "OpenFood-0.16.0-alpha.1-linux-x64.tar.gz",
+      "sha256": "8517479e407e9203f5714e8c23a5e4a33a15eafe8ed9778dd649f87c29a2cbda",
+      "bytes": 4743225,
+      "manifest_match": true,
+      "github_digest_match": true
+    }
+  ]
+}
